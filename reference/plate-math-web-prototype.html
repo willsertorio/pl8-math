@@ -1,0 +1,621 @@
+<title>Plate Math</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one phone-width column, step header on top, content stacks; workout screen has two tabs */
+:root{
+  --bg:#eef0f1; --surface:#ffffff; --sunk:#e3e6e8; --fg:#1b2024; --muted:#5d666d; --line:#d3d8dc;
+  --accent:#c8321f; --accent-fg:#ffffff; --steel:#8d979e; --steel-dark:#5a646b;
+  --ok:#2f7a4a;
+  --p-red:#c8321f; --p-blue:#2457a8; --p-yellow:#e2b322; --p-green:#2f8a4e; --p-black:#2a2e31; --p-white:#f3f3f0; --p-silver:#b9c0c5; --p-iron:#737b81;
+  --plate-ink-light:#ffffff; --plate-ink-dark:#1b2024;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14181b; --surface:#1d2226; --sunk:#262c31; --fg:#e8ebed; --muted:#98a2a9; --line:#323a40;
+  --accent:#e2533e; --accent-fg:#14181b; --steel:#7b858c; --steel-dark:#a3adb4; --ok:#5cb87d;
+  --p-black:#3a4045; --p-white:#e6e6e2; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14181b; --surface:#1d2226; --sunk:#262c31; --fg:#e8ebed; --muted:#98a2a9; --line:#323a40;
+  --accent:#e2533e; --accent-fg:#14181b; --steel:#7b858c; --steel-dark:#a3adb4; --ok:#5cb87d;
+  --p-black:#3a4045; --p-white:#e6e6e2; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45;padding-inline:16px;padding-block:20px 48px}
+.app{max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:2.1rem;font-weight:800;line-height:1;text-transform:uppercase}
+h2{font-size:1.5rem;font-weight:700;text-transform:uppercase;line-height:1.05}
+h3{font-size:1.15rem;font-weight:700;text-transform:uppercase}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+.eyebrow{font-family:var(--display);font-weight:600;font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand svg{flex:none}
+.steps{display:flex;gap:6px}
+.steps span{width:28px;height:5px;border-radius:3px;background:var(--line)}
+.steps span.on{background:var(--accent)}
+.back{background:none;border:0;color:var(--muted);font:600 .95rem var(--body);padding:6px 0;cursor:pointer}
+.back:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+.screen{display:flex;flex-direction:column;gap:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+
+/* buttons */
+.btn{appearance:none;border:0;border-radius:12px;padding:15px 18px;font:700 1.15rem var(--display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--accent-fg);width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--fg);border:1.5px solid var(--line)}
+.btn:focus-visible,.seg button:focus-visible,.chip:focus-visible,.tab:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.link{background:none;border:0;padding:0;color:var(--accent);font:600 .95rem var(--body);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+/* upload */
+.drop{border:2px dashed var(--line);border-radius:16px;padding:28px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;cursor:pointer;background:var(--surface);transition:border-color .15s}
+.drop:hover,.drop.over{border-color:var(--accent)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.preview{display:flex;gap:14px;align-items:flex-start}
+.preview img{width:84px;border-radius:8px;border:1px solid var(--line);flex:none}
+.preview .info{min-width:0;display:flex;flex-direction:column;gap:6px}
+.status{display:flex;align-items:center;gap:8px;font-weight:600}
+.spin{width:16px;height:16px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:var(--accent);font-weight:600}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* parsed summary */
+.parsed{display:flex;flex-direction:column;gap:8px}
+.parsed-row{display:flex;justify-content:space-between;gap:10px;font-size:.92rem;border-top:1px solid var(--line);padding-top:8px}
+.parsed-row:first-child{border-top:0;padding-top:0}
+.parsed-row .r{color:var(--muted);text-align:right}
+
+/* inputs */
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{font-weight:600}
+.inrow{display:flex;gap:10px;align-items:stretch}
+.inrow input{flex:1;min-width:0;font:700 1.6rem var(--mono);padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--fg)}
+.seg{display:inline-flex;background:var(--sunk);border-radius:12px;padding:4px;gap:4px;flex:none}
+.seg button{border:0;background:transparent;color:var(--muted);font:700 1.05rem var(--display);letter-spacing:.06em;text-transform:uppercase;padding:8px 14px;border-radius:9px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.seg.wide{display:flex}
+.seg.wide button{flex:1;padding:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:7px 13px;font:600 .95rem var(--mono);cursor:pointer}
+.chip[aria-pressed="false"]{color:var(--muted);text-decoration:line-through;background:transparent}
+.hint{font-size:.85rem;color:var(--muted)}
+
+/* workout */
+.wod-head{display:flex;flex-direction:column;gap:6px}
+.tabs{display:flex;background:var(--sunk);border-radius:12px;padding:4px;gap:4px;position:sticky;top:env(safe-area-inset-top,0px);z-index:2}
+.tab{flex:1;border:0;background:transparent;color:var(--muted);font:700 1.05rem var(--display);letter-spacing:.06em;text-transform:uppercase;padding:11px 8px;border-radius:9px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+
+.kit-list{display:flex;flex-direction:column}
+.kit-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+.kit-row:first-child{border-top:0}
+.kit-row .qty{font:800 2rem var(--display);line-height:1;min-width:2.2ch}
+.kit-txt{display:flex;align-items:baseline;gap:10px;min-width:0;line-height:1}
+.kit-txt .qty{font:600 1.5rem var(--display);color:var(--muted);min-width:2ch;margin:0}
+.kit-txt .kw{font:800 2.1rem var(--display);color:var(--fg)}
+.kit-txt .ku{font:500 .95rem var(--body);color:var(--muted);margin-left:-6px}
+.kit-pic{display:flex;justify-content:flex-end;align-items:center;flex:none}
+.kit-row .qty small{font-size:1.1rem;color:var(--muted);font-weight:600}
+.kit-row .w{font:700 1.3rem var(--mono)}
+.kit-row .w small{font-size:.85rem;color:var(--muted);font-weight:500}
+.kit-total{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding-top:12px;border-top:2px solid var(--fg)}
+
+.group-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.set{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px;display:flex;flex-direction:column;gap:6px}
+.set-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.set-id{display:flex;flex-direction:column;gap:2px}
+.set-no{font:800 2.2rem var(--display);line-height:.95;text-transform:uppercase;color:var(--fg)}
+.set-reps{font:700 1.3rem var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--accent)}
+.set-load{text-align:right;display:flex;flex-direction:column;gap:2px}
+.set-total{font:700 1.35rem var(--display);line-height:1;color:var(--muted)}
+.set:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.set-total small{font-size:.9rem;font-weight:600}
+.set-meta{font-size:.8rem;color:var(--muted);opacity:.8}
+.lift{border:1px solid var(--line);border-radius:16px;background:var(--sunk)}
+.lift summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer}
+.lift summary::-webkit-details-marker{display:none}
+.lift summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:16px}
+.lift-name{font:800 1.4rem var(--display);text-transform:uppercase;line-height:1.05;flex:1;min-width:0}
+.lift-meta{font:600 .95rem var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.lift .chev{flex:none;color:var(--muted);transition:transform .2s}
+.lift[open] .chev{transform:rotate(180deg)}
+.lift.warm{background:transparent;border-style:dashed}
+.lift-body{display:flex;flex-direction:column;gap:10px;padding:0 10px 10px}
+.bar-svg{width:100%;height:auto;display:block}
+.set:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar3d .pl,.bar3d .pl-lbl{transition:transform .42s cubic-bezier(.34,1.45,.55,1),opacity .25s ease}
+.bar3d .pl-lbl{font:700 10px var(--mono);fill:var(--muted);opacity:0}
+.bar3d .pl-lbl.unit{font-weight:500}
+.set.open .bar3d .pl{transform:translateX(calc(var(--i) * 13px + 13px))}
+.set.open .bar3d .pl-lbl{transform:translateX(calc(var(--i) * var(--gx) + var(--gx)))}
+.set.open .bar3d .pl-lbl{opacity:1;fill:var(--fg)}
+.set.open .bar3d .pl-lbl.unit{transform:none;fill:var(--muted)}
+.set-legend{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:4px 8px;font:600 1rem var(--mono);color:var(--fg)}
+.set-legend b{font-weight:700}
+.set-legend small{font-size:.75em;color:var(--muted);font-weight:500;margin-left:2px}
+.set-legend i{font-style:normal;color:var(--muted)}
+.side-list{font:600 .95rem var(--mono);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.side-list .lbl{font-family:var(--body);color:var(--muted);font-weight:500}
+.change{font-size:.875rem;font-weight:600;color:var(--ok)}
+.warn{font-size:.875rem;font-weight:600;color:var(--accent)}
+footer.note{font-size:.8rem;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion: reduce){.spin{animation-duration:2.4s}*{transition:none!important}}
+</style>
+
+<div class="app" id="app"></div>
+
+<script>
+const LB_PER_KG = 2.2046226218;
+const PLATE_SETS = {
+  lb: [55,45,35,25,15,10,5,2.5],
+  kg: [25,20,15,10,5,2.5,1.25]
+};
+const DEFAULT_ON = {lb:[45,35,25,15,10,5,2.5], kg:[25,20,15,10,5,2.5,1.25]};
+const BARS = {lb:[{w:45,l:"45 lb (men's)"},{w:35,l:"35 lb (women's)"},{w:15,l:"15 lb (trainer)"}],
+              kg:[{w:20,l:"20 kg (men's)"},{w:15,l:"15 kg (women's)"},{w:10,l:"10 kg (trainer)"}]};
+const PLATE_COLOR = {
+  lb:{55:"red",45:"blue",35:"yellow",25:"green",15:"black",10:"black",5:"iron",2.5:"silver"},
+  kg:{25:"red",20:"blue",15:"yellow",10:"green",5:"white",2.5:"red",1.25:"silver"}
+};
+
+// Today's WOD as read from the 01/10/2026 screenshot (used for the sample path)
+const SAMPLE_WOD = {
+  title:"WOD · 01/10/2026",
+  lifts:[
+    {name:"Back Squat",part:"A",kind:"percent",prOf:"Back Squat",note:"5-minute EMOM",format:"EMOM",
+      sets:[{reps:3,pctLow:75,pctHigh:78,plus:false},{reps:3,pctLow:75,pctHigh:78,plus:false},
+            {reps:3,pctLow:78,pctHigh:80,plus:false},{reps:3,pctLow:78,pctHigh:80,plus:false},
+            {reps:3,pctLow:80,pctHigh:null,plus:true}]},
+    {name:"Hang Power Clean",part:"B",kind:"fixed",loads:[115,80],unit:"lb",sets:3,note:"Odd sets · max reps after 300m run"},
+    {name:"Front Squat",part:"B",kind:"fixed",loads:[115,80],unit:"lb",sets:3,note:"Even sets · max reps after 300m run"}
+  ]
+};
+
+const state = {
+  step:"upload",            // upload → prs → plates → workout
+  image:null, imageUrl:null, parsing:false, parseError:null,
+  wod:null, pctFix:{},
+  prs:{},                   // prOf → {value, unit}
+  fixedPick:{},             // lift name → index in loads, or -1 to skip
+  boxUnit:"lb", bar:45, plates:{lb:new Set(DEFAULT_ON.lb), kg:new Set(DEFAULT_ON.kg)},
+  tab:"kit", flipped:{}, openLift:0
+};
+try{ const s=JSON.parse(localStorage.getItem("platemath")||"{}");
+  if(s.prs) state.prs=s.prs; if(s.boxUnit){state.boxUnit=s.boxUnit;} if(s.bar) state.bar=s.bar;
+}catch(e){}
+function persist(){ try{localStorage.setItem("platemath",JSON.stringify({prs:state.prs,boxUnit:state.boxUnit,bar:state.bar}))}catch(e){} }
+
+let sample=null, canImages=null, sampleReady=false;
+const samplePromise=(async()=>{ try{ sample = (await window.claude?.use?.("sample")) || null; if(sample){ const l=await sample.limits().catch(()=>null); canImages=l? !!l.images : null; } }catch(e){ sample=null }
+  sampleReady=true; if(state.step==="upload" && !state.parsing) render(); return sample; })();
+
+/* ---------- math ---------- */
+const conv=(w,from,to)=> from===to? w : (to==="kg"? w/LB_PER_KG : w*LB_PER_KG);
+const fmt=w=> (Math.round(w*100)/100).toString();
+const Q=0.25; // work in quarter units so 1.25 and 2.5 stay exact
+function perSideSolver(denoms){
+  // DP: min plate count to make each per-side weight, unlimited plates of each denomination
+  const units = denoms.map(d=>Math.round(d/Q)).sort((a,b)=>b-a);
+  const memo = new Map();
+  return function solve(w){
+    const n = Math.round(w/Q);
+    if(n<0) return null;
+    if(memo.has(n)) return memo.get(n);
+    const best = new Array(n+1).fill(Infinity), pick=new Array(n+1).fill(-1); best[0]=0;
+    for(let i=1;i<=n;i++) for(const u of units){ if(u<=i && best[i-u]+1<best[i]){best[i]=best[i-u]+1;pick[i]=u;} }
+    let res=null;
+    if(best[n]!==Infinity){ res=[]; let i=n; while(i>0){res.push(pick[i]*Q); i-=pick[i];} res.sort((a,b)=>b-a); }
+    memo.set(n,res); return res;
+  };
+}
+function loadable(totalTargetLow,totalTargetHigh,plus,bar,denoms,solve){
+  // enumerate reachable totals near the target and pick per rule
+  const step = Math.min(...denoms)*2;
+  const hiCap = Math.max(totalTargetHigh??totalTargetLow, totalTargetLow) + step*4;
+  const cands=[];
+  for(let t=bar; t<=hiCap+1e-9; t+=step){ const side=(t-bar)/2; const p=solve(side); if(p) cands.push({total:Math.round(t*100)/100,side:p}); }
+  if(!cands.length) return {total:bar, side:[]};
+  const lo=totalTargetLow, hi=totalTargetHigh;
+  let choice;
+  if(plus){ choice = cands.find(c=>c.total>=lo-1e-9) || cands[cands.length-1]; }
+  else if(hi!=null && hi>lo){
+    const inRange = cands.filter(c=>c.total>=lo-1e-9 && c.total<=hi+1e-9);
+    choice = inRange.length? inRange[inRange.length-1] : nearest(cands,(lo+hi)/2);
+  } else choice = nearest(cands,lo);
+  return choice;
+}
+function nearest(c,x){ return c.reduce((a,b)=> Math.abs(b.total-x)<Math.abs(a.total-x)?b:a); }
+
+function computePlan(){
+  const unit=state.boxUnit, bar=state.bar;
+  const denoms=[...state.plates[unit]].sort((a,b)=>b-a);
+  if(!denoms.length) return {groups:[],kit:[],error:"Turn on at least one plate size."};
+  const solve=perSideSolver(denoms);
+  const groups=[];
+  for(const lift of state.wod.lifts){
+    if(lift.kind==="percent"){
+      const pr=state.prs[lift.prOf]; if(!pr||!pr.value) continue;
+      const prBox=conv(pr.value,pr.unit,unit);
+      const sets=lift.sets.map((s,i)=>{
+        const lo=prBox*s.pctLow/100, hi=s.pctHigh!=null? prBox*s.pctHigh/100 : null;
+        const c=loadable(lo,hi,s.plus,bar,denoms,solve);
+        return {label:`Set ${i+1}`, reps:s.reps, pctText: pctLabel(s), total:c.total, side:c.side, belowBar: lo<bar};
+      });
+      groups.push({name:lift.name, format:liftFormat(lift), prUnit:pr.unit, sets});
+    }
+  }
+  // Warm-up: 3 rounds before the first lift, climbing to its first working load
+  if(groups.length){
+    const g0=groups[0], first=g0.sets[0], r=first.reps||1;
+    const pr0=state.prs[state.wod.lifts.find(l=>l.name===g0.name)?.prOf]; const prBox=pr0? conv(pr0.value,pr0.unit,unit) : null;
+    const plan=[[.5,Math.max(5,r)],[.7,Math.max(3,r)],[.85,Math.max(1,r)]];
+    const warm=[]; let last=-1;
+    for(const [f,reps] of plan){
+      const c=loadable(first.total*f,null,false,bar,denoms,solve);
+      if(c.total<=last || c.total>=first.total) continue;
+      last=c.total;
+      warm.push({reps, total:c.total, side:c.side, pctText: prBox? `≈${Math.round(c.total/prBox*100)}% 1RM` : ""});
+    }
+    if(!warm.length) warm.push({reps:Math.max(5,r), total:bar, side:[], pctText:"Empty bar"});
+    warm.forEach((w,i)=>w.label=`Round ${i+1}`);
+    groups.unshift({name:"Warm-up", format:"", warm:true, of:g0.name, prUnit:g0.prUnit, sets:warm});
+  }
+  // kit = most of each plate needed on one side in any set, times two
+  const maxPer={};
+  for(const g of groups) for(const s of g.sets){ const cnt={}; s.side.forEach(p=>cnt[p]=(cnt[p]||0)+1); for(const p in cnt) maxPer[p]=Math.max(maxPer[p]||0,cnt[p]); }
+  const kit=Object.keys(maxPer).map(Number).sort((a,b)=>b-a).map(p=>({w:p,qty:maxPer[p]*2}));
+  return {groups,kit};
+}
+function liftFormat(l){
+  if(l.format) return String(l.format);
+  const m=String(l.note||"").match(/\b(E\d*MOM|EMOM|AMRAP|\d+\s*x\s*\d+|every\s+[\d:]+)/i);
+  return m? m[1].toUpperCase() : "";
+}
+function sideLegend(side,u){
+  const c={}; side.forEach(p=>c[p]=(c[p]||0)+1);
+  return Object.keys(c).map(Number).sort((a,b)=>b-a).map(w=>`<span><b>${c[w]}x</b> ${fmt(w)}<small>${u}</small></span>`).join('<i>+</i>');
+}
+function pctLabel(s){ if(s.plus) return `${s.pctLow}%+`; if(s.pctHigh!=null && s.pctHigh!==s.pctLow) return `${s.pctLow}–${s.pctHigh}%`; return `${s.pctLow}%`; }
+function diffSides(prev,cur){
+  const a={},b={}; prev.forEach(p=>a[p]=(a[p]||0)+1); cur.forEach(p=>b[p]=(b[p]||0)+1);
+  const add=[],rem=[]; new Set([...Object.keys(a),...Object.keys(b)]).forEach(k=>{const d=(b[k]||0)-(a[k]||0); if(d>0) add.push(`${d>1?d+"× ":""}${k}`); if(d<0) rem.push(`${-d>1?(-d)+"× ":""}${k}`);});
+  return {add,rem};
+}
+
+/* ---------- drawing ---------- */
+function plateGeom(w,unit){
+  const max = unit==="lb"?55:25;
+  const big = w>=10;
+  const h = big ? 70 + 22*(w/max) : 34 + 26*(w/10);
+  const t = Math.max(5, 5 + 13*Math.pow(w/max,0.75));
+  return {h,t};
+}
+function plateFill(w,unit){ return `var(--p-${PLATE_COLOR[unit][w]||"black"})`; }
+
+// Whole bar, flat side view, plates mirrored on both sleeves
+function barSVG(side,unit){
+  const W=340,H=112,cy=H/2, collarX=104, sleeveEnd=8;
+  const geoms=side.map(w=>({w,...plateGeom(w,unit)}));
+  const total=geoms.reduce((s,g)=>s+g.t+1.5,0), room=collarX-sleeveEnd-6;
+  const k= total>room? room/total : 1;
+  let out=`<svg class="bar-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Barbell with ${side.length?side.map(fmt).join(", ")+" "+unit+" on each side":"no plates"}">`;
+  out+=`<rect x="${collarX}" y="${cy-3}" width="${W-2*collarX}" height="6" rx="2" style="fill:var(--steel)"/>`;
+  out+=`<rect x="${sleeveEnd}" y="${cy-6}" width="${collarX-sleeveEnd}" height="12" rx="3" style="fill:var(--steel)"/>`;
+  out+=`<rect x="${W-collarX}" y="${cy-6}" width="${collarX-sleeveEnd}" height="12" rx="3" style="fill:var(--steel)"/>`;
+  out+=`<rect x="${collarX-4}" y="${cy-11}" width="8" height="22" rx="2" style="fill:var(--steel-dark)"/>`;
+  out+=`<rect x="${W-collarX-4}" y="${cy-11}" width="8" height="22" rx="2" style="fill:var(--steel-dark)"/>`;
+  let x=collarX-6;
+  geoms.forEach(g=>{
+    const t=g.t*k, h=g.h; x-=t;
+    [x, W-x-t].forEach(px=>{
+      out+=`<rect x="${px.toFixed(1)}" y="${(cy-h/2).toFixed(1)}" width="${t.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(2.5,t/3).toFixed(1)}" style="fill:${plateFill(g.w,unit)};stroke:var(--fg)" stroke-opacity=".25" stroke-width=".8"/>`;
+    });
+    x-=1.5*k;
+  });
+  out+=`</svg>`; return out;
+}
+
+// N plates seen face-on, slightly overlapping, for the kit list
+function platesIcon(w,unit,qty){
+  const {h}=plateGeom(w,unit), r=Math.max(9,h/92*22), step=r*1.35, n=Math.max(1,qty), per=8;
+  const cols=Math.min(n,per), rows=Math.ceil(n/per), rowH=2*r+4;
+  const wd=Math.ceil(2*r+step*(cols-1)+4), ht=Math.ceil(rowH*rows);
+  let s=`<svg width="${wd}" height="${ht}" viewBox="0 0 ${wd} ${ht}" aria-hidden="true">`;
+  for(let i=0;i<n;i++){
+    const cx=2+r+(i%per)*step, cy=2+r+Math.floor(i/per)*rowH;
+    s+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" style="fill:${plateFill(w,unit)};stroke:var(--surface)" stroke-width="2"/>`+
+       `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(r*.78).toFixed(1)}" style="fill:none;stroke:var(--fg)" stroke-opacity=".18"/>`+
+       `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" style="fill:var(--bg);stroke:var(--fg)" stroke-opacity=".3"/>`;
+  }
+  return s+`</svg>`;
+}
+function barIcon(){
+  return `<svg width="64" height="24" viewBox="0 0 64 24" aria-hidden="true"><rect x="2" y="10" width="60" height="4" rx="2" style="fill:var(--steel)"/><rect x="14" y="5" width="4" height="14" rx="1" style="fill:var(--steel-dark)"/><rect x="46" y="5" width="4" height="14" rx="1" style="fill:var(--steel-dark)"/></svg>`;
+}
+
+/* ---------- screens ---------- */
+const $=s=>document.querySelector(s);
+const STEPS=["upload","prs","plates","workout"];
+function header(){
+  const i=STEPS.indexOf(state.step);
+  return `<div class="top">
+    ${i>0?`<button class="back" data-act="back">← Back</button>`:`<div class="brand"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="2" y="13.5" width="26" height="3" rx="1.5" fill="var(--steel)"/><rect x="5" y="6" width="4" height="18" rx="1" fill="var(--p-blue)"/><rect x="21" y="6" width="4" height="18" rx="1" fill="var(--p-blue)"/></svg><span class="eyebrow">Plate Math</span></div>`}
+    ${state.step==="workout"?"":`<div class="steps" aria-label="Step ${i+1} of 4">${STEPS.map((s,j)=>`<span class="${j<=i?"on":""}"></span>`).join("")}</div>`}
+  </div>`;
+}
+
+function viewUpload(){
+  const noClaude = sampleReady && !sample;
+  return `<div class="screen">
+    ${state.imageUrl? `<div class="card"><div class="preview"><img src="${state.imageUrl}" alt="Workout screenshot">${state.imageCount>1?`<span class="small muted">+${state.imageCount-1} more</span>`:""}<div class="info">
+        ${state.parsing?`<div class="status"><span class="spin"></span>${state.parseStage||"Reading the workout…"}</div><p class="small muted">This takes 10–30 seconds.</p>`:""}
+        ${state.parseError?`<p class="err">${state.parseError}</p><button class="link" data-act="pick">Try another screenshot</button>`:""}
+      </div></div></div>`:
+    `<label class="drop" id="drop">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="4" width="22" height="32" rx="4" fill="none" stroke="var(--muted)" stroke-width="2"/><path d="M20 24V13m-5 5 5-5 5 5" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <strong>Upload workout screenshot</strong>
+      <span class="small muted">Long workout? Pick 2 or more screenshots.</span>
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp" multiple>
+    </label>`}
+    ${noClaude?`<p class="hint">Claude isn't reachable from this view. Open the page inside the Claude app or claude.ai.</p>`:""}
+  </div>`;
+}
+
+function prOfsOf(){ return [...new Set(state.wod.lifts.filter(l=>l.kind==="percent").map(l=>l.prOf))]; }
+function missingLifts(){ return state.wod.lifts.map((l,i)=>({l,i})).filter(x=>x.l.kind==="percent"&&x.l.pctMissing); }
+function parsePct(t){
+  const m=String(t||"").replace(/\s/g,"").match(/^(\d{1,3})(?:[-–](\d{1,3}))?(\+)?%?$/);
+  if(!m) return null; const lo=+m[1], hi=m[2]?+m[2]:null;
+  if(lo<=0||lo>150||(hi!=null&&hi<lo)) return null;
+  return {pctLow:lo, pctHigh: m[3]?null:(hi??lo), plus:!!m[3]};
+}
+function canProceed(){
+  const prOfs=prOfsOf();
+  return prOfs.length && prOfs.every(p=>+state.prs[p]?.value>0) && missingLifts().every(x=>parsePct(state.pctFix?.[x.i]));
+}
+function viewPRs(){
+  const prOfs=prOfsOf(), miss=missingLifts();
+  return `<div class="screen">
+    ${prOfs.map((p,i)=>{ const pr=state.prs[p]||{value:"",unit:"lb"}; return `<div class="field">
+      <h2><label for="pr-${i}">What's your ${esc(p)} PR?</label></h2>
+      <div class="inrow"><input id="pr-${i}" data-pr="${esc(p)}" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0" value="${pr.value||""}">
+      <div class="seg" role="group" aria-label="Unit for ${esc(p)}">${["lb","kg"].map(u=>`<button data-prunit="${esc(p)}" data-u="${u}" aria-pressed="${pr.unit===u}">${u}</button>`).join("")}</div></div>
+    </div>`}).join("")}
+    ${miss.map(x=>`<div class="field">
+      <h2><label for="pct-${x.i}">What % for ${esc(x.l.name)}?</label></h2>
+      <p class="hint">Part of this line was hidden in the screenshot.${x.l.sets.length?` ${x.l.sets.length} sets${x.l.sets[0].reps?` of ${x.l.sets[0].reps}`:""}.`:""}</p>
+      <input id="pct-${x.i}" data-pctfix="${x.i}" type="text" inputmode="decimal" placeholder="e.g. 83-85" value="${esc(state.pctFix?.[x.i]||"")}" style="font:700 1.6rem var(--mono);padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--fg)">
+    </div>`).join("")}
+    ${!prOfs.length?`<p class="err">No percentage-based lifts found in this workout.</p>`:""}
+    <button class="btn" data-act="toPlates" ${canProceed()?"":"disabled"}>Next</button>
+  </div>`;
+}
+
+function viewPlates(){
+  const u=state.boxUnit;
+  return `<div class="screen">
+    <h2>What's the gym measure?</h2>
+    <div class="seg wide" role="group" aria-label="Plate unit">${["lb","kg"].map(x=>`<button data-box="${x}" aria-pressed="${u===x}">${x==="lb"?"Pounds (lb)":"Kilos (kg)"}</button>`).join("")}</div>
+    <div class="field"><label>Bar</label>
+      <div class="seg wide" role="group" aria-label="Bar weight">${BARS[u].map(b=>`<button data-bar="${b.w}" aria-pressed="${state.bar===b.w}">${b.w} ${u}</button>`).join("")}</div>
+      <p class="hint">${BARS[u].find(b=>b.w===state.bar)?.l||""}</p>
+    </div>
+    <div class="field"><label>Plates on the rack</label>
+      <div class="chips">${PLATE_SETS[u].map(p=>`<button class="chip" data-plate="${p}" aria-pressed="${state.plates[u].has(p)}">${fmt(p)}</button>`).join("")}</div>
+      <p class="hint">Tap to turn off sizes your box doesn't have.</p>
+    </div>
+    <button class="btn" data-act="toWorkout" ${state.plates[u].size?"":"disabled"}>Show my plates</button>
+  </div>`;
+}
+
+// Show a total in the lifter's PR unit; a flipped card shows the other unit
+function showTotal(total,boxUnit,prUnit,flipped){
+  const shown = flipped ? (prUnit==="kg"?"lb":"kg") : prUnit;
+  const v = conv(total,boxUnit,shown);
+  return {v: shown===boxUnit? fmt(v) : (Math.round(v*10)/10).toString(), u: shown};
+}
+
+function viewWorkout(){
+  const plan=computePlan(), u=state.boxUnit;
+  const lifts=plan.groups.filter(g=>!g.warm);
+  const multi=plan.groups.length>1;
+  const title=lifts.length>1? "Strength" : lifts.map(g=>`${g.name}${g.format?" "+g.format:""}`)[0] || "Workout";
+  let body="";
+  if(plan.error) body=`<p class="err">${plan.error}</p>`;
+  else if(state.tab==="kit"){
+    const totalPlates=plan.kit.reduce((s,k)=>s+k.qty,0);
+    const heavy=Math.max(state.bar,...plan.groups.flatMap(g=>g.sets.map(s=>s.total)));
+    const ht=showTotal(heavy,u,plan.groups[0]?.prUnit||u,false);
+    body=`<div class="card">
+      <div class="kit-list">
+        <div class="kit-row"><div class="kit-txt"><span class="qty">1x</span><span class="kw">${state.bar}</span><span class="ku">${u} bar</span></div><div class="kit-pic">${barIcon()}</div></div>
+        ${plan.kit.map(k=>`<div class="kit-row"><div class="kit-txt"><span class="qty">${k.qty}x</span><span class="kw">${fmt(k.w)}</span><span class="ku">${u}</span></div><div class="kit-pic">${platesIcon(k.w,u,k.qty)}</div></div>`).join("")}
+      </div>
+      <div class="kit-total"><span class="small muted">Heaviest set</span><span class="num" style="font-weight:700">${ht.v} ${ht.u}</span></div>
+    </div>`;
+  } else {
+    const cards=(g,gi)=>g.sets.map((s,i)=>{ const prev=i>0?g.sets[i-1]:null; const d=prev?diffSides(prev.side,s.side):null;
+        const same=d && !d.add.length && !d.rem.length;
+        const t=showTotal(s.total,u,g.prUnit,false);
+        return `<article class="set">
+        <div class="set-top">
+          <div class="set-id"><span class="set-no">${s.label}</span>${s.reps?`<span class="set-reps">${s.reps} ${s.reps===1?"rep":"reps"}</span>`:""}</div>
+          <div class="set-load"><div class="set-total">${t.v}<small> ${t.u}</small></div><div class="set-meta">${s.pctText}</div></div>
+        </div>
+        ${barSVG(s.side,u)}
+        <div class="set-legend">${s.side.length? sideLegend(s.side,u) : "Empty bar"}</div>
+        ${s.belowBar?`<p class="warn">Target is lighter than the bar. Use a lighter bar or the empty bar.</p>`:""}
+        ${prev? (same?`<p class="change">Same as previous set</p>`:`<p class="change">${d.add.length?"Add "+d.add.join(", "):""}${d.add.length&&d.rem.length?" · ":""}${d.rem.length?"Remove "+d.rem.join(", "):""} each side</p>`):""}
+      </article>`}).join("");
+    body= multi
+      ? plan.groups.map((g,gi)=>`<details class="lift${g.warm?" warm":""}" data-lift="${gi}" ${state.openLift===gi?"open":""}>
+          <summary><span class="lift-name">${esc(g.name)}</span><span class="lift-meta">${g.warm? esc(g.of)+" · "+g.sets.length+" rounds" : `${esc(g.format||"")}${g.format?" · ":""}${g.sets.length} sets`}</span><svg class="chev" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4 7l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="lift-body">${cards(g,gi)}</div>
+        </details>`).join("")
+      : `<div class="screen" style="gap:10px">${plan.groups.map(cards).join("")}</div>`;
+  }
+  return `<div class="screen">
+    <h1>${esc(title)}</h1>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="kit" aria-selected="${state.tab==="kit"}">Plate kit</button>
+      <button class="tab" role="tab" data-tab="sets" aria-selected="${state.tab==="sets"}">Set by set</button>
+    </div>
+    ${body}
+  </div>`;
+}
+
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+function render(){
+  const v={upload:viewUpload,prs:viewPRs,plates:viewPlates,workout:viewWorkout}[state.step]();
+  $("#app").innerHTML=header()+v;
+  bindUpload();
+}
+
+/* ---------- parsing ---------- */
+const PROMPT=`This image is a screenshot of a CrossFit class plan. It usually has several lettered blocks (A., B., C.).
+Some blocks are STRENGTH work: one barbell movement repeated for sets, each set loaded as a percentage of a 1-rep max (e.g. "3 Back Squat @75% 1RM Back Squat", "1 Snatch Pull + Snatch @68% 1RM Snatch"). A strength block may also be written as shorthand like "5x3 @80%".
+Other blocks are the WOD / metcon / conditioning: several different movements, often with running, rowing, double unders, gymnastics or bodyweight work, under formats like For Time, AMRAP, RFT or Chipper, sometimes with fixed loads like (115/80). IGNORE those blocks completely, even when they mention a barbell.
+RULE: any line that loads a lift as a percentage (e.g. "@83-85% 1RM Back Squat", "@70%") is STRENGTH work, whatever its block is called ("After Party", "Finisher", "Bonus", "Accessory") and wherever it appears, including after the WOD. A block is a WOD only if it has no percentage loads.
+A block like "5 Minute EMOM" followed by a single line ("2 Back Squat @83-85%") means that line repeated every minute: return 5 sets of 2 reps. "E2MOM 10 min" means 5 sets.
+Part of a line may be hidden or garbled (a button over the text, OCR noise). If a block clearly prescribes a barbell lift with reps and sets in the strength style but its percentage can't be read, still return it with "pctLow": null and "pctHigh": null in each set and "pctMissing": true on the block. Never invent a percentage.
+Read the whole screenshot (or all screenshots, in order) and return EVERY strength block, in the order they appear.
+Reply with only JSON in this shape:
+{"title": "short title, e.g. WOD · 02/10/2026", "lifts": [ ... ]}
+One entry per strength block:
+{"name": "movement as written, e.g. Snatch Pull + Snatch", "part": "A", "kind": "percent", "prOf": "the movement whose 1RM the percentage refers to, e.g. Snatch", "format": "short format label, e.g. EMOM, E2MOM, 5x3, or empty", "note": "format details, e.g. 6-minute EMOM, rest 2 min between sets", "sets": [{"reps": 1, "pctLow": 68, "pctHigh": 68, "plus": false}]}
+One entry in "sets" per set, in order. Expand shorthand like "5x3 @75%" into 5 sets. A range "75-78%" is pctLow 75, pctHigh 78. "80%+" or "80-80+%" is pctLow 80, pctHigh null, plus true. A single "80%" is pctLow 80, pctHigh 80.
+If there is no strength block, reply {"title": "", "lifts": []}.`;
+
+const ERR_COPY={not_granted:"Claude wasn't allowed to read it. Reload and accept the permission prompt.",
+  rate_limited:"Too many requests right now. Try again in a minute.",
+  image_rejected:"That file couldn't be read. Try a PNG or JPG screenshot.",
+  images_unavailable:"This Claude view can't send images.",
+  no_text:"Couldn't find any text in that image. Try a sharper screenshot.",
+  ocr_failed:"The screenshot reader didn't load. Check your connection and try again.",
+  sampling_disabled:"Claude isn't enabled for this account here. Use the sample WOD.",
+  invalid_json:"Couldn't make sense of that workout. Try again or use the sample.",
+  no_claude:"Claude isn't reachable from this view. Open the page in the Claude app or claude.ai."};
+function errText(e){ return ERR_COPY[e?.code] || `Something went wrong reading the workout (${e?.code||"unknown"}). Try again.`; }
+function acceptParsed(data){
+  const lifts=Array.isArray(data?.lifts)? data.lifts.filter(validLift).filter(l=>l.kind==="percent") : [];
+  if(!lifts.length) return false;
+  state.wod={title:String(data.title||"Workout"), lifts}; state.fixedPick={}; state.pctFix={}; state.step="prs"; return true;
+}
+async function parseImage(input){
+  const files=[...(input instanceof Blob? [input] : input)].filter(f=>f&&f.type?.startsWith("image/")).slice(0,4);
+  if(!files.length) return;
+  state.image=files; if(state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+  state.imageUrl=URL.createObjectURL(files[0]); state.imageCount=files.length; state.parseError=null;
+  state.parsing=true; state.parseStage="Reading the screenshot…"; render();
+  try{
+    const s=await samplePromise; if(!s) throw {code:"no_claude"};
+    let data=null;
+    if(canImages){
+      try{ data=await s.json(PROMPT,{images:files}); }
+      catch(e){ if(e?.code!=="images_unavailable") throw e; canImages=false; }
+    }
+    if(!data){
+      // This view can't send images to Claude: read the text on-device, then let Claude interpret it
+      let text="";
+      for(let i=0;i<files.length;i++){
+        if(files.length>1) setStage(`Reading screenshot ${i+1} of ${files.length}…`);
+        text+=(files.length>1?`\n--- Screenshot ${i+1} ---\n`:"")+await ocr(files[i]);
+      }
+      if(!text.trim()) throw {code:"no_text"};
+      setStage("Working out the sets…");
+      data=await s.json(PROMPT.replace("This image is a screenshot of","The text below was read (by OCR, so expect small typos and some hidden words) from a screenshot of")+"\n\nScreenshot text:\n"+text.slice(0,12000));
+    }
+    if(!acceptParsed(data)) state.parseError="Couldn't find a strength block in that screenshot.";
+  }catch(e){ state.parseError=errText(e); }
+  state.parsing=false; render();
+}
+function setStage(t){ state.parseStage=t; const el=document.querySelector(".status"); if(el) el.lastChild.textContent=t; }
+
+let ocrWorker=null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej({code:"ocr_failed"}); document.head.appendChild(s); }); }
+async function ocr(file){
+  if(!ocrWorker){
+    setStage("Loading the reader…");
+    if(!window.Tesseract) await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+    const abs=p=>new URL(p,location.href).href;
+    try{
+      // Small wrapper worker: points the language download at our own file, then loads the real OCR worker
+      const wrap=`const f=self.fetch.bind(self);self.fetch=(u,o)=>f(String(u).includes("eng.traineddata")?${JSON.stringify(abs("ocr/eng-traineddata-gz.wasm"))}:u,o);importScripts(${JSON.stringify(abs("ocr/worker.min.js"))});`;
+      const wurl=URL.createObjectURL(new Blob([wrap],{type:"text/javascript"}));
+      ocrWorker=await Tesseract.createWorker("eng",1,{workerPath:wurl,corePath:abs("ocr/"),langPath:abs("ocr"),gzip:true,workerBlobURL:false,cacheMethod:"none",
+        logger:m=>{ if(m.status==="recognizing text") setStage(`Reading the screenshot… ${Math.round(m.progress*100)}%`); }});
+    }catch(e){ console.error(e); throw {code:"ocr_failed"}; }
+  }
+  setStage("Reading the screenshot…");
+  const {data}=await ocrWorker.recognize(file);
+  return data.text||"";
+}
+function validLift(l){
+  if(!l||!l.name) return false;
+  if(l.kind==="percent"){
+    l.prOf=l.prOf||l.name;
+    l.sets=(l.sets||[]).filter(s=>+s.pctLow>0 || l.pctMissing).map(s=>({reps:s.reps??null,pctLow:+s.pctLow>0?+s.pctLow:null,pctHigh:s.pctHigh!=null&&+s.pctHigh>0?+s.pctHigh:null,plus:!!s.plus}));
+    l.pctMissing=l.sets.some(s=>s.pctLow==null);
+    return l.sets.length>0;
+  }
+  if(l.kind==="fixed"){ l.loads=(l.loads||[]).map(Number).filter(n=>n>0); l.unit=l.unit==="kg"?"kg":"lb"; return l.loads.length>0; }
+  return false;
+}
+
+/* ---------- events ---------- */
+function bindUpload(){
+  const f=$("#file"), d=$("#drop"); if(!f) return;
+  f.addEventListener("change",()=>f.files.length&&parseImage(f.files));
+  d.addEventListener("dragover",e=>{e.preventDefault();d.classList.add("over")});
+  d.addEventListener("dragleave",()=>d.classList.remove("over"));
+  d.addEventListener("drop",e=>{e.preventDefault();d.classList.remove("over");if(e.dataTransfer.files.length) parseImage(e.dataTransfer.files);});
+}
+document.addEventListener("paste",e=>{ if(state.step!=="upload"||state.parsing) return; const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith("image/")); if(it) parseImage(it.getAsFile()); });
+
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button"); if(!t) return;
+  const a=t.dataset.act;
+  if(a==="back"){ const i=STEPS.indexOf(state.step); state.step=STEPS[Math.max(0,i-1)]; if(state.step==="upload"){state.imageUrl=null;state.parseError=null;} return render(); }
+  if(a==="sample"){ state.wod=JSON.parse(JSON.stringify(SAMPLE_WOD)); state.fixedPick={}; state.step="prs"; return render(); }
+  if(a==="pick"){ state.imageUrl=null; state.parseError=null; return render(); }
+  if(a==="toPlates"){
+    missingLifts().forEach(x=>{ const p=parsePct(state.pctFix[x.i]); x.l.sets.forEach(s=>{ if(s.pctLow==null) Object.assign(s,p); }); x.l.pctMissing=false; });
+    persist(); state.step="plates"; return render();
+  }
+  if(a==="toWorkout"){ persist(); state.step="workout"; state.tab="kit"; state.flipped={}; state.openLift=0; return render(); }
+  if(a==="edit"){ state.step="prs"; return render(); }
+  if(t.dataset.prunit){ const p=t.dataset.prunit; state.prs[p]={...(state.prs[p]||{value:""}),unit:t.dataset.u}; persist(); return render(); }
+  if(t.dataset.fixed){ state.fixedPick[t.dataset.fixed]=+t.dataset.i; return render(); }
+  if(t.dataset.box){ const u=t.dataset.box; if(u!==state.boxUnit){ state.boxUnit=u; state.bar=BARS[u][0].w; } persist(); return render(); }
+  if(t.dataset.bar){ state.bar=+t.dataset.bar; persist(); return render(); }
+  if(t.dataset.plate){ const p=+t.dataset.plate, s=state.plates[state.boxUnit]; s.has(p)?s.delete(p):s.add(p); return render(); }
+  if(t.dataset.tab){ state.tab=t.dataset.tab; return render(); }
+});
+document.addEventListener("toggle",e=>{
+  const d=e.target; if(!d.matches?.("details.lift")) return;
+  const i=+d.dataset.lift;
+  if(d.open){ state.openLift=i; document.querySelectorAll("details.lift[open]").forEach(o=>{ if(o!==d) o.open=false; }); }
+  else if(state.openLift===i) state.openLift=-1;
+},true);
+document.addEventListener("input",e=>{
+  const fx=e.target.dataset?.pctfix;
+  if(fx!=null){ state.pctFix=state.pctFix||{}; state.pctFix[fx]=e.target.value; }
+  const p=e.target.dataset?.pr;
+  if(p) state.prs[p]={...(state.prs[p]||{unit:"lb"}),value:e.target.value};
+  const btn=$('[data-act="toPlates"]'); if(btn) btn.disabled=!canProceed();
+});
+
+render();
+</script>
