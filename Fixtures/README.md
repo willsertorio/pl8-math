@@ -69,8 +69,9 @@ Format: `reps @ total [plates per side]`. Totals in the gym's unit.
 - Kit: just the bar
 
 ### Edge: missing small plates · Back Squat PR 100 kg @75–78% ×5 reps · lb gym with only 45, 35, 25, 15, 10 · 45 lb bar
-- Warm-up: `5@85 [10+10]` · `5@125 [25+15]` · `5@145 [35+15]`
+- Warm-up: `5@85 [10+10]` · `5@115 [35]` · `5@145 [35+15]`
 - Back Squat: `5@165 [45+15]`
-- Kit: 2×45, 2×35, 2×25, 2×15, **4×10**
+- Kit: 2×45, 2×35, 2×15, **4×10**
+- (The prototype gave `5@125 [25+15]` for round 2 because it only tried totals in steps of 2 × the smallest plate. Changed to follow SPEC 3.3 — see DECISIONS.md 2026-10-13.)
 
 These numbers come from `reference/plate-math-web-prototype.html`, the web prototype Will tested at the box. If a Swift result differs, check the rule in `SPEC.md` 3.3–3.5 before changing either.

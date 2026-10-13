@@ -14,3 +14,4 @@ Short entries, newest last. Why we chose something, so future-me (and anyone rea
 - **2026-10-11 · Build in 2D first, 3D after.** The math and flow must be right at the box before the 3D layer goes on top.
 - **2026-10-11 · Free Apple developer account for now.** The app expires every 7 days; fine while building. Paid program when it's in weekly use.
 - **2026-10-11 · Rules-first parsing, on device.** The box's format is regular; Vision OCR + rules works offline and free. AI only as a later fallback.
+- **2026-10-13 · Any combination of plates counts as loadable.** The prototype only tried totals in jumps of 2 × the smallest plate, so with only 45/35/25/15/10 lb plates it skipped 115 lb (one 35 a side) for a 115.5 lb target and loaded 125. PlateKit follows SPEC 3.3: any sum of the gym's plates. Fixture updated.
