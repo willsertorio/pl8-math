@@ -146,7 +146,7 @@ Bars — kg: 20 / 15 / 10. lb: 45 / 35 / 15. Collars are ignored.
 ### 3.3 One load
 Inputs: target range (low, optional high, optional "plus"), bar weight, the gym's plate sizes. Plates per side are unlimited.
 
-1. Loadable totals = bar + 2 × (any sum of plate sizes). Step = 2 × smallest plate.
+1. Loadable totals = bar + 2 × (any sum of plate sizes).
 2. Per side, use the **fewest plates**; on ties prefer the **larger plates**. List them heaviest first (inner to outer).
 3. Choose the total:
    - **Range** `75–78%` → the heaviest loadable total inside the range; if none is inside, the one nearest the middle (tie → lighter).
