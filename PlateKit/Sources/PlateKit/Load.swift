@@ -16,6 +16,14 @@ public struct Target: Hashable, Codable, Sendable {
     public static func plus(_ low: Double) -> Target { Target(low: low, plus: true) }
     /// `80%`
     public static func single(_ percent: Double) -> Target { Target(low: percent) }
+
+    /// "75–78%", "80%+" or "80%".
+    public var text: String {
+        let low = WeightUnit.trimmed(self.low)
+        if plus { return "\(low)%+" }
+        if let high, high != self.low { return "\(low)–\(WeightUnit.trimmed(high))%" }
+        return "\(low)%"
+    }
 }
 
 /// What goes on the bar: the total (bar included) and the plates on one side, heaviest (innermost) first.

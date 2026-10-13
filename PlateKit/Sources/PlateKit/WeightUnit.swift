@@ -27,7 +27,7 @@ public enum WeightUnit: String, Codable, CaseIterable, Sendable {
     }
 
     /// "170", "62.5", "1.25" — up to 2 decimals, no trailing zeros.
-    static func trimmed(_ value: Double) -> String {
+    public static func trimmed(_ value: Double) -> String {
         var text = String(format: "%.2f", value)
         while text.hasSuffix("0") { text.removeLast() }
         if text.hasSuffix(".") { text.removeLast() }

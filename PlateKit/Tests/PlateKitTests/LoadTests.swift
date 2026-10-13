@@ -91,3 +91,13 @@ struct LoadTests {
         #expect(kgGym.load(for: .single(80), pr: 225, prUnit: .lb) == Load(total: 82, perSide: [25, 5, 1]))
     }
 }
+
+@Suite("Target text")
+struct TargetTextTests {
+    @Test func rangePlusAndSingle() {
+        #expect(Target.range(75, 78).text == "75–78%")
+        #expect(Target.plus(80).text == "80%+")
+        #expect(Target.single(68).text == "68%")
+        #expect(Target.single(82.5).text == "82.5%")
+    }
+}
