@@ -75,6 +75,28 @@ struct WorkoutFixtureTests {
     }
 }
 
+@Suite("Workout parser · real use")
+struct WorkoutRealUseTests {
+    // Vision on the iPhone read "A." with a Cyrillic А, so block A was missed.
+    @Test func workout1310ReadByVision() throws {
+        let blocks = WorkoutParser.parse(try fixture("2026-10-13.vision.txt"))
+        #expect(blocks.map(\.letter) == ["A"])                      // B (run) and C (planks) ignored
+        let a = try #require(blocks.first)
+        #expect(a.name == "Split Jerk")
+        #expect(a.prLift == "Split Jerk")
+        #expect(a.format == "EMOM")
+        #expect(a.sets.map(\.reps) == Array(repeating: 1, count: 6))
+        #expect(targets(a) == [.single(83), .single(83), .single(85), .single(85), .range(85, 88), .range(85, 88)])
+    }
+
+    @Test func lookalikeLettersInsideWordsAreReadAsLatin() {
+        // "Back" with a Cyrillic а and с.
+        let blocks = WorkoutParser.parse("A.\n3 B\u{0430}\u{0441}k Squat @80% 1RM B\u{0430}\u{0441}k Squat")
+        #expect(blocks.first?.name == "Back Squat")
+        #expect(blocks.first?.prLift == "Back Squat")
+    }
+}
+
 @Suite("Workout parser · rules (SPEC 3.6)")
 struct WorkoutRuleTests {
     @Test func blocksStartAtALetterAndADot() {

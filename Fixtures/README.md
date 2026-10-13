@@ -10,6 +10,7 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 | `2026-10-01.ocr.txt` | Text read from it (Tesseract, during prototyping). Regenerate with Vision in M2 and keep both. |
 | `2026-10-02.png` / `.ocr.txt` | 02/10 |
 | `2026-10-05.png` / `.ocr.txt` | 05/10 — the Back Squat line in block D is hidden under the app's "Check-In" button |
+| `2026-10-13.webp` / `.vision.txt` | 13/10 — read by Vision on the iPhone. Vision read "A." with a **Cyrillic А** (and Cyrillic letters in "TIMECAP"), so the block was missed. |
 
 ### Expected parse
 
@@ -27,6 +28,11 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 - B · Snatch · EMOM · prLift `Snatch` · 6 × 1: `75–80` ×3, `80–83` ×3
 - C (dumbbell snatch + lunges, 50/35): ignored
 - D "After Party" · Back Squat · EMOM · prLift `Back Squat` · 5 × 2 · **pctMissing** (the user then enters `83-85`)
+
+**13/10** (`.vision.txt`)
+- A · Split Jerk · EMOM · prLift `Split Jerk` · 6 × 1: `83, 83, 85, 85, 85–88, 85–88`
+- B (run, double unders, wall walks): ignored
+- C "After a Party" (planks, cut off by Check-In, no %): ignored
 
 ## Golden loads (M1)
 

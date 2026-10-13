@@ -16,7 +16,7 @@ public struct PREntry: Hashable, Codable, Sendable {
 /// Reads PRs from text: `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb` (SPEC 3.7).
 public enum PRParser {
     public static func parse(_ text: String) -> [PREntry] {
-        text.split(whereSeparator: \.isNewline).compactMap { parseLine(String($0)) }
+        OCRText.latinized(text).split(whereSeparator: \.isNewline).compactMap { parseLine(String($0)) }
     }
 
     /// True when some line had no unit: ask once for the whole screenshot.

@@ -60,4 +60,9 @@ struct PRParserTests {
         #expect(filled.map(\.unit) == [.kg, .kg, .lb])               // a unit on the line wins
         #expect(!PRParser.needsUnit(filled))
     }
+
+    @Test func lookalikeLettersAreReadAsLatin() {
+        // "Snatch 85 kg" with a Cyrillic а and к.
+        #expect(PRParser.parse("Sn\u{0430}tch 85 \u{043A}g") == [PREntry(lift: "Snatch", value: 85, unit: .kg)])
+    }
 }

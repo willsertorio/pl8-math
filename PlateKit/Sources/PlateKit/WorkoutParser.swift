@@ -67,7 +67,7 @@ public enum WorkoutParser {
     }
 
     public static func parse(_ text: String) -> [StrengthBlock] {
-        let lines = text.split(whereSeparator: \.isNewline)
+        let lines = OCRText.latinized(text).split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
 
