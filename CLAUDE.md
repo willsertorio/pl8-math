@@ -15,7 +15,7 @@ Will is a product person learning native iOS development with this project (and 
 
 ## Layout
 ```
-pl8/                 the app target (SwiftUI views, SwiftData models, RealityKit scene)
+pl8/                 the app: pl8.xcodeproj + pl8/ sources (SwiftUI views, SwiftData models, RealityKit scene)
 PlateKit/            Swift package: Sources/PlateKit, Tests/PlateKitTests
 Fixtures/            real screenshots, OCR text and expected results (see Fixtures/README.md)
 reference/           the web prototypes and the art/layout values; read-only, never ship
@@ -25,7 +25,7 @@ SPEC.md  CLAUDE.md  DECISIONS.md
 ## How we work
 1. **Tests first for anything in PlateKit.** Turn the spec's examples and `Fixtures/README.md` into tests, see them fail, then implement.
 2. **A task is done only when** `cd PlateKit && swift test` passes and the app builds. For app code, also build:
-   `xcodebuild -scheme pl8 -destination 'platform=iOS Simulator,name=iPhone 16' build`
+   `xcodebuild -project pl8/pl8.xcodeproj -scheme pl8 -destination 'platform=iOS Simulator,name=iPhone 16' build`
    (adjust the simulator name to one installed: `xcrun simctl list devices available`).
 3. **Every bug from real use becomes a fixture + a failing test first**, then the fix.
 4. Keep the rules in one place. If code needs a rule the spec doesn't have, propose the spec change; after Will agrees, update `SPEC.md` and add a line to `DECISIONS.md`.
@@ -38,4 +38,4 @@ SPEC.md  CLAUDE.md  DECISIONS.md
 - `reference/plate-math-web-prototype.html` — the earlier prototype whose plate rules were tested at the box; the golden values come from it.
 
 ## Current milestone
-M0 — repo, Xcode project and PlateKit skeleton. (Update this line as milestones finish.)
+M1 — plate engine. M0 done 2026-10-13. (Update this line as milestones finish.)
