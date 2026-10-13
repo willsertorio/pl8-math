@@ -89,6 +89,22 @@ struct WorkoutRealUseTests {
         #expect(targets(a) == [.single(83), .single(83), .single(85), .single(85), .range(85, 88), .range(85, 88)])
     }
 
+    @Test func workout0110ReadByVision() throws {
+        let blocks = WorkoutParser.parse(try fixture("2026-10-01.vision.txt"))
+        #expect(blocks.count == 1)
+        let a = try #require(blocks.first)
+        #expect(a.letter == "A")
+        #expect(a.name == "Back Squat")
+        #expect(a.format == "EMOM")
+        #expect(targets(a) == [.range(75, 78), .range(75, 78), .range(78, 80), .range(78, 80), .plus(80)])
+    }
+
+    @Test func workout0210AppVersionReadByVision() throws {
+        let blocks = WorkoutParser.parse(try fixture("2026-10-02-app.vision.txt"))
+        #expect(blocks.map(\.name) == ["Snatch Balance"])          // B "10 Back Squats (225/155)" has no %
+        #expect(blocks.first.map(targets) == [68, 68, 73, 73, 75, 75].map { .single($0) })
+    }
+
     @Test func lookalikeLettersInsideWordsAreReadAsLatin() {
         // "Back" with a Cyrillic а and с.
         let blocks = WorkoutParser.parse("A.\n3 B\u{0430}\u{0441}k Squat @80% 1RM B\u{0430}\u{0441}k Squat")
