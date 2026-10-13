@@ -71,15 +71,16 @@ public enum WorkoutParser {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
 
-        var blocks: [(letter: String, lines: [String])] = []
+        var blocks: [(letter: String, label: String?, lines: [String])] = []
         for line in lines {
-            if let match = line.wholeMatch(of: #/([A-Z])\./#) {
-                blocks.append((String(match.1), []))
+            // "A." or "C. After a Party"
+            if let match = line.wholeMatch(of: #/([A-Z])\.(?:\s+(.+))?/#) {
+                blocks.append((String(match.1), match.2.map { clean(String($0)) }, []))
             } else if !blocks.isEmpty {
                 blocks[blocks.count - 1].lines.append(line)
             }
         }
-        return blocks.flatMap { parseBlock(letter: $0.letter, lines: $0.lines) }
+        return blocks.flatMap { parseBlock(letter: $0.letter, label: $0.label, lines: $0.lines) }
     }
 
     // MARK: - Private
@@ -105,9 +106,9 @@ public enum WorkoutParser {
         var notes: [String] = []
     }
 
-    private static func parseBlock(letter: String, lines: [String]) -> [StrengthBlock] {
+    private static func parseBlock(letter: String, label: String?, lines: [String]) -> [StrengthBlock] {
         var header: Header?
-        var label: String?
+        var label = label
         var lifts: [Lift] = []
 
         for text in lines {

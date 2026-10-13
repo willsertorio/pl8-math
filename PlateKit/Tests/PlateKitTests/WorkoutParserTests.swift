@@ -145,6 +145,19 @@ struct WorkoutRuleTests {
         #expect(blocks.map(\.name) == ["Deadlift"])                  // lines before the first block are ignored
     }
 
+    // 02/10 app version: "C. After a Party" on one line.
+    @Test func blockLetterCanHaveItsLabelOnTheSameLine() {
+        let blocks = WorkoutParser.parse("""
+        A.
+        For Time:
+        100 Double Unders
+        C. After a Party
+        3 Back Squat @80% 1RM Back Squat
+        """)
+        #expect(blocks.map(\.letter) == ["C"])
+        #expect(blocks.first?.label == "After a Party")
+    }
+
     @Test func anyPercentLineIsStrengthWhateverTheBlockIsCalled() {
         let blocks = WorkoutParser.parse("""
         A.
