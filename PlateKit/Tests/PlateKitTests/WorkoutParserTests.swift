@@ -99,6 +99,26 @@ struct WorkoutRealUseTests {
         #expect(targets(a) == [.range(75, 78), .range(75, 78), .range(78, 80), .range(78, 80), .plus(80)])
     }
 
+    @Test func workout0210ReadByVision() throws {
+        let blocks = WorkoutParser.parse(try fixture("2026-10-02.vision.txt"))
+        #expect(blocks.map(\.letter) == ["A", "B"])
+        #expect(blocks.map(\.prLift) == ["Snatch Balance", "Snatch"])
+        #expect(blocks.map(\.sets.count) == [6, 8])
+        #expect(blocks.last?.note == "Rest 2 minutes between sets")
+    }
+
+    @Test func workout0510ReadByVision() throws {
+        let blocks = WorkoutParser.parse(try fixture("2026-10-05.vision.txt"))
+        #expect(blocks.map(\.letter) == ["B", "D"])
+        #expect(blocks.first.map(targets) == [.range(75, 80), .range(75, 80), .range(75, 80), .range(80, 83), .range(80, 83), .range(80, 83)])
+        let d = try #require(blocks.last)
+        #expect(d.label == "After Party")
+        #expect(d.name == "Back Squat")
+        #expect(!d.pctMissing)                                       // Vision read the % through the button
+        #expect(d.sets.map(\.reps) == [2, 2, 2, 2, 2])
+        #expect(targets(d) == Array(repeating: .range(83, 85), count: 5))
+    }
+
     @Test func workout0210AppVersionReadByVision() throws {
         let blocks = WorkoutParser.parse(try fixture("2026-10-02-app.vision.txt"))
         #expect(blocks.map(\.name) == ["Snatch Balance"])          // B "10 Back Squats (225/155)" has no %

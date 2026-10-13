@@ -38,4 +38,4 @@ SPEC.md  CLAUDE.md  DECISIONS.md
 - `reference/plate-math-web-prototype.html` — the earlier prototype whose plate rules were tested at the box; the golden values come from it.
 
 ## Current milestone
-M2 — parsers + OCR. M0 done 2026-10-13, M1 done 2026-10-13. (Update this line as milestones finish.)
+M3 — data (SwiftData). M0 done 2026-10-13, M1 done 2026-10-13, M2 done 2026-10-13. (Update this line as milestones finish.)

@@ -11,6 +11,8 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 | `2026-10-02.png` / `.ocr.txt` | 02/10 |
 | `2026-10-05.png` / `.ocr.txt` | 05/10 — the Back Squat line in block D is hidden under the app's "Check-In" button |
 | `2026-10-01.vision.txt` | 01/10 read by Vision on the iPhone (from Will's own screenshot; again a Cyrillic А in "A.") |
+| `2026-10-02.vision.txt` | 02/10 fixture image read by Vision on the iPhone |
+| `2026-10-05.vision.txt` | 05/10 fixture image read by Vision on the iPhone. Vision reads the Back Squat % through the Check-In button, so D is **not** missing its % here (the `.ocr.txt` keeps the hidden-% case) |
 | `2026-10-02-app.vision.txt` | 02/10 as the box's app showed it later, read by Vision (no image saved): block B is a fixed-load AMRAP and C is "C. After a Party" on one line |
 | `2026-10-13.webp` / `.vision.txt` | 13/10 — read by Vision on the iPhone. Vision read "A." with a **Cyrillic А** (and Cyrillic letters in "TIMECAP"), so the block was missed. |
 
@@ -32,6 +34,10 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 - D "After Party" · Back Squat · EMOM · prLift `Back Squat` · 5 × 2 · **pctMissing** (the user then enters `83-85`)
 
 **01/10** (`.vision.txt`): same as 01/10 above.
+
+**02/10** (`.vision.txt`): same as 02/10 above.
+
+**05/10** (`.vision.txt`): same as 05/10 above, except D reads `83–85` ×5 directly (no question).
 
 **02/10, app version** (`2026-10-02-app.vision.txt`)
 - A · Snatch Balance · EMOM · 6 × 1: `68, 68, 73, 73, 75, 75`
