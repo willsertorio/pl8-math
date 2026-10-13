@@ -56,6 +56,20 @@ struct SampleWorkout: Identifiable, Hashable {
         ),
     ]
 
+    static let screenshotID = "From screenshot"
+
+    /// A workout from parsed blocks. Blocks whose % is still missing are left out until answered.
+    static func fromScreenshot(_ blocks: [StrengthBlock]) -> SampleWorkout {
+        let lifts = blocks.compactMap { block -> Lift? in
+            let sets = block.sets.compactMap { set in
+                set.target.map { LiftInput.WorkSet(reps: set.reps, target: $0) }
+            }
+            guard !sets.isEmpty, !block.pctMissing else { return nil }
+            return Lift(name: block.name, prLift: block.prLift, sets: sets)
+        }
+        return SampleWorkout(name: screenshotID, lifts: lifts, prs: [:])
+    }
+
     private static func sets(_ reps: Int, _ targets: [Target]) -> [LiftInput.WorkSet] {
         targets.map { LiftInput.WorkSet(reps: reps, target: $0) }
     }

@@ -1,15 +1,44 @@
+import PhotosUI
 import SwiftUI
+import UIKit
 import PlateKit
 
-/// A test screen for M1: pick a sample workout, set up the gym and PRs, and see every load PlateKit plans.
-/// Not the real design (that's M4+); it's here to try the math on the phone.
+/// A test screen for M1–M2: read a workout screenshot (or pick a sample), set up the gym and PRs,
+/// and see every load PlateKit plans. Not the real design (that's M4+).
 struct PlateCalculatorView: View {
-    @State private var workout = SampleWorkout.all[0]
+    // Workout
+    @State private var workoutID = SampleWorkout.all[0].id
+    @State private var photo: PhotosPickerItem?
+    @State private var isReading = false
+    @State private var readText: String?
+    @State private var readError: String?
+    @State private var blocks: [StrengthBlock] = []
+    @State private var percentAnswers: [Int: String] = [:]
+
+    // Gym
     @State private var unit: WeightUnit = .lb
     @State private var bar: Double = 45
     @State private var plates: Set<Double> = Set(Plate.catalog(.lb).map(\.size))
+
+    // PRs
     @State private var prs: [String: Double] = SampleWorkout.all[0].prs
     @State private var prUnits: [String: WeightUnit] = [:]
+
+    /// Blocks with the user's answers for any hidden %.
+    private var answeredBlocks: [StrengthBlock] {
+        blocks.enumerated().map { index, block in
+            guard block.pctMissing, let target = Target(parsing: percentAnswers[index] ?? "") else { return block }
+            return block.fillingMissingPercent(with: target)
+        }
+    }
+
+    private var workouts: [SampleWorkout] {
+        blocks.isEmpty ? SampleWorkout.all : [SampleWorkout.fromScreenshot(answeredBlocks)] + SampleWorkout.all
+    }
+
+    private var workout: SampleWorkout {
+        workouts.first { $0.id == workoutID } ?? SampleWorkout.all[0]
+    }
 
     private var plan: SessionPlan {
         let gym = GymSetup(unit: unit, plateSizes: Array(plates), barWeight: bar)
@@ -27,10 +56,12 @@ struct PlateCalculatorView: View {
     var body: some View {
         let plan = plan
         Form {
+            screenshotSection
+
             Section("Workout") {
-                Picker("Workout", selection: $workout) {
-                    ForEach(SampleWorkout.all) { sample in
-                        Text(sample.name).tag(sample)
+                Picker("Workout", selection: $workoutID) {
+                    ForEach(workouts) { sample in
+                        Text(sample.name).tag(sample.id)
                     }
                 }
             }
@@ -122,14 +153,104 @@ struct PlateCalculatorView: View {
         }
         .navigationTitle("Plate math")
         .scrollDismissesKeyboard(.interactively)
+        .sensoryFeedback(.success, trigger: blocks)
+        .onChange(of: photo) { _, item in
+            guard let item else { return }
+            Task { await read(item) }
+        }
         .onChange(of: unit) { _, newUnit in
             bar = Bar.weights(newUnit)[0]
             plates = Set(Plate.catalog(newUnit).map(\.size))
         }
-        .onChange(of: workout) { _, newWorkout in
-            prs = newWorkout.prs
-            prUnits = [:]
+        .onChange(of: workoutID) { _, _ in
+            // Sample PRs fill in; PRs you typed for other lifts stay.
+            prs = workout.prs.merging(prs) { sample, _ in sample }
         }
+    }
+
+    // MARK: - Screenshot
+
+    @ViewBuilder
+    private var screenshotSection: some View {
+        Section("Screenshot") {
+            PhotosPicker(selection: $photo, matching: .images) {
+                Label("Upload a screenshot", systemImage: "photo.on.rectangle")
+            }
+
+            if isReading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Reading…")
+                }
+            }
+
+            if let readError {
+                Text(readError).foregroundStyle(.orange)
+            }
+
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(blockTitle(block)).font(.headline)
+                    if let note = block.note {
+                        Text(note).font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if block.pctMissing {
+                        TextField("What % for \(block.name)?", text: answerBinding(index))
+                            .keyboardType(.numbersAndPunctuation)
+                            .textFieldStyle(.roundedBorder)
+                        if let answer = percentAnswers[index], !answer.isEmpty, Target(parsing: answer) == nil {
+                            Text("Try 83-85, 80 or 80+").font(.footnote).foregroundStyle(.orange)
+                        }
+                    } else {
+                        Text(block.sets.compactMap { $0.target?.text }.joined(separator: ", "))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
+            if let readText {
+                DisclosureGroup("Text Vision read") {
+                    Text(readText)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                    Button("Copy text") {
+                        UIPasteboard.general.string = readText
+                    }
+                }
+            }
+        }
+    }
+
+    private func read(_ item: PhotosPickerItem) async {
+        isReading = true
+        readError = nil
+        defer { isReading = false }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                readError = "Couldn't open that image."
+                return
+            }
+            let text = try await TextReader.lines(in: data).joined(separator: "\n")
+            readText = text
+            percentAnswers = [:]
+            blocks = WorkoutParser.parse(text)
+            if blocks.isEmpty {
+                readError = "No strength work found in that screenshot."
+            } else {
+                workoutID = SampleWorkout.screenshotID
+            }
+        } catch {
+            readError = "Couldn't read that image: \(error.localizedDescription)"
+        }
+    }
+
+    /// "D · After Party · Back Squat · EMOM · 5 × 2"
+    private func blockTitle(_ block: StrengthBlock) -> String {
+        let reps = block.sets.first?.reps ?? 0
+        let parts: [String?] = [block.letter, block.label, block.name, block.format, "\(block.sets.count) × \(reps)"]
+        return parts.compactMap { $0 }.joined(separator: " · ")
     }
 
     // MARK: - Helpers
@@ -158,6 +279,10 @@ struct PlateCalculatorView: View {
 
     private func prUnitBinding(_ lift: String) -> Binding<WeightUnit> {
         Binding(get: { prUnits[lift] ?? .kg }, set: { prUnits[lift] = $0 })
+    }
+
+    private func answerBinding(_ index: Int) -> Binding<String> {
+        Binding(get: { percentAnswers[index] ?? "" }, set: { percentAnswers[index] = $0 })
     }
 }
 
