@@ -172,9 +172,6 @@ struct PlateCalculatorView: View {
         .sheet(item: $editingPR) { item in
             PREditor(lift: item.lift, record: record(for: item.lift))
         }
-        .task {
-            seedIfNeeded()
-        }
     }
 
     // MARK: - Screenshot
@@ -336,19 +333,6 @@ struct PlateCalculatorView: View {
         return parts.joined(separator: " · ")
     }
 
-    /// First launch: one gym with every plate, and the default PR list with no values yet.
-    private func seedIfNeeded() {
-        if gyms.isEmpty {
-            context.insert(Gym(name: "MY BOX", unit: .lb))
-        }
-        if records.isEmpty {
-            for lift in LiftNames.defaultPRLifts {
-                context.insert(PersonalRecord(lift: lift))
-            }
-        }
-        try? context.save()
-    }
-
     private func answerBinding(_ index: Int) -> Binding<String> {
         Binding(get: { percentAnswers[index] ?? "" }, set: { percentAnswers[index] = $0 })
     }
@@ -401,77 +385,6 @@ private struct GymEditor: View {
     }
 }
 
-/// Sheet to enter or change one PR. Saving keeps the old value in its history.
-private struct PREditor: View {
-    let lift: String
-    let record: PersonalRecord?
-
-    @Environment(\.modelContext) private var context
-    @Environment(\.dismiss) private var dismiss
-    @State private var value: Double?
-    @State private var unit: WeightUnit = .kg
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("PR", value: $value, format: .number)
-                        .keyboardType(.decimalPad)
-                    Picker("Unit", selection: $unit) {
-                        Text("kg").tag(WeightUnit.kg)
-                        Text("lb").tag(WeightUnit.lb)
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                if let record, !record.history.isEmpty {
-                    Section("Earlier") {
-                        ForEach(record.history.sorted { $0.date > $1.date }) { entry in
-                            LabeledContent(
-                                "\(WeightUnit.trimmed(entry.value)) \(entry.unit.rawValue)",
-                                value: entry.date.formatted(date: .abbreviated, time: .shortened)
-                            )
-                        }
-                    }
-                }
-            }
-            .navigationTitle("\(lift) PR")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        save()
-                        dismiss()
-                    }
-                    .disabled((value ?? 0) <= 0)
-                }
-            }
-            .onAppear {
-                value = record?.value
-                unit = record?.unit ?? .kg
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func save() {
-        guard let value, value > 0 else { return }
-        if let record {
-            if record.value != value || record.unit != unit {
-                record.update(value: value, unit: unit)
-            }
-        } else {
-            let newRecord = PersonalRecord(lift: lift)
-            context.insert(newRecord)
-            newRecord.update(value: value, unit: unit)
-        }
-        try? context.save()
-    }
-}
-
 /// One set: title and total on top, then the % and plates, then what to change.
 private struct SetRow: View {
     let title: String
@@ -497,18 +410,6 @@ private struct SetRow: View {
             }
         }
         .padding(.vertical, 2)
-    }
-}
-
-private extension Color {
-    /// "#D3262E" → Color.
-    init(hex: String) {
-        let value = UInt64(hex.dropFirst(), radix: 16) ?? 0
-        self.init(
-            red: Double((value >> 16) & 0xFF) / 255,
-            green: Double((value >> 8) & 0xFF) / 255,
-            blue: Double(value & 0xFF) / 255
-        )
     }
 }
 
