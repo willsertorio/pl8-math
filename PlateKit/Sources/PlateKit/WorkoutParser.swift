@@ -103,25 +103,94 @@ private func number(_ text: Substring) -> Double? {
 /// Reads strength work from workout text (Vision OCR or typed) — SPEC 3.6.
 public enum WorkoutParser {
     /// Several screenshots of one workout, read in order and joined.
+    /// Several screenshots of one workout (SPEC 3.6 rule 9). They may overlap and may be picked in any order:
+    /// lines a screenshot repeats from an earlier one are dropped, a block letter seen twice keeps its longer
+    /// version, and blocks come out in letter order.
     public static func parse(screenshots: [String]) -> [StrengthBlock] {
-        parse(screenshots.joined(separator: "\n"))
+        var sections: [Section] = []
+        var earlierLines: [String] = []          // normalized, every screenshot so far
+        for (shot, text) in screenshots.enumerated() {
+            let lines = prepare(text)
+            let (leading, shotSections) = split(lines, shot: shot)
+
+            // Lines before this screenshot's first letter continue the previous screenshot's last block,
+            // unless they're the overlap.
+            let fresh = droppingOverlap(leading, earlier: earlierLines)
+            if !fresh.isEmpty, let last = sections.lastIndex(where: { $0.shot == shot - 1 }) {
+                sections[last].lines += fresh
+            }
+
+            for section in shotSections {
+                if let index = sections.firstIndex(where: { $0.letter == section.letter && $0.shot != shot }) {
+                    if section.lines.count > sections[index].lines.count { sections[index] = section }
+                } else {
+                    sections.append(section)
+                }
+            }
+            earlierLines += lines.map(normalized)
+        }
+
+        let ordered = sections.enumerated()
+            .sorted { ($0.element.letter, $0.offset) < ($1.element.letter, $1.offset) }
+            .map(\.element)
+        return ordered.flatMap { parseBlock(letter: $0.letter, label: $0.label, lines: $0.lines) }
     }
 
     public static func parse(_ text: String) -> [StrengthBlock] {
+        parse(screenshots: [text])
+    }
+
+    private struct Section {
+        let letter: String
+        let label: String?
+        var lines: [String]
+        /// Which screenshot it came from.
+        let shot: Int
+    }
+
+    /// Latin letters, trimmed non-empty lines, wrapped lines joined.
+    private static func prepare(_ text: String) -> [String] {
         let lines = OCRText.latinized(text).split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+        return joinWrappedLines(lines)
+    }
 
-        var blocks: [(letter: String, label: String?, lines: [String])] = []
-        for line in joinWrappedLines(lines) {
-            // "A." or "C. After a Party"
+    /// Lines before the first block letter, and the blocks ("A." or "C. After a Party").
+    private static func split(_ lines: [String], shot: Int) -> (leading: [String], sections: [Section]) {
+        var leading: [String] = []
+        var sections: [Section] = []
+        for line in lines {
             if let match = line.wholeMatch(of: #/([A-Z])\.(?:\s+(.+))?/#) {
-                blocks.append((String(match.1), match.2.map { clean(String($0)) }, []))
-            } else if !blocks.isEmpty {
-                blocks[blocks.count - 1].lines.append(line)
+                sections.append(Section(letter: String(match.1), label: match.2.map { clean(String($0)) }, lines: [], shot: shot))
+            } else if sections.isEmpty {
+                leading.append(line)
+            } else {
+                sections[sections.count - 1].lines.append(line)
             }
         }
-        return blocks.flatMap { parseBlock(letter: $0.letter, label: $0.label, lines: $0.lines) }
+        return (leading, sections)
+    }
+
+    /// Finds the longest run of `lines` an earlier screenshot already showed (in a row) and drops everything up to
+    /// its end: the overlap, and the status bar and title above it.
+    private static func droppingOverlap(_ lines: [String], earlier: [String]) -> [String] {
+        let keys = lines.map(normalized)
+        for count in stride(from: keys.count, through: 1, by: -1) {
+            for start in 0...(keys.count - count) {
+                let run = Array(keys[start..<(start + count)])
+                let seen = earlier.count >= count && (0...(earlier.count - count)).contains { from in
+                    Array(earlier[from..<(from + count)]) == run
+                }
+                if seen { return Array(lines.dropFirst(start + count)) }
+            }
+        }
+        return lines
+    }
+
+    /// Compares lines the way OCR repeats them: no spaces, any case.
+    private static func normalized(_ line: String) -> String {
+        line.filter { !$0.isWhitespace }.lowercased()
     }
 
     // MARK: - Private
@@ -145,6 +214,7 @@ public enum WorkoutParser {
         guard previous.firstMatch(of: #/^\d+\s+\S/#) != nil else { return false }
         if line.wholeMatch(of: #/([A-Z])\.(?:\s+(.+))?/#) != nil || parseHeader(line) != nil { return false }
         if let first = line.first, "*-–•".contains(first) { return false }
+        if isAppButton(line) { return false }
         if line.firstMatch(of: #/^\d+\s/#) != nil { return false }
 
         // An RPE line is complete like a % line.
@@ -193,6 +263,8 @@ public enum WorkoutParser {
                 } else {
                     lifts.append(Lift(movement: line.movement, prLift: line.prLift, header: header, lines: [line]))
                 }
+            } else if isAppNoise(text) {
+                continue
             } else if lifts.isEmpty {
                 label = label ?? clean(text)
             } else {
@@ -260,9 +332,9 @@ public enum WorkoutParser {
 
         var prText = ""
         if let rm = rest.firstMatch(of: #/1\s*RM\s*(.*)/#.ignoresCase()) {
-            prText = clean(String(rm.1))
+            prText = liftText(String(rm.1))
         }
-        let move = LiftNames.canonical(String(movement))
+        let move = movementName(String(movement))
         guard !move.isEmpty || !prText.isEmpty else { return nil }
         let prLift = prText.isEmpty ? move : LiftNames.canonical(prText)
 
@@ -280,7 +352,7 @@ public enum WorkoutParser {
         let pattern = #/(?<reps>\d+)\s+(?<move>.+?)\s*@\s*(?:RPE\s*(?<a>\d+(?:[.,]\d+)?)|(?<b>\d+(?:[.,]\d+)?)\s*(?:\/\s*10)?\s*RPE)\b.*/#.ignoresCase()
         guard let match = text.wholeMatch(of: pattern), let reps = Int(match.reps),
               let rpe = (match.a ?? match.b).flatMap(number), rpe > 0, rpe <= 10 else { return nil }
-        let movement = LiftNames.canonical(String(match.move))
+        let movement = movementName(String(match.move))
         return Line(
             movement: movement,
             prLift: LiftNames.firstKnown(in: movement) ?? movement,
@@ -304,6 +376,30 @@ public enum WorkoutParser {
         guard hasFragments || (repeatsLastWord && !text.contains("+")) else { return nil }
 
         return Line(movement: lift, prLift: lift, sets: [ParsedSet(reps: reps, target: nil)], countsItself: false)
+    }
+
+    /// "Deadlift (315/225) (OR" → "Deadlift": fixed loads in brackets and a dangling "or" aren't the movement.
+    static func movementName(_ text: String) -> String {
+        var name = text.replacing(#/\([^)]*\)/#, with: " ")
+        if let open = name.firstIndex(of: "(") { name = String(name[..<open]) }
+        name = name.replacing(#/\s+(?:or|ou)\s*$/#.ignoresCase(), with: "")
+        return LiftNames.canonical(liftText(name))
+    }
+
+    /// The lift after "1RM", without brackets or punctuation around it. Nothing left (e.g. ")") means none.
+    static func liftText(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.symbols).union(.whitespaces))
+        return trimmed.contains(where: \.isLetter) ? trimmed : ""
+    }
+
+    /// The box app's own buttons: "Check-In", "Ações".
+    private static func isAppButton(_ line: String) -> Bool {
+        ["check-in", "ações", "acoes"].contains(line.lowercased())
+    }
+
+    /// Buttons and stray marks ("L 0", "c") that aren't labels or notes.
+    private static func isAppNoise(_ line: String) -> Bool {
+        isAppButton(line) || line.filter(\.isLetter).count < 3
     }
 
     /// "*Rest 2 minutes between sets." → "Rest 2 minutes between sets"

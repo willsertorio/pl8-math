@@ -154,6 +154,39 @@ struct WorkoutRealUseTests {
         #expect(targets(c) == [.single(80), .single(83), .single(85), .plus(85), .plus(85)])
     }
 
+    // Two overlapping screenshots, picked in either order.
+    @Test(arguments: [false, true])
+    func workout1410TwoScreenshots(bottomFirst: Bool) throws {
+        let top = try fixture("2026-10-14-top.vision.txt")
+        let bottom = try fixture("2026-10-14-bottom.vision.txt")
+        let blocks = WorkoutParser.parse(screenshots: bottomFirst ? [bottom, top] : [top, bottom])
+        #expect(blocks.map(\.letter) == ["A", "B", "C", "E"])        // in letter order; D has fixed loads only
+
+        #expect(blocks[2].name == "Power Clean")
+        #expect(blocks[2].sets.count == 5)                            // the overlap isn't counted twice
+
+        let e = blocks[3]
+        #expect(e.label == "After Party")
+        #expect(e.name == "Deadlift")
+        #expect(e.prLift == "Deadlift")                               // not ")"
+        #expect(e.sets.map(\.reps) == [10, 5])
+        #expect(targets(e) == [.single(60), .single(65)])
+        #expect(e.note?.hasPrefix("1000m Bike Erg OR 24/19 cal Echo Bike between sets") == true)
+        #expect(e.note?.contains("Check-In") == false)                // app buttons aren't notes
+    }
+
+    @Test func percentWrappedOnItsOwnLine() {
+        let blocks = WorkoutParser.parse("A.\n1 Clean Pull + 1 Power Clean\n@68-70%\n1RM Power Clean")
+        #expect(blocks.first?.prLift == "Power Clean")
+        #expect(blocks.first.map(targets) == [.range(68, 70)])
+    }
+
+    @Test func fixedLoadsAndOrAreNotPartOfTheName() {
+        let blocks = WorkoutParser.parse("A.\n5 Front Squat (185/125) or 70% 1RM Front Squat")
+        #expect(blocks.first?.name == "Front Squat")
+        #expect(blocks.first?.prLift == "Front Squat")
+    }
+
     @Test func liftAfter1RMOnTheNextLine() {
         let blocks = WorkoutParser.parse("A.\n3 Front Squat @80%\n1RM Front Squat\n3 Front Squat @82%\n1RM Front Squat")
         #expect(blocks.first?.sets.count == 2)

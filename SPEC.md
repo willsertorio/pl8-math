@@ -178,7 +178,7 @@ Input: text lines (from Vision OCR, or typed). Output: strength blocks, each `{n
    Complexes joined with `+` that have no `@`/`%` anywhere (05/10 block A) are technique work, not hidden %, and are ignored.
 7. **RPE instead of %** (`@ 5/10 RPE`, `@ RPE 8`, `@8 RPE`; the `@` is required): the block is strength with the % missing; the app suggests RPE × 10 (5/10 → 50%) as the answer to "What % for …?", which the user confirms or changes. Its PR is the first known lift named in the line (e.g. "Muscle Clean + …" → Clean), changeable in Edit.
 8. **Lift names** match case-insensitively, trimmed, with an alias list (`Back squat` = `Back Squat` = `BS`). Unknown lifts are added to the PR list when the user enters their PR.
-9. Several screenshots of one workout are read in order and joined.
+9. Several screenshots of one workout are read and joined. They may overlap and be picked in any order: lines a screenshot repeats from an earlier one are dropped (with the status bar above them), a block letter seen twice keeps its longer version, and blocks are ordered by letter. Fixed loads in brackets and a dangling "or" are not part of the movement (`10 Deadlift (315/225) (OR 60% 1RM)` → Deadlift); the box app's buttons ("Check-In") aren't notes.
 10. (Later, optional) AI fallback when the rules find nothing.
 
 ### 3.7 Reading PRs

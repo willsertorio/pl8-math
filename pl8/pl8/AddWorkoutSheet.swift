@@ -42,7 +42,7 @@ struct AddWorkoutSheet: View {
                             OptionRow(title: "Upload screenshots", systemImage: "photo.on.rectangle")
                         }
                         .buttonStyle(.plain)
-                        Text("Pick several, in order, if the workout doesn't fit on one screen.")
+                        Text("Pick several if the workout doesn't fit on one screen.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -73,7 +73,7 @@ struct AddWorkoutSheet: View {
         .sensoryFeedback(.success, trigger: readCount)
         .fullScreenCover(isPresented: $showScanner) {
             WhiteboardScanner { image in
-                Task { await read { try await TextReader.lines(in: image) } }
+                Task { await read { [try await TextReader.lines(in: image).joined(separator: "\n")] } }
             }
         }
         .onChange(of: photos) { _, items in
@@ -82,26 +82,27 @@ struct AddWorkoutSheet: View {
             Task {
                 // Several screenshots of one workout are read in order and joined (SPEC 3.6 rule 8).
                 await read {
-                    var lines: [String] = []
+                    var texts: [String] = []
                     for item in items {
                         if let data = try await item.loadTransferable(type: Data.self) {
-                            lines += try await TextReader.lines(in: data)
+                            texts.append(try await TextReader.lines(in: data).joined(separator: "\n"))
                         }
                     }
-                    return lines
+                    return texts
                 }
             }
         }
     }
 
-    /// Reads the text, keeps the strength work, saves it as today's workout.
-    private func read(_ lines: () async throws -> [String]) async {
+    /// Reads each screenshot's text, keeps the strength work, saves it as today's workout.
+    private func read(_ screenshots: () async throws -> [String]) async {
         isReading = true
         message = nil
         defer { isReading = false }
         do {
-            let text = try await lines().joined(separator: "\n")
-            let blocks = WorkoutParser.parse(text)
+            let texts = try await screenshots()
+            let text = texts.joined(separator: "\n\n")
+            let blocks = WorkoutParser.parse(screenshots: texts)
             guard !blocks.isEmpty else {
                 message = "No strength work found. Try again, or type it in."
                 return
