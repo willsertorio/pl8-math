@@ -15,13 +15,29 @@ struct TrainView: View {
         }
     }
 
+    @Environment(\.modelContext) private var context
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
+    @Query private var gyms: [Gym]
+    @Query private var records: [PersonalRecord]
     @AppStorage("hasFinishedFirstRun") private var hasFinishedFirstRun = true
     @State private var sheet: TrainSheet?
-    @State private var started: Workout?
+    @State private var activeSession: Session?
 
     private var today: Workout? {
         workouts.first { Calendar.current.isDateInToday($0.date) }
+    }
+
+    private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+
+    /// Today's session that isn't finished yet, to resume.
+    private func unfinishedSession(of workout: Workout) -> Session? {
+        workout.sessions.first { $0.endedAt == nil }
+    }
+
+    private func start(_ workout: Workout) {
+        guard let gym else { return }
+        let plan = Planner.plan(blocks: workout.blocks, gym: gym, records: records)
+        activeSession = Session.start(workout: workout, plan: plan, gym: gym, in: context)
     }
 
     var body: some View {
@@ -30,8 +46,13 @@ struct TrainView: View {
                 VStack(spacing: 16) {
                     if let today {
                         Whiteboard(blocks: today.blocks, title: "Today")
-                        Button("Start training") { sheet = .ready(today) }
-                            .buttonStyle(.bigBlack)
+                        if let session = unfinishedSession(of: today) {
+                            Button("Resume session") { activeSession = session }
+                                .buttonStyle(.bigBlack)
+                        } else {
+                            Button("Start training") { sheet = .ready(today) }
+                                .buttonStyle(.bigBlack)
+                        }
                         Button("Add a different workout") { sheet = .add }
                             .buttonStyle(.black)
                     } else {
@@ -57,8 +78,8 @@ struct TrainView: View {
             }
             .background(Theme.background)
             .navigationTitle("Train")
-            .navigationDestination(item: $started) { workout in
-                PlanView(workout: workout)
+            .navigationDestination(item: $activeSession) { session in
+                SessionView(session: session) { activeSession = nil }
             }
             .sheet(item: $sheet) { item in
                 switch item {
@@ -67,7 +88,7 @@ struct TrainView: View {
                 case .ready(let workout):
                     ReadyToLiftSheet(workout: workout) { workout in
                         sheet = nil
-                        started = workout
+                        start(workout)
                     }
                 }
             }

@@ -310,14 +310,7 @@ struct PlateCalculatorView: View {
 
     private func saveSession(_ plan: SessionPlan) {
         guard let gym else { return }
-        let session = Session(gym: gym, workout: savedWorkout, plan: plan)
-        context.insert(session)
-        for (order, record) in plan.setRecords.enumerated() {
-            let log = SetLog(order: order, record: record)
-            context.insert(log)
-            session.setLogs.append(log)
-        }
-        try? context.save()
+        _ = Session.start(workout: savedWorkout, plan: plan, gym: gym, in: context)
     }
 
     /// "14 Oct, 09:30 · MY BOX · 14 sets · top 260 lb"

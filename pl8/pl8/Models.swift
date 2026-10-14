@@ -145,6 +145,8 @@ final class Session {
     var workout: Workout?
     /// Lift names by block index, so history reads well even if the workout is deleted.
     var liftNames: [String]
+    /// Each lift's PR unit by block index: totals are shown in it (SPEC 3.2).
+    var prUnits: [WeightUnit] = []
 
     // Gym snapshot: later changes to the gym don't change history.
     var gymName: String
@@ -163,6 +165,7 @@ final class Session {
         self.createdAt = .now
         self.workout = workout
         self.liftNames = plan.lifts.map(\.name)
+        self.prUnits = plan.lifts.map(\.prUnit)
         self.gymName = gym.name
         self.gymUnit = gym.unit
         self.barWeight = gym.barWeight
@@ -172,6 +175,27 @@ final class Session {
     /// SwiftData doesn't keep a relationship's order, so each log has an `order`.
     var orderedLogs: [SetLog] {
         setLogs.sorted { $0.order < $1.order }
+    }
+
+    func liftName(for blockIndex: Int) -> String {
+        liftNames.indices.contains(blockIndex) ? liftNames[blockIndex] : "Lift"
+    }
+
+    func prUnit(for blockIndex: Int) -> WeightUnit {
+        prUnits.indices.contains(blockIndex) ? prUnits[blockIndex] : gymUnit
+    }
+
+    /// Saves a new session with every planned set, ready to check off.
+    static func start(workout: Workout?, plan: SessionPlan, gym: Gym, in context: ModelContext) -> Session {
+        let session = Session(gym: gym, workout: workout, plan: plan)
+        context.insert(session)
+        for (order, record) in plan.setRecords.enumerated() {
+            let log = SetLog(order: order, record: record)
+            context.insert(log)
+            session.setLogs.append(log)
+        }
+        try? context.save()
+        return session
     }
 
     var heaviestTotal: Double? {

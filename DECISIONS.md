@@ -20,3 +20,4 @@ Short entries, newest last. Why we chose something, so future-me (and anyone rea
 - **2026-10-14 · History is a 4th tab.** Train · PRs · Gym · History; simplest in 2D, and the 3D wall calendar can link to it later.
 - **2026-10-14 · "Type it in" is the simple form.** Lift, sets, reps, one %: fastest between sets. Per-set % still comes from screenshots.
 - **2026-10-14 · M4 uses the spec look with the system font.** Black on white, square black buttons, outlined fields, orange background (SPEC 2.5) now, so screens aren't restyled later. Space Grotesk comes in when the font file is added.
+- **2026-10-14 · Sessions keep each lift's PR unit.** Set totals are shown in the PR's unit (SPEC 3.2); storing `prUnits` with the session keeps that right even if a PR changes later.
