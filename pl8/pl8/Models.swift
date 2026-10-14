@@ -100,6 +100,8 @@ final class Workout {
     var sourceText: String
     /// The blocks, saved as JSON so SwiftData only stores plain data.
     private var blocksData: Data
+    @Relationship(deleteRule: .nullify, inverse: \Session.workout)
+    var sessions: [Session] = []
 
     init(sourceText: String, blocks: [StrengthBlock], date: Date = .now) {
         self.date = date
@@ -118,5 +120,77 @@ final class Workout {
             if !names.contains(name) { names.append(name) }
         }
         return "\(date.formatted(.dateTime.day().month().hour().minute())) · \(lifts.joined(separator: ", "))"
+    }
+}
+
+/// One training session: a snapshot of the gym and every planned set (SPEC Part 4).
+@Model
+final class Session {
+    var id = UUID()
+    var createdAt: Date
+    var workout: Workout?
+    /// Lift names by block index, so history reads well even if the workout is deleted.
+    var liftNames: [String]
+
+    // Gym snapshot: later changes to the gym don't change history.
+    var gymName: String
+    var gymUnit: WeightUnit
+    var barWeight: Double
+    var plateSizes: [Double]
+
+    /// Set when the first and last sets are checked (M4).
+    var startedAt: Date?
+    var endedAt: Date?
+
+    @Relationship(deleteRule: .cascade, inverse: \SetLog.session)
+    var setLogs: [SetLog] = []
+
+    init(gym: Gym, workout: Workout?, plan: SessionPlan) {
+        self.createdAt = .now
+        self.workout = workout
+        self.liftNames = plan.lifts.map(\.name)
+        self.gymName = gym.name
+        self.gymUnit = gym.unit
+        self.barWeight = gym.barWeight
+        self.plateSizes = gym.plateSizes
+    }
+
+    /// SwiftData doesn't keep a relationship's order, so each log has an `order`.
+    var orderedLogs: [SetLog] {
+        setLogs.sorted { $0.order < $1.order }
+    }
+
+    var heaviestTotal: Double? {
+        setLogs.filter { !$0.isWarmUp }.map(\.plannedTotal).max()
+    }
+}
+
+/// One set of a session.
+@Model
+final class SetLog {
+    var order: Int
+    var blockIndex: Int
+    var setIndex: Int
+    var isWarmUp: Bool
+    var reps: Int
+    var pctText: String
+    var plannedTotal: Double
+    var unit: WeightUnit
+    var perSide: [Double]
+    var checkedAt: Date?
+    /// What the user said they lifted (last set of each lift).
+    var reportedTotal: Double?
+    var session: Session?
+
+    init(order: Int, record: PlannedSetRecord) {
+        self.order = order
+        self.blockIndex = record.blockIndex
+        self.setIndex = record.setIndex
+        self.isWarmUp = record.isWarmUp
+        self.reps = record.reps
+        self.pctText = record.pctText
+        self.plannedTotal = record.plannedTotal
+        self.unit = record.unit
+        self.perSide = record.perSide
     }
 }

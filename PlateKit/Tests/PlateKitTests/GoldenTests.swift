@@ -115,3 +115,39 @@ struct SessionPlanTests {
         #expect(plan.kit.plates.isEmpty)
     }
 }
+
+@Suite("Set records for history (SPEC Part 4 SetLog)")
+struct SetRecordTests {
+    @Test func warmUpThenEveryWorkingSetInOrder() {
+        let plan = SessionPlan(gym: GymSetup(unit: .lb), lifts: GoldenTests.session0510)
+        let records = plan.setRecords
+        #expect(records.count == 3 + 6 + 5)
+
+        let first = records[0]
+        #expect(first.isWarmUp)
+        #expect(first.blockIndex == 0)
+        #expect(first.setIndex == 0)
+        #expect(first.reps == 5)
+        #expect(first.pctText == "≈37% 1RM")                       // 70 lb of 187.4 lb
+        #expect(first.plannedTotal == 70)
+        #expect(first.unit == .lb)
+        #expect(first.perSide == [10, 2.5])
+
+        let squat = records[9]
+        #expect(!squat.isWarmUp)
+        #expect(squat.blockIndex == 1)
+        #expect(squat.setIndex == 0)
+        #expect(squat.reps == 2)
+        #expect(squat.pctText == "83–85%")
+        #expect(squat.plannedTotal == 260)
+        #expect(squat.perSide == [55, 45, 5, 2.5])
+
+        #expect(records.last?.setIndex == 4)
+    }
+
+    @Test func heaviestSet() {
+        let plan = SessionPlan(gym: GymSetup(unit: .lb), lifts: GoldenTests.session0510)
+        #expect(plan.heaviestSet?.plannedTotal == 260)
+        #expect(SessionPlan(gym: GymSetup(unit: .kg), lifts: []).heaviestSet == nil)
+    }
+}

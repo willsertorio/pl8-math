@@ -22,6 +22,7 @@ struct PlateCalculatorView: View {
     @Query private var gyms: [Gym]
     @Query private var records: [PersonalRecord]
     @Query(sort: \Workout.date, order: .reverse) private var savedWorkouts: [Workout]
+    @Query(sort: \Session.createdAt, order: .reverse) private var sessions: [Session]
     @State private var editingPR: EditingPR?
 
     private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
@@ -137,8 +138,23 @@ struct PlateCalculatorView: View {
             }
 
             Section {
+                Button("Save session") { saveSession(plan) }
+                    .disabled(plan.lifts.isEmpty || gym == nil)
+                ForEach(sessions) { session in
+                    NavigationLink {
+                        SessionDetailView(session: session)
+                    } label: {
+                        Text(sessionTitle(session))
+                    }
+                }
+                .onDelete { offsets in
+                    for index in offsets { context.delete(sessions[index]) }
+                    try? context.save()
+                }
+            } header: {
+                Text("Sessions")
             } footer: {
-                Text("PlateKit \(PlateKit.version)")
+                Text("Saves the plan above with today's gym. Swipe left to delete.\nPlateKit \(PlateKit.version)")
             }
         }
         .navigationTitle("Plate math")
@@ -292,6 +308,31 @@ struct PlateCalculatorView: View {
     private func platesText(_ perSide: [Double]) -> String {
         if perSide.isEmpty { return "Empty bar" }
         return perSide.map(WeightUnit.trimmed).joined(separator: " + ") + " \(unit.rawValue) each side"
+    }
+
+    private func saveSession(_ plan: SessionPlan) {
+        guard let gym else { return }
+        let session = Session(gym: gym, workout: savedWorkout, plan: plan)
+        context.insert(session)
+        for (order, record) in plan.setRecords.enumerated() {
+            let log = SetLog(order: order, record: record)
+            context.insert(log)
+            session.setLogs.append(log)
+        }
+        try? context.save()
+    }
+
+    /// "14 Oct, 09:30 · MY BOX · 14 sets · top 260 lb"
+    private func sessionTitle(_ session: Session) -> String {
+        var parts = [
+            session.createdAt.formatted(.dateTime.day().month().hour().minute()),
+            session.gymName,
+            "\(session.setLogs.count) sets",
+        ]
+        if let top = session.heaviestTotal {
+            parts.append("top \(WeightUnit.trimmed(top)) \(session.gymUnit.rawValue)")
+        }
+        return parts.joined(separator: " · ")
     }
 
     /// First launch: one gym with every plate, and the default PR list with no values yet.

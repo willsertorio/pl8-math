@@ -97,3 +97,43 @@ public struct SessionPlan: Hashable, Sendable {
         gym.unit.display(set.load.total, in: set.prUnit)
     }
 }
+
+/// One planned set as history stores it (SPEC Part 4 `SetLog`, without the check-off fields).
+public struct PlannedSetRecord: Hashable, Sendable {
+    /// Which lift: index into `SessionPlan.lifts`. The warm-up belongs to the first lift (0).
+    public let blockIndex: Int
+    /// 0, 1, 2… within the warm-up or the lift.
+    public let setIndex: Int
+    public let isWarmUp: Bool
+    public let reps: Int
+    /// "75–78%", or "≈39% 1RM" for a warm-up round.
+    public let pctText: String
+    /// In the gym's unit.
+    public let plannedTotal: Double
+    public let unit: WeightUnit
+    public let perSide: [Double]
+}
+
+extension SessionPlan {
+    /// Every set in order: warm-up rounds, then each lift's working sets.
+    public var setRecords: [PlannedSetRecord] {
+        let warmUpRecords = warmUp.enumerated().map { index, set in
+            PlannedSetRecord(blockIndex: 0, setIndex: index, isWarmUp: true, reps: set.reps,
+                             pctText: set.round.percentText, plannedTotal: set.load.total,
+                             unit: gym.unit, perSide: set.load.perSide)
+        }
+        let workingRecords = lifts.enumerated().flatMap { liftIndex, lift in
+            lift.sets.enumerated().map { index, set in
+                PlannedSetRecord(blockIndex: liftIndex, setIndex: index, isWarmUp: false, reps: set.reps,
+                                 pctText: set.target.text, plannedTotal: set.load.total,
+                                 unit: gym.unit, perSide: set.load.perSide)
+            }
+        }
+        return warmUpRecords + workingRecords
+    }
+
+    /// The heaviest working set (for the session-over scale and history).
+    public var heaviestSet: PlannedSetRecord? {
+        setRecords.filter { !$0.isWarmUp }.max { $0.plannedTotal < $1.plannedTotal }
+    }
+}
