@@ -168,7 +168,7 @@ Label each round "Round n", with "≈N% 1RM".
 Input: text lines (from Vision OCR, or typed). Output: strength blocks, each `{name, prLift, format, note, sets[{reps, pctLow, pctHigh?, plus}], pctMissing}`.
 
 1. **Blocks** start at a line that begins with a letter and a dot (`A.`, `B.`…, or `C. After a Party`); text after the dot is the block's label. Labels inside a block ("After Party", "6 Sets", "Compete") stay in the block.
-2. **A strength line** has reps, a movement and a percentage: `1 Snatch @75-80% 1RM Snatch`, `3 Back Squat @80-80+% 1RM Back Squat`, `5x3 @80%`.
+2. **A strength line** has reps, a movement and a percentage: `1 Snatch @75-80% 1RM Snatch`, `3 Back Squat @80-80+% 1RM Back Squat`, `5x3 @80%`. Long lines wrap on a phone, so a line that starts with reps but has no % yet (or ends right after `1RM`) continues on the next line, until a new set, header, note or block letter.
    The lift whose PR applies is the text after `1RM`; if absent, the movement itself.
 3. **Anything with a % of 1RM is strength**, whatever the block is called and wherever it appears (including after the WOD). A block with no % lines is a WOD and is ignored, even if it lists loads like `(50/35)`.
 4. Consecutive strength lines for the same movement form one lift; each line is one set.

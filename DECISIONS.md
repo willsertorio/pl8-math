@@ -21,3 +21,4 @@ Short entries, newest last. Why we chose something, so future-me (and anyone rea
 - **2026-10-14 · "Type it in" is the simple form.** Lift, sets, reps, one %: fastest between sets. Per-set % still comes from screenshots.
 - **2026-10-14 · M4 uses the spec look with the system font.** Black on white, square black buttons, outlined fields, orange background (SPEC 2.5) now, so screens aren't restyled later. Space Grotesk comes in when the font file is added.
 - **2026-10-14 · Sessions keep each lift's PR unit.** Set totals are shown in the PR's unit (SPEC 3.2); storing `prUnits` with the session keeps that right even if a PR changes later.
+- **2026-10-14 · Wrapped lines are joined before reading.** On 14/10 each Power Clean complex wrapped over 3 lines and block B was missed. SPEC 3.6 rule 2 now says how wrapped lines continue. Upload also takes several screenshots, in order, for workouts longer than one screen.

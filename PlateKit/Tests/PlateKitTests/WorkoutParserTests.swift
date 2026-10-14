@@ -125,6 +125,31 @@ struct WorkoutRealUseTests {
         #expect(blocks.first.map(targets) == [68, 68, 73, 73, 75, 75].map { .single($0) })
     }
 
+    // The B sets wrap over 3 lines each on the phone.
+    @Test func workout1410WrappedLines() throws {
+        let blocks = WorkoutParser.parse(try fixture("2026-10-14.screen.txt"))
+        #expect(blocks.map(\.letter) == ["B", "C"])                  // A is RPE, no %; D is cut off
+
+        let b = blocks[0]
+        #expect(b.name == "Clean Pull + 1 Hang Power Clean + 1 Floating Power Clean + 1 Power Clean")
+        #expect(b.prLift == "Power Clean")
+        #expect(b.sets.map(\.reps) == [1, 1, 1])
+        #expect(targets(b) == [.range(68, 70), .range(73, 75), .range(75, 78)])
+        #expect(b.note == "Rest as needed between sets")
+
+        let c = blocks[1]
+        #expect(c.name == "Power Clean")
+        #expect(c.format == "EMOM")
+        #expect(c.sets.map(\.reps) == [2, 2, 2, 1, 1])
+        #expect(targets(c) == [.single(80), .single(83), .single(85), .plus(85), .plus(85)])
+    }
+
+    @Test func liftAfter1RMOnTheNextLine() {
+        let blocks = WorkoutParser.parse("A.\n3 Front Squat @80%\n1RM Front Squat\n3 Front Squat @82%\n1RM Front Squat")
+        #expect(blocks.first?.sets.count == 2)
+        #expect(blocks.first?.prLift == "Front Squat")
+    }
+
     @Test func lookalikeLettersInsideWordsAreReadAsLatin() {
         // "Back" with a Cyrillic а and с.
         let blocks = WorkoutParser.parse("A.\n3 B\u{0430}\u{0441}k Squat @80% 1RM B\u{0430}\u{0441}k Squat")

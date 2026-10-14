@@ -100,7 +100,7 @@ public enum WorkoutParser {
             .filter { !$0.isEmpty }
 
         var blocks: [(letter: String, label: String?, lines: [String])] = []
-        for line in lines {
+        for line in joinWrappedLines(lines) {
             // "A." or "C. After a Party"
             if let match = line.wholeMatch(of: #/([A-Z])\.(?:\s+(.+))?/#) {
                 blocks.append((String(match.1), match.2.map { clean(String($0)) }, []))
@@ -112,6 +112,35 @@ public enum WorkoutParser {
     }
 
     // MARK: - Private
+
+    /// Long sets wrap over several lines on a phone (Fixtures 14/10). Joins a line onto the one before when that
+    /// one starts with reps but has no % yet, or ends right after "1RM". A new set, a header, a note or a block
+    /// letter always starts a new line.
+    static func joinWrappedLines(_ lines: [String]) -> [String] {
+        var result: [String] = []
+        for line in lines {
+            if let previous = result.last, continues(previous, with: line) {
+                result[result.count - 1] = previous + " " + line
+            } else {
+                result.append(line)
+            }
+        }
+        return result
+    }
+
+    private static func continues(_ previous: String, with line: String) -> Bool {
+        guard previous.firstMatch(of: #/^\d+\s+\S/#) != nil else { return false }
+        if line.wholeMatch(of: #/([A-Z])\.(?:\s+(.+))?/#) != nil || parseHeader(line) != nil { return false }
+        if let first = line.first, "*-–•".contains(first) { return false }
+        if line.firstMatch(of: #/^\d+\s/#) != nil { return false }
+
+        let endsWith1RM = previous.wholeMatch(of: #/.*1\s*RM\s*/#.ignoresCase()) != nil
+        let startsWith1RM = line.firstMatch(of: #/^1\s*RM/#.ignoresCase()) != nil
+        if previous.contains("%") {
+            return endsWith1RM || (startsWith1RM && !previous.localizedCaseInsensitiveContains("RM"))
+        }
+        return true
+    }
 
     private struct Header {
         let format: String?

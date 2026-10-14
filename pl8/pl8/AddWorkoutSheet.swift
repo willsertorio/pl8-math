@@ -11,7 +11,7 @@ struct AddWorkoutSheet: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @State private var photo: PhotosPickerItem?
+    @State private var photos: [PhotosPickerItem] = []
     @State private var showScanner = false
     @State private var isReading = false
     @State private var message: String?
@@ -37,10 +37,15 @@ struct AddWorkoutSheet: View {
                     .disabled(!WhiteboardScanner.isAvailable)
                     .opacity(WhiteboardScanner.isAvailable ? 1 : 0.4)
 
-                    PhotosPicker(selection: $photo, matching: .images) {
-                        OptionRow(title: "Upload a screenshot", systemImage: "photo.on.rectangle")
+                    VStack(alignment: .leading, spacing: 6) {
+                        PhotosPicker(selection: $photos, maxSelectionCount: 5, selectionBehavior: .ordered, matching: .images) {
+                            OptionRow(title: "Upload screenshots", systemImage: "photo.on.rectangle")
+                        }
+                        .buttonStyle(.plain)
+                        Text("Pick several, in order, if the workout doesn't fit on one screen.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
 
                     NavigationLink {
                         TypedWorkoutForm(onSave: onAdded)
@@ -71,13 +76,19 @@ struct AddWorkoutSheet: View {
                 Task { await read { try await TextReader.lines(in: image) } }
             }
         }
-        .onChange(of: photo) { _, item in
-            guard let item else { return }
-            photo = nil
+        .onChange(of: photos) { _, items in
+            guard !items.isEmpty else { return }
+            photos = []
             Task {
+                // Several screenshots of one workout are read in order and joined (SPEC 3.6 rule 8).
                 await read {
-                    guard let data = try await item.loadTransferable(type: Data.self) else { return [] }
-                    return try await TextReader.lines(in: data)
+                    var lines: [String] = []
+                    for item in items {
+                        if let data = try await item.loadTransferable(type: Data.self) {
+                            lines += try await TextReader.lines(in: data)
+                        }
+                    }
+                    return lines
                 }
             }
         }
