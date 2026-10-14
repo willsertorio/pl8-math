@@ -109,8 +109,9 @@ final class Workout {
         self.blocksData = (try? JSONEncoder().encode(blocks)) ?? Data()
     }
 
+    /// Decoded once per change: screens read this many times while you type.
     var blocks: [StrengthBlock] {
-        get { (try? JSONDecoder().decode([StrengthBlock].self, from: blocksData)) ?? [] }
+        get { BlockCache.blocks(for: blocksData) }
         set { blocksData = (try? JSONEncoder().encode(newValue)) ?? Data() }
     }
 
@@ -120,6 +121,19 @@ final class Workout {
             if !names.contains(name) { names.append(name) }
         }
         return "\(date.formatted(.dateTime.day().month().hour().minute())) · \(lifts.joined(separator: ", "))"
+    }
+}
+
+/// Decoded blocks by their saved JSON, so the same data is only decoded once.
+private enum BlockCache {
+    private static var decoded: [Data: [StrengthBlock]] = [:]
+
+    static func blocks(for data: Data) -> [StrengthBlock] {
+        if let blocks = decoded[data] { return blocks }
+        let blocks = (try? JSONDecoder().decode([StrengthBlock].self, from: data)) ?? []
+        if decoded.count > 100 { decoded.removeAll() }
+        decoded[data] = blocks
+        return blocks
     }
 }
 

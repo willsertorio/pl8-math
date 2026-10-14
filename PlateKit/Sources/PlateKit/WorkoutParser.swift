@@ -53,12 +53,26 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
 
 extension Target {
     /// The user's answer to "What % for Back Squat?": `83-85`, `80` or `80+` (a `%` is fine too).
+    /// Parsed by hand, not with a Regex: it runs on every keystroke and Regex is slow to build.
     public init?(parsing text: String) {
-        let pattern = #/^\s*(\d+(?:[.,]\d+)?)\s*(?:[-–]\s*(\d+(?:[.,]\d+)?))?\s*%?\s*(\+)?\s*%?\s*$/#
-        guard let match = text.wholeMatch(of: pattern), let low = number(match.1) else { return nil }
-        let high = match.2.flatMap(number)
-        if let high, high < low { return nil }
-        self = Target.make(low: low, high: high, plus: match.3 != nil)
+        var compact = String(text.filter { !$0.isWhitespace && $0 != "%" })
+            .replacingOccurrences(of: ",", with: ".")
+            .replacingOccurrences(of: "–", with: "-")
+        guard !compact.isEmpty, compact.allSatisfy({ $0.isASCII && ($0.isNumber || ".-+".contains($0)) }) else {
+            return nil
+        }
+        let plus = compact.hasSuffix("+")
+        if plus { compact.removeLast() }
+
+        let parts = compact.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count <= 2,
+              let low = Double(parts[0]), low > 0 else { return nil }
+        var high: Double?
+        if parts.count == 2 {
+            guard let value = Double(parts[1]), value >= low else { return nil }
+            high = value
+        }
+        self = Target.make(low: low, high: high, plus: plus)
     }
 
     static func make(low: Double, high: Double?, plus: Bool) -> Target {

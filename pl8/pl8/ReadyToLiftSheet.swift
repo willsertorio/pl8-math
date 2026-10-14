@@ -17,12 +17,11 @@ struct ReadyToLiftSheet: View {
     @State private var warned = false
     @State private var confirmCancel = false
 
-    private var blocks: [StrengthBlock] { workout.blocks }
-    private var missingPRs: [String] { Planner.missingPRs(blocks: blocks, records: records) }
-    private var missingPercents: [Int] { blocks.indices.filter { blocks[$0].pctMissing } }
-    private var isReady: Bool { !blocks.isEmpty && missingPRs.isEmpty && missingPercents.isEmpty }
-
     var body: some View {
+        let blocks = workout.blocks
+        let missingPRs = Planner.missingPRs(blocks: blocks, records: records)
+        let missingPercents = blocks.indices.filter { blocks[$0].pctMissing }
+        let isReady = !blocks.isEmpty && missingPRs.isEmpty && missingPercents.isEmpty
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
