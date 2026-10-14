@@ -26,9 +26,22 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
     /// e.g. "Rest 2 minutes between sets".
     public let note: String?
     public let sets: [ParsedSet]
+    /// Effort out of 10 when the board gives RPE instead of a % (`@ 5/10 RPE`).
+    public private(set) var rpe: Double? = nil
 
     /// Some % couldn't be read; ask "What % for Back Squat?".
     public var pctMissing: Bool { sets.contains { $0.target == nil } }
+
+    /// For an RPE block: RPE × 10, offered as the answer to "What % for …?" (DECISIONS 2026-10-14).
+    public var suggestedTarget: Target? {
+        rpe.map { .single($0 * 10) }
+    }
+
+    /// The same block based on another PR (e.g. a complex the app guessed wrong).
+    public func settingPRLift(_ lift: String) -> StrengthBlock {
+        StrengthBlock(letter: letter, label: label, name: name, prLift: LiftNames.canonical(lift), format: format,
+                      note: note, sets: sets, rpe: rpe)
+    }
 
     /// A lift from the "Type it in" form: sets × reps at one % (SPEC 2.2, simple form).
     public static func typed(letter: String, lift: String, sets: Int, reps: Int, target: Target) -> StrengthBlock {
@@ -41,13 +54,13 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
     /// The same block with every set at `target` (editing the plan).
     public func settingPercent(_ target: Target) -> StrengthBlock {
         StrengthBlock(letter: letter, label: label, name: name, prLift: prLift, format: format, note: note,
-                      sets: sets.map { ParsedSet(reps: $0.reps, target: target) })
+                      sets: sets.map { ParsedSet(reps: $0.reps, target: target) }, rpe: rpe)
     }
 
     /// The same block with every unread % set to `target`.
     public func fillingMissingPercent(with target: Target) -> StrengthBlock {
         StrengthBlock(letter: letter, label: label, name: name, prLift: prLift, format: format, note: note,
-                      sets: sets.map { ParsedSet(reps: $0.reps, target: $0.target ?? target) })
+                      sets: sets.map { ParsedSet(reps: $0.reps, target: $0.target ?? target) }, rpe: rpe)
     }
 }
 
@@ -134,6 +147,8 @@ public enum WorkoutParser {
         if let first = line.first, "*-–•".contains(first) { return false }
         if line.firstMatch(of: #/^\d+\s/#) != nil { return false }
 
+        // An RPE line is complete like a % line.
+        if previous.firstMatch(of: #/@\s*(?:RPE|\d+(?:[.,]\d+)?\s*(?:\/\s*10)?\s*RPE)/#.ignoresCase()) != nil { return false }
         let endsWith1RM = previous.wholeMatch(of: #/.*1\s*RM\s*/#.ignoresCase()) != nil
         let startsWith1RM = line.firstMatch(of: #/^1\s*RM/#.ignoresCase()) != nil
         if previous.contains("%") {
@@ -153,6 +168,7 @@ public enum WorkoutParser {
         let sets: [ParsedSet]
         /// `NxR` lines say their own set count; a format header doesn't expand them.
         let countsItself: Bool
+        var rpe: Double? = nil
     }
 
     private struct Lift {
@@ -171,7 +187,7 @@ public enum WorkoutParser {
         for text in lines {
             if let newHeader = parseHeader(text) {
                 header = newHeader
-            } else if let line = parseStrength(text) ?? parseHiddenPercent(text, under: header) {
+            } else if let line = parseStrength(text) ?? parseRPE(text) ?? parseHiddenPercent(text, under: header) {
                 if let last = lifts.last, last.movement == line.movement, last.prLift == line.prLift {
                     lifts[lifts.count - 1].lines.append(line)
                 } else {
@@ -196,7 +212,8 @@ public enum WorkoutParser {
                 prLift: lift.prLift,
                 format: lift.header?.format,
                 note: lift.notes.isEmpty ? nil : lift.notes.joined(separator: " "),
-                sets: sets
+                sets: sets,
+                rpe: lift.lines.first?.rpe
             )
         }
     }
@@ -254,6 +271,22 @@ public enum WorkoutParser {
             prLift: prLift,
             sets: Array(repeating: ParsedSet(reps: reps, target: target), count: setCount),
             countsItself: setCount > 1
+        )
+    }
+
+    /// `3 Muscle Clean + 3 Tall Cleans @ 5/10 RPE`, `3 Front Squat @ RPE 8`: % missing, RPE kept for a suggestion.
+    /// The PR is the first known lift named in the line.
+    private static func parseRPE(_ text: String) -> Line? {
+        let pattern = #/(?<reps>\d+)\s+(?<move>.+?)\s*@\s*(?:RPE\s*(?<a>\d+(?:[.,]\d+)?)|(?<b>\d+(?:[.,]\d+)?)\s*(?:\/\s*10)?\s*RPE)\b.*/#.ignoresCase()
+        guard let match = text.wholeMatch(of: pattern), let reps = Int(match.reps),
+              let rpe = (match.a ?? match.b).flatMap(number), rpe > 0, rpe <= 10 else { return nil }
+        let movement = LiftNames.canonical(String(match.move))
+        return Line(
+            movement: movement,
+            prLift: LiftNames.firstKnown(in: movement) ?? movement,
+            sets: [ParsedSet(reps: reps, target: nil)],
+            countsItself: false,
+            rpe: rpe
         )
     }
 

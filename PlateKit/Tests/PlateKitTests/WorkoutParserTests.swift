@@ -128,16 +128,26 @@ struct WorkoutRealUseTests {
     // The B sets wrap over 3 lines each on the phone.
     @Test func workout1410WrappedLines() throws {
         let blocks = WorkoutParser.parse(try fixture("2026-10-14.screen.txt"))
-        #expect(blocks.map(\.letter) == ["B", "C"])                  // A is RPE, no %; D is cut off
+        #expect(blocks.map(\.letter) == ["A", "B", "C"])             // D is cut off
 
-        let b = blocks[0]
+        // A is RPE-based: % missing, RPE 5 remembered, 50% suggested.
+        let a = blocks[0]
+        #expect(a.name == "Muscle Clean + 3 Hang Power Clean to Parallel Catch + 3 Tall Cleans")
+        #expect(a.prLift == "Clean")
+        #expect(a.sets.map(\.reps) == [3, 3, 3])
+        #expect(a.pctMissing)
+        #expect(a.rpe == 5)
+        #expect(a.suggestedTarget == .single(50))
+        #expect(a.note == "Rest 90 seconds between sets")
+
+        let b = blocks[1]
         #expect(b.name == "Clean Pull + 1 Hang Power Clean + 1 Floating Power Clean + 1 Power Clean")
         #expect(b.prLift == "Power Clean")
         #expect(b.sets.map(\.reps) == [1, 1, 1])
         #expect(targets(b) == [.range(68, 70), .range(73, 75), .range(75, 78)])
         #expect(b.note == "Rest as needed between sets")
 
-        let c = blocks[1]
+        let c = blocks[2]
         #expect(c.name == "Power Clean")
         #expect(c.format == "EMOM")
         #expect(c.sets.map(\.reps) == [2, 2, 2, 1, 1])
@@ -383,5 +393,56 @@ struct SettingPercentTests {
         let edited = block.settingPercent(.range(75, 80))
         #expect(edited.sets == Array(repeating: ParsedSet(reps: 1, target: .range(75, 80)), count: 3))
         #expect(edited.name == "Snatch")
+    }
+}
+
+@Suite("RPE (suggested % = RPE × 10)")
+struct RPETests {
+    @Test func rpeForms() {
+        let blocks = WorkoutParser.parse("""
+        A.
+        3 Front Squat @ RPE 8
+        B.
+        2 Deadlift @7.5/10 RPE
+        C.
+        1 Snatch @9 RPE
+        """)
+        #expect(blocks.map(\.rpe) == [8, 7.5, 9])
+        #expect(blocks.map(\.suggestedTarget) == [.single(80), .single(75), .single(90)])
+        #expect(blocks.allSatisfy { $0.pctMissing })
+        #expect(blocks.map(\.prLift) == ["Front Squat", "Deadlift", "Snatch"])
+    }
+
+    @Test func needsTheAtSignAndAValidRPE() {
+        let blocks = WorkoutParser.parse("""
+        A.
+        5 Sets
+        10 Back Squats (225/155) (RPE 8)
+        B.
+        3 Front Squat @ RPE 12
+        """)
+        #expect(blocks.isEmpty)
+    }
+
+    @Test func answeringKeepsTheRPE() {
+        let block = WorkoutParser.parse("A.\n3 Front Squat @ RPE 8")[0]
+        let filled = block.fillingMissingPercent(with: .single(78))
+        #expect(!filled.pctMissing)
+        #expect(filled.rpe == 8)
+    }
+
+    @Test func changingThePRLift() {
+        let block = WorkoutParser.parse("A.\n3 Muscle Clean + 3 Tall Cleans @ 5/10 RPE")[0]
+        #expect(block.prLift == "Clean")
+        #expect(block.settingPRLift("power clean").prLift == "Power Clean")
+    }
+}
+
+@Suite("First known lift in a line")
+struct FirstKnownLiftTests {
+    @Test func earliestWholeWordMatch() {
+        #expect(LiftNames.firstKnown(in: "Muscle Clean + 3 Hang Power Clean") == "Clean")
+        #expect(LiftNames.firstKnown(in: "Tall Cleans + Snatch Balance") == "Snatch Balance")
+        #expect(LiftNames.firstKnown(in: "Wall Walks") == nil)
     }
 }

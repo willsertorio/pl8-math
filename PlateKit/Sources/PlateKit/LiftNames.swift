@@ -36,6 +36,29 @@ public enum LiftNames {
         return nil
     }
 
+    /// The first known lift named anywhere in `text` (whole words, longest name at that spot), e.g. the PR a
+    /// complex like "Muscle Clean + 3 Hang Power Clean" is based on → "Clean".
+    public static func firstKnown(in text: String) -> String? {
+        let lower = text.lowercased()
+        var best: (offset: Int, name: String)?
+        for key in lookupKeysLongestFirst {
+            var start = lower.startIndex
+            while let range = lower.range(of: key, range: start..<lower.endIndex) {
+                let wordStart = range.lowerBound == lower.startIndex || !lower[lower.index(before: range.lowerBound)].isLetter
+                let wordEnd = range.upperBound == lower.endIndex || !lower[range.upperBound].isLetter
+                if wordStart && wordEnd {
+                    let offset = lower.distance(from: lower.startIndex, to: range.lowerBound)
+                    if best.map({ offset < $0.offset }) ?? true {
+                        best = (offset, lookup[key]!)
+                    }
+                    break
+                }
+                start = range.upperBound
+            }
+        }
+        return best?.name
+    }
+
     private static let lookup: [String: String] = {
         var table = aliases
         for name in known { table[name.lowercased()] = name }

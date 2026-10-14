@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import SwiftUI
 import PlateKit
@@ -28,16 +29,22 @@ struct ReadyToLiftSheet: View {
                     Whiteboard(blocks: blocks)
 
                     ForEach(missingPercents, id: \.self) { index in
+                        let block = blocks[index]
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("What % for \(blocks[index].name)?").font(.headline)
+                            Text("What % for \(block.letter) · \(block.name)?").font(.headline)
+                            if let rpe = block.rpe, let suggested = block.suggestedTarget {
+                                Text("The board says RPE \(WeightUnit.trimmed(rpe))/10, so \(suggested.text) of your \(block.prLift) PR is suggested. Change it if it feels off.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                             HStack(spacing: 8) {
-                                TextField("83-85, 80 or 80+", text: percentBinding(index))
+                                TextField("83-85, 80 or 80+", text: percentBinding(index, block: block))
                                     .textFieldStyle(OutlineFieldStyle())
                                     .keyboardType(.numbersAndPunctuation)
-                                Button("OK") { answerPercent(index) }
+                                Button("OK") { answerPercent(index, block: block) }
                                     .buttonStyle(.black)
                                     .frame(width: 64)
-                                    .disabled(Target(parsing: percents[index] ?? "") == nil)
+                                    .disabled(Target(parsing: answer(index, block: block)) == nil)
                             }
                         }
                         .drawer()
@@ -101,8 +108,13 @@ struct ReadyToLiftSheet: View {
         }
     }
 
-    private func percentBinding(_ index: Int) -> Binding<String> {
-        Binding(get: { percents[index] ?? "" }, set: { percents[index] = $0 })
+    /// What's typed, or the RPE suggestion before anything is typed.
+    private func answer(_ index: Int, block: StrengthBlock) -> String {
+        percents[index] ?? block.suggestedTarget.map { $0.text.replacingOccurrences(of: "%", with: "") } ?? ""
+    }
+
+    private func percentBinding(_ index: Int, block: StrengthBlock) -> Binding<String> {
+        Binding(get: { answer(index, block: block) }, set: { percents[index] = $0 })
     }
 
     private func prBinding(_ lift: String) -> Binding<Double?> {
@@ -114,8 +126,8 @@ struct ReadyToLiftSheet: View {
     }
 
     /// Saves the answer into the workout, for every unread set of that block.
-    private func answerPercent(_ index: Int) {
-        guard let target = Target(parsing: percents[index] ?? "") else { return }
+    private func answerPercent(_ index: Int, block: StrengthBlock) {
+        guard let target = Target(parsing: answer(index, block: block)) else { return }
         var updated = workout.blocks
         guard updated.indices.contains(index) else { return }
         updated[index] = updated[index].fillingMissingPercent(with: target)
@@ -143,6 +155,7 @@ struct ReadyToLiftSheet: View {
 struct EditWorkoutView: View {
     let workout: Workout
 
+    @Query(sort: \PersonalRecord.lift) private var records: [PersonalRecord]
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var blocks: [StrengthBlock] = []
@@ -170,6 +183,14 @@ struct EditWorkoutView: View {
                             }
                             .disabled(Target(parsing: percents[index] ?? "") == nil)
                         }
+                        Picker("Based on", selection: Binding(
+                            get: { blocks[index].prLift },
+                            set: { blocks[index] = blocks[index].settingPRLift($0) }
+                        )) {
+                            ForEach(prLiftChoices(including: block.prLift), id: \.self) { lift in
+                                Text("\(lift) PR").tag(lift)
+                            }
+                        }
                         Button("Remove this lift", role: .destructive) {
                             blocks.remove(at: index)
                             percents = [:]
@@ -193,5 +214,11 @@ struct EditWorkoutView: View {
             }
             .onAppear { blocks = workout.blocks }
         }
+    }
+
+    /// Every saved PR lift, plus the block's own if it isn't saved yet.
+    private func prLiftChoices(including lift: String) -> [String] {
+        let saved = records.map(\.lift)
+        return saved.contains(lift) ? saved : [lift] + saved
     }
 }

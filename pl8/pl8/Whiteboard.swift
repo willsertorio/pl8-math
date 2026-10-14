@@ -15,7 +15,11 @@ struct Whiteboard: View {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 VStack(alignment: .leading, spacing: 3) {
                     Text(headline(block)).font(.headline)
-                    if block.pctMissing {
+                    if let rpe = block.rpe, block.pctMissing {
+                        Text("\(sets(block)) · RPE \(WeightUnit.trimmed(rpe))/10 · suggested \(block.suggestedTarget?.text ?? "")")
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
+                    } else if block.pctMissing {
                         Text("\(sets(block)) · % missing").font(.subheadline).foregroundStyle(.orange)
                     } else {
                         Text("\(sets(block)) · \(percents(block))")
