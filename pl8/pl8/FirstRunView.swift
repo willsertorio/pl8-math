@@ -152,35 +152,6 @@ private struct UnitList: View {
     }
 }
 
-/// A big option button with an icon and an optional tag ("Fastest").
-private struct OptionRow: View {
-    let title: String
-    let systemImage: String
-    var tag: String? = nil
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage).font(.title3)
-            Text(title).font(.headline)
-            Spacer()
-            if let tag {
-                Text(tag.uppercased())
-                    .font(.caption.weight(.bold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .foregroundStyle(Theme.paper)
-                    .background(Theme.ink)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity)
-        .foregroundStyle(Theme.ink)
-        .background(Theme.paper)
-        .overlay(Rectangle().stroke(Theme.ink, lineWidth: 2))
-        .contentShape(Rectangle())
-    }
-}
-
 /// Stands in for the room: each answer shows up as it's given.
 private struct GymPreview: View {
     @Bindable var gym: Gym

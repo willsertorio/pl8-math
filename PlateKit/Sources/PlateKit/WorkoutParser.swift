@@ -30,6 +30,20 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
     /// Some % couldn't be read; ask "What % for Back Squat?".
     public var pctMissing: Bool { sets.contains { $0.target == nil } }
 
+    /// A lift from the "Type it in" form: sets × reps at one % (SPEC 2.2, simple form).
+    public static func typed(letter: String, lift: String, sets: Int, reps: Int, target: Target) -> StrengthBlock {
+        let name = LiftNames.canonical(lift)
+        let set = ParsedSet(reps: max(1, reps), target: target)
+        return StrengthBlock(letter: letter, label: nil, name: name, prLift: name, format: nil, note: nil,
+                             sets: Array(repeating: set, count: max(1, sets)))
+    }
+
+    /// The same block with every set at `target` (editing the plan).
+    public func settingPercent(_ target: Target) -> StrengthBlock {
+        StrengthBlock(letter: letter, label: label, name: name, prLift: prLift, format: format, note: note,
+                      sets: sets.map { ParsedSet(reps: $0.reps, target: target) })
+    }
+
     /// The same block with every unread % set to `target`.
     public func fillingMissingPercent(with target: Target) -> StrengthBlock {
         StrengthBlock(letter: letter, label: label, name: name, prLift: prLift, format: format, note: note,

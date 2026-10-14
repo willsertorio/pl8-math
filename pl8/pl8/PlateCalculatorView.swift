@@ -386,7 +386,7 @@ private struct GymEditor: View {
 }
 
 /// One set: title and total on top, then the % and plates, then what to change.
-private struct SetRow: View {
+struct SetRow: View {
     let title: String
     let total: String
     let detail: String

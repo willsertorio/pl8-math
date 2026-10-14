@@ -332,3 +332,31 @@ struct LiftNameTests {
         #expect(LiftNames.canonical("Zercher Squat") == "Zercher Squat")  // unknown lifts are kept
     }
 }
+
+@Suite("Typed workout (SPEC 2.2 'Type it in', simple form)")
+struct TypedBlockTests {
+    @Test func oneLiftWithSetsRepsAndOnePercent() {
+        let block = StrengthBlock.typed(letter: "A", lift: " back squat ", sets: 5, reps: 3, target: .range(75, 78))
+        #expect(block.letter == "A")
+        #expect(block.name == "Back Squat")
+        #expect(block.prLift == "Back Squat")
+        #expect(block.format == nil)
+        #expect(block.sets == Array(repeating: ParsedSet(reps: 3, target: .range(75, 78)), count: 5))
+        #expect(!block.pctMissing)
+    }
+
+    @Test func atLeastOneSetAndOneRep() {
+        let block = StrengthBlock.typed(letter: "B", lift: "Snatch", sets: 0, reps: 0, target: .single(70))
+        #expect(block.sets == [ParsedSet(reps: 1, target: .single(70))])
+    }
+}
+
+@Suite("Editing a block's %")
+struct SettingPercentTests {
+    @Test func everySetGetsTheNewPercent() {
+        let block = StrengthBlock.typed(letter: "A", lift: "Snatch", sets: 3, reps: 1, target: .single(70))
+        let edited = block.settingPercent(.range(75, 80))
+        #expect(edited.sets == Array(repeating: ParsedSet(reps: 1, target: .range(75, 80)), count: 3))
+        #expect(edited.name == "Snatch")
+    }
+}
