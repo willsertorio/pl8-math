@@ -60,6 +60,7 @@ extension View {
         self
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(Theme.ink)
             .background(Theme.paper)
             .overlay(Rectangle().stroke(Theme.ink, lineWidth: 2))
     }
