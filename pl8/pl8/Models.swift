@@ -90,3 +90,33 @@ final class PRHistory {
         self.date = date
     }
 }
+
+/// A workout read from a screenshot (or typed), with its strength blocks (SPEC Part 4).
+@Model
+final class Workout {
+    var id = UUID()
+    var date: Date
+    /// The text the blocks were read from.
+    var sourceText: String
+    /// The blocks, saved as JSON so SwiftData only stores plain data.
+    private var blocksData: Data
+
+    init(sourceText: String, blocks: [StrengthBlock], date: Date = .now) {
+        self.date = date
+        self.sourceText = sourceText
+        self.blocksData = (try? JSONEncoder().encode(blocks)) ?? Data()
+    }
+
+    var blocks: [StrengthBlock] {
+        get { (try? JSONDecoder().decode([StrengthBlock].self, from: blocksData)) ?? [] }
+        set { blocksData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+    }
+
+    /// "14 Oct, 09:12 · Split Jerk"
+    var title: String {
+        let lifts = blocks.map(\.name).reduce(into: [String]()) { names, name in
+            if !names.contains(name) { names.append(name) }
+        }
+        return "\(date.formatted(.dateTime.day().month().hour().minute())) · \(lifts.joined(separator: ", "))"
+    }
+}

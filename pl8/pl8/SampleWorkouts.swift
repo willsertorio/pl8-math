@@ -9,10 +9,15 @@ struct SampleWorkout: Identifiable, Hashable {
         let sets: [LiftInput.WorkSet]
     }
 
+    let id: String
     let name: String
     let lifts: [Lift]
 
-    var id: String { name }
+    init(id: String? = nil, name: String, lifts: [Lift]) {
+        self.id = id ?? name
+        self.name = name
+        self.lifts = lifts
+    }
 
     /// PR lifts in workout order, without repeats.
     var prLifts: [String] {
@@ -51,10 +56,12 @@ struct SampleWorkout: Identifiable, Hashable {
         ),
     ]
 
-    static let screenshotID = "From screenshot"
+    /// A saved workout as a picker option. Blocks whose % is still missing are left out until answered.
+    static func from(_ workout: Workout) -> SampleWorkout {
+        from(blocks: workout.blocks, id: workout.id.uuidString, name: workout.title)
+    }
 
-    /// A workout from parsed blocks. Blocks whose % is still missing are left out until answered.
-    static func fromScreenshot(_ blocks: [StrengthBlock]) -> SampleWorkout {
+    static func from(blocks: [StrengthBlock], id: String, name: String) -> SampleWorkout {
         let lifts = blocks.compactMap { block -> Lift? in
             let sets = block.sets.compactMap { set in
                 set.target.map { LiftInput.WorkSet(reps: set.reps, target: $0) }
@@ -62,7 +69,7 @@ struct SampleWorkout: Identifiable, Hashable {
             guard !sets.isEmpty, !block.pctMissing else { return nil }
             return Lift(name: block.name, prLift: block.prLift, sets: sets)
         }
-        return SampleWorkout(name: screenshotID, lifts: lifts)
+        return SampleWorkout(id: id, name: name, lifts: lifts)
     }
 
     private static func sets(_ reps: Int, _ targets: [Target]) -> [LiftInput.WorkSet] {

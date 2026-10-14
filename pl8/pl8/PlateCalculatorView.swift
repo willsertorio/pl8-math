@@ -11,15 +11,17 @@ struct PlateCalculatorView: View {
     @State private var workoutID = SampleWorkout.all[0].id
     @State private var photo: PhotosPickerItem?
     @State private var isReading = false
-    @State private var readText: String?
     @State private var readError: String?
-    @State private var blocks: [StrengthBlock] = []
+    @State private var readCount = 0
+    /// Vision's text when nothing was found, so it can be copied for a fixture.
+    @State private var failedText: String?
     @State private var percentAnswers: [Int: String] = [:]
 
     // Saved data (SwiftData)
     @Environment(\.modelContext) private var context
     @Query private var gyms: [Gym]
     @Query private var records: [PersonalRecord]
+    @Query(sort: \Workout.date, order: .reverse) private var savedWorkouts: [Workout]
     @State private var editingPR: EditingPR?
 
     private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
@@ -31,16 +33,15 @@ struct PlateCalculatorView: View {
         return records.first { $0.lift == name }
     }
 
-    /// Blocks with the user's answers for any hidden %.
-    private var answeredBlocks: [StrengthBlock] {
-        blocks.enumerated().map { index, block in
-            guard block.pctMissing, let target = Target(parsing: percentAnswers[index] ?? "") else { return block }
-            return block.fillingMissingPercent(with: target)
-        }
+    /// The saved workout picked in the Workout picker, if it is one.
+    private var savedWorkout: Workout? {
+        savedWorkouts.first { $0.id.uuidString == workoutID }
     }
 
+    private var blocks: [StrengthBlock] { savedWorkout?.blocks ?? [] }
+
     private var workouts: [SampleWorkout] {
-        blocks.isEmpty ? SampleWorkout.all : [SampleWorkout.fromScreenshot(answeredBlocks)] + SampleWorkout.all
+        savedWorkouts.map(SampleWorkout.from) + SampleWorkout.all
     }
 
     private var workout: SampleWorkout {
@@ -142,10 +143,14 @@ struct PlateCalculatorView: View {
         }
         .navigationTitle("Plate math")
         .scrollDismissesKeyboard(.interactively)
-        .sensoryFeedback(.success, trigger: blocks)
+        .sensoryFeedback(.success, trigger: readCount)
         .onChange(of: photo) { _, item in
             guard let item else { return }
             Task { await read(item) }
+        }
+        .onChange(of: workoutID) { _, _ in
+            percentAnswers = [:]
+            failedText = nil
         }
         .sheet(item: $editingPR) { item in
             PREditor(lift: item.lift, record: record(for: item.lift))
@@ -182,9 +187,15 @@ struct PlateCalculatorView: View {
                         Text(note).font(.footnote).foregroundStyle(.secondary)
                     }
                     if block.pctMissing {
-                        TextField("What % for \(block.name)?", text: answerBinding(index))
-                            .keyboardType(.numbersAndPunctuation)
-                            .textFieldStyle(.roundedBorder)
+                        HStack {
+                            TextField("What % for \(block.name)?", text: answerBinding(index))
+                                .keyboardType(.numbersAndPunctuation)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit { answerPercent(index) }
+                            Button("OK") { answerPercent(index) }
+                                .buttonStyle(.bordered)
+                                .disabled(Target(parsing: percentAnswers[index] ?? "") == nil)
+                        }
                         if let answer = percentAnswers[index], !answer.isEmpty, Target(parsing: answer) == nil {
                             Text("Try 83-85, 80 or 80+").font(.footnote).foregroundStyle(.orange)
                         }
@@ -197,7 +208,7 @@ struct PlateCalculatorView: View {
                 .padding(.vertical, 2)
             }
 
-            if let readText {
+            if let readText = failedText ?? savedWorkout?.sourceText {
                 DisclosureGroup("Text Vision read") {
                     Text(readText)
                         .font(.caption.monospaced())
@@ -208,6 +219,34 @@ struct PlateCalculatorView: View {
                 }
             }
         }
+
+        if !savedWorkouts.isEmpty {
+            Section {
+                ForEach(savedWorkouts) { saved in
+                    Button(saved.title) { workoutID = saved.id.uuidString }
+                        .tint(.primary)
+                }
+                .onDelete { offsets in
+                    for index in offsets { context.delete(savedWorkouts[index]) }
+                    try? context.save()
+                }
+            } header: {
+                Text("Saved workouts")
+            } footer: {
+                Text("Swipe left to delete.")
+            }
+        }
+    }
+
+    /// Saves the answer to "What % for …?" into the workout.
+    private func answerPercent(_ index: Int) {
+        guard let workout = savedWorkout, let target = Target(parsing: percentAnswers[index] ?? "") else { return }
+        var updated = workout.blocks
+        guard updated.indices.contains(index) else { return }
+        updated[index] = updated[index].fillingMissingPercent(with: target)
+        workout.blocks = updated
+        percentAnswers[index] = nil
+        try? context.save()
     }
 
     private func read(_ item: PhotosPickerItem) async {
@@ -220,14 +259,18 @@ struct PlateCalculatorView: View {
                 return
             }
             let text = try await TextReader.lines(in: data).joined(separator: "\n")
-            readText = text
-            percentAnswers = [:]
-            blocks = WorkoutParser.parse(text)
-            if blocks.isEmpty {
+            let parsed = WorkoutParser.parse(text)
+            if parsed.isEmpty {
                 readError = "No strength work found in that screenshot."
-            } else {
-                workoutID = SampleWorkout.screenshotID
+                failedText = text
+                return
             }
+            failedText = nil
+            let workout = Workout(sourceText: text, blocks: parsed)
+            context.insert(workout)
+            try? context.save()
+            workoutID = workout.id.uuidString
+            readCount += 1
         } catch {
             readError = "Couldn't read that image: \(error.localizedDescription)"
         }

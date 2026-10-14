@@ -6,6 +6,6 @@ import SwiftUI
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [Gym.self, PersonalRecord.self, PRHistory.self])
+        .modelContainer(for: [Gym.self, PersonalRecord.self, PRHistory.self, Workout.self])
     }
 }
