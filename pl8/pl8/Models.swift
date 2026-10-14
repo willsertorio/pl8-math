@@ -98,8 +98,8 @@ final class Workout {
     var date: Date
     /// The text the blocks were read from.
     var sourceText: String
-    /// The blocks, saved as JSON so SwiftData only stores plain data.
-    private var blocksData: Data
+    /// The blocks, saved as JSON so SwiftData only stores plain data. Use `blocks` instead.
+    var blocksData: Data
     @Relationship(deleteRule: .nullify, inverse: \Session.workout)
     var sessions: [Session] = []
 

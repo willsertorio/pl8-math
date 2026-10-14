@@ -1,3 +1,4 @@
+import Foundation
 import PlateKit
 
 /// The three real workouts from Fixtures/README.md, for trying the plate math before the app can read screenshots.
