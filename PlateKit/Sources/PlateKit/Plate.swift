@@ -71,6 +71,12 @@ public enum Bar {
         case .lb: [45, 35, 15]
         }
     }
+
+    /// "20 Olympic · 15 Women's Olympic · 10 Technique" (SPEC 2.2). Pound bars have no names.
+    public static func name(_ weight: Double, _ unit: WeightUnit) -> String? {
+        guard unit == .kg else { return nil }
+        return [20: "Olympic", 15: "Women's Olympic", 10: "Technique"][weight]
+    }
 }
 
 /// What the plate math needs to know about a gym: its unit, which plate sizes it has, and its bar.

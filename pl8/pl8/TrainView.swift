@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Train tab. Adding today's workout and the session come in the next M4 steps.
 struct TrainView: View {
+    @AppStorage("hasFinishedFirstRun") private var hasFinishedFirstRun = true
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -13,6 +15,8 @@ struct TrainView: View {
                         PlateCalculatorView()
                     }
                     .buttonStyle(.black)
+                    Button("Replay the first run") { hasFinishedFirstRun = false }
+                        .font(.subheadline.weight(.semibold))
                 }
                 .drawer()
                 .padding(16)

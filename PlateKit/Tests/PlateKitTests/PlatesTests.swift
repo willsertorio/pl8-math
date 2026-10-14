@@ -42,6 +42,13 @@ struct PlatesTests {
         #expect(Bar.weights(.lb) == [45, 35, 15])
     }
 
+    @Test func barNames() {
+        #expect(Bar.name(20, .kg) == "Olympic")
+        #expect(Bar.name(15, .kg) == "Women's Olympic")
+        #expect(Bar.name(10, .kg) == "Technique")
+        #expect(Bar.name(45, .lb) == nil)                           // lb bars go by weight only
+    }
+
     @Test func newGymHasEveryPlateOfItsUnit() {
         let gym = GymSetup(unit: .lb)
         #expect(gym.plateSizes == [55, 45, 35, 25, 15, 10, 5, 2.5])

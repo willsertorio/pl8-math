@@ -2,54 +2,22 @@ import SwiftData
 import SwiftUI
 import PlateKit
 
-/// PRs tab: every PR, tap to edit, swipe to delete, + to add (SPEC 2.4).
+/// PRs tab: every PR, tap to edit, swipe to delete, + to add, or read a screenshot (SPEC 2.4).
 struct PRsView: View {
-    @Environment(\.modelContext) private var context
-    @Query(sort: \PersonalRecord.lift) private var records: [PersonalRecord]
     @State private var editing: PRTarget?
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(records) { record in
+            PRList(editing: $editing)
+                .background(Theme.background)
+                .navigationTitle("PRs")
+                .toolbar {
                     Button {
-                        editing = PRTarget(lift: record.lift, record: record)
+                        editing = PRTarget(lift: nil, record: nil)
                     } label: {
-                        HStack {
-                            Text(record.lift).font(.headline)
-                            Spacer()
-                            if let value = record.value {
-                                Text("\(WeightUnit.trimmed(value)) \(record.unit.rawValue)")
-                                    .font(.headline)
-                                    .monospacedDigit()
-                            } else {
-                                Text("Add").foregroundStyle(.orange)
-                            }
-                        }
-                        .contentShape(Rectangle())
+                        Label("Add PR", systemImage: "plus")
                     }
-                    .tint(Theme.ink)
-                    .listRowBackground(Theme.paper)
                 }
-                .onDelete { offsets in
-                    for index in offsets { context.delete(records[index]) }
-                    try? context.save()
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Theme.background)
-            .navigationTitle("PRs")
-            .toolbar {
-                Button {
-                    editing = PRTarget(lift: nil, record: nil)
-                } label: {
-                    Label("Add PR", systemImage: "plus")
-                }
-            }
-            .sheet(item: $editing) { target in
-                PREditor(lift: target.lift, record: target.record)
-            }
         }
     }
 }
