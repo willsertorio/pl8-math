@@ -195,7 +195,7 @@ Lines like `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb`. Unit from t
 - `Gym`: id, name (≤ 8 chars), unit (kg|lb), plateSizes [Double], barWeight, isCurrent, placeID? (later).
 - `PersonalRecord`: id, lift (canonical name), value, unit, updatedAt. Keep previous values as `PRHistory` entries.
 - `Workout`: id, date, sourceText, blocks (Codable `StrengthBlock` array).
-- `Session`: id, workout, gym snapshot (name, unit, bar, plates), startedAt?, endedAt?, setLogs.
+- `Session`: id, workout, liftNames (by block index, so history reads well if the workout is deleted), gym snapshot (name, unit, bar, plates), startedAt?, endedAt?, setLogs.
 - `SetLog`: blockIndex, setIndex, isWarmUp, reps, pctText, plannedTotal, unit, perSide [Double], checkedAt?, reportedTotal?.
 Default PR list: Back squat, Front squat, Deadlift, Clean, Snatch, Bench press (empty values).
 
