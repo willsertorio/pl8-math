@@ -148,6 +148,8 @@ final class Session {
     var liftNames: [String]
     /// Each lift's PR unit by block index: totals are shown in it (SPEC 3.2).
     var prUnits: [WeightUnit] = []
+    /// The PR each lift is based on, by block index (e.g. "Snatch" for Snatch Pull + Snatch), for the new-PR check.
+    var prLifts: [String] = []
 
     // Gym snapshot: later changes to the gym don't change history.
     var gymName: String
@@ -186,9 +188,14 @@ final class Session {
         prUnits.indices.contains(blockIndex) ? prUnits[blockIndex] : gymUnit
     }
 
+    func prLift(for blockIndex: Int) -> String {
+        prLifts.indices.contains(blockIndex) ? prLifts[blockIndex] : liftName(for: blockIndex)
+    }
+
     /// Saves a new session with every planned set, ready to check off.
-    static func start(workout: Workout?, plan: SessionPlan, gym: Gym, in context: ModelContext) -> Session {
+    static func start(workout: Workout?, plan: SessionPlan, prLifts: [String], gym: Gym, in context: ModelContext) -> Session {
         let session = Session(gym: gym, workout: workout, plan: plan)
+        session.prLifts = prLifts
         context.insert(session)
         for (order, record) in plan.setRecords.enumerated() {
             let log = SetLog(order: order, record: record)
@@ -199,8 +206,17 @@ final class Session {
         return session
     }
 
-    var heaviestTotal: Double? {
-        setLogs.filter { !$0.isWarmUp }.map(\.plannedTotal).max()
+    /// The heaviest working set: what was lifted where reported, else what was planned.
+    var heaviestLog: SetLog? {
+        setLogs.filter { !$0.isWarmUp }.max { $0.liftedTotal < $1.liftedTotal }
+    }
+
+    var heaviestTotal: Double? { heaviestLog?.liftedTotal }
+
+    /// First check to last check (SPEC 3.8).
+    var duration: TimeInterval? {
+        guard let startedAt, let endedAt else { return nil }
+        return endedAt.timeIntervalSince(startedAt)
     }
 }
 
@@ -220,6 +236,9 @@ final class SetLog {
     /// What the user said they lifted (last set of each lift).
     var reportedTotal: Double?
     var session: Session?
+
+    /// History keeps the planned load, except where the user reported what they lifted (SPEC 3.8).
+    var liftedTotal: Double { reportedTotal ?? plannedTotal }
 
     init(order: Int, record: PlannedSetRecord) {
         self.order = order

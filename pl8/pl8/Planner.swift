@@ -19,6 +19,11 @@ enum Planner {
         return SessionPlan(gym: gym?.setup ?? GymSetup(unit: .lb), lifts: lifts)
     }
 
+    /// The PR each planned lift is based on, in plan order (same blocks `plan` keeps).
+    static func prLifts(blocks: [StrengthBlock]) -> [String] {
+        blocks.filter { !$0.pctMissing }.map { LiftNames.canonical($0.prLift) }
+    }
+
     /// PR lifts these blocks need that have no value yet, in workout order.
     static func missingPRs(blocks: [StrengthBlock], records: [PersonalRecord]) -> [String] {
         var names: [String] = []

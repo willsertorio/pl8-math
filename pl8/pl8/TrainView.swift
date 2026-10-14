@@ -36,8 +36,10 @@ struct TrainView: View {
 
     private func start(_ workout: Workout) {
         guard let gym else { return }
-        let plan = Planner.plan(blocks: workout.blocks, gym: gym, records: records)
-        activeSession = Session.start(workout: workout, plan: plan, gym: gym, in: context)
+        let blocks = workout.blocks
+        let plan = Planner.plan(blocks: blocks, gym: gym, records: records)
+        activeSession = Session.start(workout: workout, plan: plan, prLifts: Planner.prLifts(blocks: blocks),
+                                      gym: gym, in: context)
     }
 
     var body: some View {

@@ -23,6 +23,9 @@ struct SessionDetailView: View {
             Section {
                 LabeledContent("Gym", value: session.gymName)
                 LabeledContent("Bar", value: "\(WeightUnit.trimmed(session.barWeight)) \(session.gymUnit.rawValue)")
+                if let duration = session.duration {
+                    LabeledContent("Time", value: Duration.seconds(duration).formatted(.time(pattern: .hourMinute)))
+                }
                 if let workout = session.workout {
                     LabeledContent("Workout", value: workout.title)
                 }
@@ -33,8 +36,13 @@ struct SessionDetailView: View {
                     ForEach(group.logs) { log in
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
-                                Text("\(log.reps) × \(WeightUnit.trimmed(log.plannedTotal)) \(log.unit.rawValue)")
+                                Text("\(log.reps) × \(WeightUnit.trimmed(log.liftedTotal)) \(log.unit.rawValue)")
                                     .font(.headline)
+                                if log.reportedTotal != nil, log.reportedTotal != log.plannedTotal {
+                                    Text("planned \(WeightUnit.trimmed(log.plannedTotal))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                                 Spacer()
                                 Text(log.pctText).foregroundStyle(.secondary)
                             }

@@ -310,7 +310,7 @@ struct PlateCalculatorView: View {
 
     private func saveSession(_ plan: SessionPlan) {
         guard let gym else { return }
-        _ = Session.start(workout: savedWorkout, plan: plan, gym: gym, in: context)
+        _ = Session.start(workout: savedWorkout, plan: plan, prLifts: workout.lifts.map(\.prLift), gym: gym, in: context)
     }
 
     /// "14 Oct, 09:30 · MY BOX · 14 sets · top 260 lb"
