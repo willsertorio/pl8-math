@@ -1,3 +1,5 @@
+import Foundation
+
 /// One plate size and how it looks (SPEC 3.1).
 public struct Plate: Hashable, Sendable {
     public enum Kind: String, Sendable {
@@ -77,6 +79,15 @@ public struct GymSetup: Hashable, Sendable {
     /// Heaviest first, no duplicates. A gym stores which sizes it has, not how many.
     public let plateSizes: [Double]
     public let barWeight: Double
+
+    /// Longest gym name: it has to fit on the flag.
+    public static let maxNameLength = 8
+
+    /// Gym names are uppercase, up to 8 characters (SPEC 2.2).
+    public static func normalizedName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespaces).uppercased()
+        return String(trimmed.prefix(maxNameLength)).trimmingCharacters(in: .whitespaces)
+    }
 
     /// Defaults: every plate size of the unit and the unit's heaviest bar.
     public init(unit: WeightUnit, plateSizes: [Double]? = nil, barWeight: Double? = nil) {

@@ -11,8 +11,6 @@ struct SampleWorkout: Identifiable, Hashable {
 
     let name: String
     let lifts: [Lift]
-    /// Starting PRs, in kg.
-    let prs: [String: Double]
 
     var id: String { name }
 
@@ -30,8 +28,7 @@ struct SampleWorkout: Identifiable, Hashable {
                 Lift(name: "Back Squat", prLift: "Back Squat", sets: sets(3, [
                     .range(75, 78), .range(75, 78), .range(78, 80), .range(78, 80), .plus(80),
                 ])),
-            ],
-            prs: ["Back Squat": 100]
+            ]
         ),
         SampleWorkout(
             name: "02/10 · Snatch Balance, Snatch",
@@ -40,8 +37,7 @@ struct SampleWorkout: Identifiable, Hashable {
                      sets: sets(1, [68, 68, 73, 73, 75, 75].map { .single($0) })),
                 Lift(name: "Snatch Pull + Snatch", prLift: "Snatch",
                      sets: sets(1, [68, 68, 70, 73, 75, 75, 78, 78].map { .single($0) })),
-            ],
-            prs: ["Snatch Balance": 100, "Snatch": 85]
+            ]
         ),
         SampleWorkout(
             name: "05/10 · Snatch, Back Squat",
@@ -51,8 +47,7 @@ struct SampleWorkout: Identifiable, Hashable {
                 ])),
                 Lift(name: "Back Squat", prLift: "Back Squat",
                      sets: sets(2, Array(repeating: .range(83, 85), count: 5))),
-            ],
-            prs: ["Snatch": 85, "Back Squat": 140]
+            ]
         ),
     ]
 
@@ -67,7 +62,7 @@ struct SampleWorkout: Identifiable, Hashable {
             guard !sets.isEmpty, !block.pctMissing else { return nil }
             return Lift(name: block.name, prLift: block.prLift, sets: sets)
         }
-        return SampleWorkout(name: screenshotID, lifts: lifts, prs: [:])
+        return SampleWorkout(name: screenshotID, lifts: lifts)
     }
 
     private static func sets(_ reps: Int, _ targets: [Target]) -> [LiftInput.WorkSet] {

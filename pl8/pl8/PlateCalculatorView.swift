@@ -1,9 +1,10 @@
 import PhotosUI
+import SwiftData
 import SwiftUI
 import UIKit
 import PlateKit
 
-/// A test screen for M1–M2: read a workout screenshot (or pick a sample), set up the gym and PRs,
+/// A test screen for M1–M3: read a workout screenshot (or pick a sample), set up the gym and PRs,
 /// and see every load PlateKit plans. Not the real design (that's M4+).
 struct PlateCalculatorView: View {
     // Workout
@@ -15,14 +16,20 @@ struct PlateCalculatorView: View {
     @State private var blocks: [StrengthBlock] = []
     @State private var percentAnswers: [Int: String] = [:]
 
-    // Gym
-    @State private var unit: WeightUnit = .lb
-    @State private var bar: Double = 45
-    @State private var plates: Set<Double> = Set(Plate.catalog(.lb).map(\.size))
+    // Saved data (SwiftData)
+    @Environment(\.modelContext) private var context
+    @Query private var gyms: [Gym]
+    @Query private var records: [PersonalRecord]
+    @State private var editingPR: EditingPR?
 
-    // PRs
-    @State private var prs: [String: Double] = SampleWorkout.all[0].prs
-    @State private var prUnits: [String: WeightUnit] = [:]
+    private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+    private var unit: WeightUnit { gym?.unit ?? .lb }
+
+    /// The saved PR for a lift, matching names the same way the parser does.
+    private func record(for lift: String) -> PersonalRecord? {
+        let name = LiftNames.canonical(lift)
+        return records.first { $0.lift == name }
+    }
 
     /// Blocks with the user's answers for any hidden %.
     private var answeredBlocks: [StrengthBlock] {
@@ -41,16 +48,16 @@ struct PlateCalculatorView: View {
     }
 
     private var plan: SessionPlan {
-        let gym = GymSetup(unit: unit, plateSizes: Array(plates), barWeight: bar)
         let lifts = workout.lifts.map { lift in
-            LiftInput(
+            let saved = record(for: lift.prLift)
+            return LiftInput(
                 name: lift.name,
-                pr: prs[lift.prLift] ?? 0,
-                prUnit: prUnits[lift.prLift] ?? .kg,
+                pr: saved?.value ?? 0,
+                prUnit: saved?.unit ?? .kg,
                 sets: lift.sets
             )
         }
-        return SessionPlan(gym: gym, lifts: lifts)
+        return SessionPlan(gym: gym?.setup ?? GymSetup(unit: .lb), lifts: lifts)
     }
 
     var body: some View {
@@ -67,49 +74,31 @@ struct PlateCalculatorView: View {
             }
 
             Section("Gym") {
-                Picker("Units", selection: $unit) {
-                    Text("Kilograms").tag(WeightUnit.kg)
-                    Text("Pounds").tag(WeightUnit.lb)
-                }
-                .pickerStyle(.segmented)
-
-                Picker("Bar", selection: $bar) {
-                    ForEach(Bar.weights(unit), id: \.self) { weight in
-                        Text(weightText(weight)).tag(weight)
-                    }
-                }
-
-                ForEach(Plate.catalog(unit), id: \.size) { plate in
-                    Toggle(isOn: plateBinding(plate.size)) {
-                        HStack {
-                            Circle()
-                                .fill(Color(hex: plate.colorHex))
-                                .overlay(Circle().stroke(.secondary, lineWidth: 0.5))
-                                .frame(width: 12 + 16 * plate.diameter, height: 12 + 16 * plate.diameter)
-                            Text(weightText(plate.size))
-                        }
-                    }
+                if let gym {
+                    GymEditor(gym: gym)
                 }
             }
 
-            Section("PRs") {
+            Section {
                 ForEach(workout.prLifts, id: \.self) { lift in
-                    HStack {
-                        Text(lift)
-                        Spacer()
-                        TextField("PR", value: prBinding(lift), format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 70)
-                        Picker("Unit", selection: prUnitBinding(lift)) {
-                            Text("kg").tag(WeightUnit.kg)
-                            Text("lb").tag(WeightUnit.lb)
+                    let saved = record(for: lift)
+                    Button {
+                        editingPR = EditingPR(lift: lift)
+                    } label: {
+                        LabeledContent(lift) {
+                            if let saved, let value = saved.value {
+                                Text("\(WeightUnit.trimmed(value)) \(saved.unit.rawValue)")
+                            } else {
+                                Text("Add PR").foregroundStyle(.orange)
+                            }
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(width: 90)
                     }
+                    .tint(.primary)
                 }
+            } header: {
+                Text("PRs")
+            } footer: {
+                Text("Tap a PR to change it. Earlier values are kept.")
             }
 
             Section("Plate kit") {
@@ -158,13 +147,11 @@ struct PlateCalculatorView: View {
             guard let item else { return }
             Task { await read(item) }
         }
-        .onChange(of: unit) { _, newUnit in
-            bar = Bar.weights(newUnit)[0]
-            plates = Set(Plate.catalog(newUnit).map(\.size))
+        .sheet(item: $editingPR) { item in
+            PREditor(lift: item.lift, record: record(for: item.lift))
         }
-        .onChange(of: workoutID) { _, _ in
-            // Sample PRs fill in; PRs you typed for other lifts stay.
-            prs = workout.prs.merging(prs) { sample, _ in sample }
+        .task {
+            seedIfNeeded()
         }
     }
 
@@ -264,25 +251,139 @@ struct PlateCalculatorView: View {
         return perSide.map(WeightUnit.trimmed).joined(separator: " + ") + " \(unit.rawValue) each side"
     }
 
-    private func plateBinding(_ size: Double) -> Binding<Bool> {
-        Binding(
-            get: { plates.contains(size) },
-            set: { isOn in
-                if isOn { plates.insert(size) } else { plates.remove(size) }
+    /// First launch: one gym with every plate, and the default PR list with no values yet.
+    private func seedIfNeeded() {
+        if gyms.isEmpty {
+            context.insert(Gym(name: "MY BOX", unit: .lb))
+        }
+        if records.isEmpty {
+            for lift in LiftNames.defaultPRLifts {
+                context.insert(PersonalRecord(lift: lift))
             }
-        )
-    }
-
-    private func prBinding(_ lift: String) -> Binding<Double> {
-        Binding(get: { prs[lift] ?? 0 }, set: { prs[lift] = $0 })
-    }
-
-    private func prUnitBinding(_ lift: String) -> Binding<WeightUnit> {
-        Binding(get: { prUnits[lift] ?? .kg }, set: { prUnits[lift] = $0 })
+        }
+        try? context.save()
     }
 
     private func answerBinding(_ index: Int) -> Binding<String> {
         Binding(get: { percentAnswers[index] ?? "" }, set: { percentAnswers[index] = $0 })
+    }
+}
+
+/// Which PR the editor sheet is open for.
+private struct EditingPR: Identifiable {
+    let lift: String
+    var id: String { lift }
+}
+
+/// The gym's name, units, bar and plates, saved as you change them.
+private struct GymEditor: View {
+    @Bindable var gym: Gym
+
+    var body: some View {
+        TextField("Gym name", text: Binding(
+            get: { gym.name },
+            set: { gym.name = GymSetup.normalizedName($0) }
+        ))
+        .textInputAutocapitalization(.characters)
+        .autocorrectionDisabled()
+
+        Picker("Units", selection: Binding(get: { gym.unit }, set: { gym.switchUnit(to: $0) })) {
+            Text("Kilograms").tag(WeightUnit.kg)
+            Text("Pounds").tag(WeightUnit.lb)
+        }
+        .pickerStyle(.segmented)
+
+        Picker("Bar", selection: $gym.barWeight) {
+            ForEach(Bar.weights(gym.unit), id: \.self) { weight in
+                Text("\(WeightUnit.trimmed(weight)) \(gym.unit.rawValue)").tag(weight)
+            }
+        }
+
+        ForEach(Plate.catalog(gym.unit), id: \.size) { plate in
+            Toggle(isOn: Binding(
+                get: { gym.plateSizes.contains(plate.size) },
+                set: { gym.setPlate(plate.size, isOn: $0) }
+            )) {
+                HStack {
+                    Circle()
+                        .fill(Color(hex: plate.colorHex))
+                        .overlay(Circle().stroke(.secondary, lineWidth: 0.5))
+                        .frame(width: 12 + 16 * plate.diameter, height: 12 + 16 * plate.diameter)
+                    Text("\(WeightUnit.trimmed(plate.size)) \(gym.unit.rawValue)")
+                }
+            }
+        }
+    }
+}
+
+/// Sheet to enter or change one PR. Saving keeps the old value in its history.
+private struct PREditor: View {
+    let lift: String
+    let record: PersonalRecord?
+
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @State private var value: Double?
+    @State private var unit: WeightUnit = .kg
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("PR", value: $value, format: .number)
+                        .keyboardType(.decimalPad)
+                    Picker("Unit", selection: $unit) {
+                        Text("kg").tag(WeightUnit.kg)
+                        Text("lb").tag(WeightUnit.lb)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if let record, !record.history.isEmpty {
+                    Section("Earlier") {
+                        ForEach(record.history.sorted { $0.date > $1.date }) { entry in
+                            LabeledContent(
+                                "\(WeightUnit.trimmed(entry.value)) \(entry.unit.rawValue)",
+                                value: entry.date.formatted(date: .abbreviated, time: .shortened)
+                            )
+                        }
+                    }
+                }
+            }
+            .navigationTitle("\(lift) PR")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        save()
+                        dismiss()
+                    }
+                    .disabled((value ?? 0) <= 0)
+                }
+            }
+            .onAppear {
+                value = record?.value
+                unit = record?.unit ?? .kg
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func save() {
+        guard let value, value > 0 else { return }
+        if let record {
+            if record.value != value || record.unit != unit {
+                record.update(value: value, unit: unit)
+            }
+        } else {
+            let newRecord = PersonalRecord(lift: lift)
+            context.insert(newRecord)
+            newRecord.update(value: value, unit: unit)
+        }
+        try? context.save()
     }
 }
 

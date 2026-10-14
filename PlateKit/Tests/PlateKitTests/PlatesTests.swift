@@ -54,3 +54,12 @@ struct PlatesTests {
         #expect(gym.barWeight == 15)
     }
 }
+
+@Suite("Gym name (SPEC 2.2)")
+struct GymNameTests {
+    @Test func uppercaseUpToEightCharacters() {
+        #expect(GymSetup.normalizedName("crossfit jennie") == "CROSSFIT")
+        #expect(GymSetup.normalizedName("  my box ") == "MY BOX")
+        #expect(GymSetup.normalizedName("") == "")
+    }
+}
