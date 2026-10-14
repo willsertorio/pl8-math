@@ -231,7 +231,7 @@ Each milestone ends with tests green and something Will can try on his iPhone.
 ---
 
 ## Open decisions
-1. Where History lives: a 4th tab, or the wall calendar in the room (the prototype already builds a calendar object).
+1. ~~Where History lives~~ — decided 2026-10-14: a 4th tab (Train · PRs · Gym · History). The wall calendar in the room can link to it in M6.
 2. Does the opening box animation play on every launch, or only the first?
-3. "Type it in": keep the prototype's simple form (lift, sets, reps, one %), or allow a % per set?
+3. ~~"Type it in"~~ — decided 2026-10-14: the simple form (lift, sets, reps, one %).
 4. Plate counts per gym (e.g. only two 2.5s) — currently out of scope.

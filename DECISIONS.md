@@ -17,3 +17,6 @@ Short entries, newest last. Why we chose something, so future-me (and anyone rea
 - **2026-10-13 · Any combination of plates counts as loadable.** The prototype only tried totals in jumps of 2 × the smallest plate, so with only 45/35/25/15/10 lb plates it skipped 115 lb (one 35 a side) for a 115.5 lb target and loaded 125. PlateKit follows SPEC 3.3: any sum of the gym's plates. Fixture updated.
 - **2026-10-13 · A block can start with its label on the same line.** The box's app showed "C. After a Party" on one line, which wasn't read as block C. SPEC 3.6 rule 1 now accepts `C. After a Party`; the text after the dot is the label.
 - **2026-10-14 · Sessions keep their lift names.** History should still say "Back Squat" after the workout it came from is deleted, so `Session` stores `liftNames` by block index.
+- **2026-10-14 · History is a 4th tab.** Train · PRs · Gym · History; simplest in 2D, and the 3D wall calendar can link to it later.
+- **2026-10-14 · "Type it in" is the simple form.** Lift, sets, reps, one %: fastest between sets. Per-set % still comes from screenshots.
+- **2026-10-14 · M4 uses the spec look with the system font.** Black on white, square black buttons, outlined fields, orange background (SPEC 2.5) now, so screens aren't restyled later. Space Grotesk comes in when the font file is added.
