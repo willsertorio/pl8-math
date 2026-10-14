@@ -479,3 +479,19 @@ struct FirstKnownLiftTests {
         #expect(LiftNames.firstKnown(in: "Wall Walks") == nil)
     }
 }
+
+@Suite("Repairing saved blocks")
+struct RepairTests {
+    // Workouts saved before the 14/10 fix have prLift ")" and the brackets in the name.
+    @Test func prLiftWithoutLettersFallsBackToTheMovement() {
+        let old = StrengthBlock.typed(letter: "E", lift: "Deadlift (315/225) (OR", sets: 1, reps: 10, target: .single(60))
+            .settingPRLift(")")
+        #expect(old.prLift == ")")
+        #expect(old.repaired().prLift == "Deadlift")
+    }
+
+    @Test func goodBlocksAreUnchanged() {
+        let block = StrengthBlock.typed(letter: "A", lift: "Snatch", sets: 3, reps: 1, target: .single(70))
+        #expect(block.repaired() == block)
+    }
+}

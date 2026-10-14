@@ -37,6 +37,13 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
         rpe.map { .single($0 * 10) }
     }
 
+    /// Fixes blocks saved by older parser versions: a PR name with no letters (")" — Fixtures 14/10) falls back to
+    /// the movement.
+    public func repaired() -> StrengthBlock {
+        guard !prLift.contains(where: \.isLetter) else { return self }
+        return settingPRLift(WorkoutParser.movementName(name))
+    }
+
     /// The same block based on another PR (e.g. a complex the app guessed wrong).
     public func settingPRLift(_ lift: String) -> StrengthBlock {
         StrengthBlock(letter: letter, label: label, name: name, prLift: LiftNames.canonical(lift), format: format,

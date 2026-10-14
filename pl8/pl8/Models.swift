@@ -130,7 +130,8 @@ private enum BlockCache {
 
     static func blocks(for data: Data) -> [StrengthBlock] {
         if let blocks = decoded[data] { return blocks }
-        let blocks = (try? JSONDecoder().decode([StrengthBlock].self, from: data)) ?? []
+        // `repaired()` fixes blocks saved by older parser versions (e.g. a ")" PR).
+        let blocks = ((try? JSONDecoder().decode([StrengthBlock].self, from: data)) ?? []).map { $0.repaired() }
         if decoded.count > 100 { decoded.removeAll() }
         decoded[data] = blocks
         return blocks
