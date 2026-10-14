@@ -169,8 +169,8 @@ struct WorkoutRealUseTests {
         #expect(e.label == "After Party")
         #expect(e.name == "Deadlift")
         #expect(e.prLift == "Deadlift")                               // not ")"
-        #expect(e.sets.map(\.reps) == [10, 5])
-        #expect(targets(e) == [.single(60), .single(65)])
+        #expect(e.sets.map(\.reps) == [10, 5, 10, 5])                // "2-3 Sets": the pair, twice
+        #expect(targets(e) == [.single(60), .single(65), .single(60), .single(65)])
         #expect(e.note?.hasPrefix("1000m Bike Erg OR 24/19 cal Echo Bike between sets") == true)
         #expect(e.note?.contains("Check-In") == false)                // app buttons aren't notes
     }
@@ -324,6 +324,31 @@ struct WorkoutRuleTests {
         """)
         #expect(blocks.first?.sets.count == 6)
         #expect(blocks.first?.format == nil)
+    }
+
+    @Test func setRangeUsesTheLowerNumber() {
+        let blocks = WorkoutParser.parse("A.\n2-3 Sets\n5 Deadlift @70% 1RM Deadlift")
+        #expect(blocks.first?.sets.count == 2)
+    }
+
+    @Test func severalLinesUnderNSetsAreOneRoundRepeated() {
+        let blocks = WorkoutParser.parse("A.\n3 Sets\n10 Deadlift @60% 1RM Deadlift\n5 Deadlift @65% 1RM Deadlift")
+        #expect(blocks.first?.sets.map(\.reps) == [10, 5, 10, 5, 10, 5])
+    }
+
+    @Test func aRangeIsAlwaysRounds() {
+        let blocks = WorkoutParser.parse("A.\n2-3 Sets\n10 Deadlift @60% 1RM Deadlift\n5 Deadlift @65% 1RM Deadlift")
+        #expect(blocks.first?.sets.map(\.reps) == [10, 5, 10, 5])
+    }
+
+    @Test func asManyLinesAsSetsAreTheSets() {
+        let blocks = WorkoutParser.parse("A.\n3 Sets\n5 Deadlift @60% 1RM Deadlift\n5 Deadlift @65% 1RM Deadlift\n5 Deadlift @70% 1RM Deadlift")
+        #expect(blocks.first?.sets.count == 3)
+    }
+
+    @Test func emomLinesAreNeverRepeated() {
+        let blocks = WorkoutParser.parse("A.\n6 Minute EMOM\n2 Clean @70% 1RM Clean\n2 Clean @75% 1RM Clean")
+        #expect(blocks.first?.sets.count == 2)
     }
 
     @Test func setsByReps() {

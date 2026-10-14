@@ -172,7 +172,7 @@ Input: text lines (from Vision OCR, or typed). Output: strength blocks, each `{n
    The lift whose PR applies is the text after `1RM`; if absent, the movement itself.
 3. **Anything with a % of 1RM is strength**, whatever the block is called and wherever it appears (including after the WOD). A block with no % lines is a WOD and is ignored, even if it lists loads like `(50/35)`.
 4. Consecutive strength lines for the same movement form one lift; each line is one set.
-5. Format headers expand a single line: `N Minute EMOM` + one line → N sets; `E2MOM N min` → N/2 sets; `N Sets` + one line → N sets; `NxR @P%` → N sets of R reps.
+5. Format headers expand a single line: `N Minute EMOM` + one line → N sets; `E2MOM N min` → N/2 sets; `N Sets` + one line → N sets; `NxR @P%` → N sets of R reps. `N-M Sets` counts as N. Under a Sets header, several lines of one lift are one round done N times (`2-3 Sets` + `10 Deadlift @60%` + `5 Deadlift @65%` → 10, 5, 10, 5) — except a plain `N Sets` with exactly N lines, where each line is one set. EMOM lines are never repeated.
 6. **Hidden %**: a line that looks like a strength line whose % was cut off or garbled → keep the block with `pctMissing = true`; the app asks "What % for Back Squat?" (accepts `83-85`, `80`, `80+`). Never invent a %.
    A line counts as cut off when it starts with `<reps> <known lift>`, sits under a format header (`N Minute EMOM`, `N Sets`), and has leftover fragments of a strength line: `@`, `%`, `RM`, or the lift's last word repeated (the 05/10 OCR reads `2 Back Squat K checn J Squat`).
    Complexes joined with `+` that have no `@`/`%` anywhere (05/10 block A) are technique work, not hidden %, and are ignored.

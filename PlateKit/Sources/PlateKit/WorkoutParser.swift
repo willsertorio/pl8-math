@@ -237,6 +237,10 @@ public enum WorkoutParser {
     private struct Header {
         let format: String?
         let count: Int
+        /// "N Sets": several lines are one round, done N times. EMOM lines are never repeated.
+        var repeatsRound = false
+        /// "2-3 Sets": always rounds, even when the line count equals the lower number.
+        var isRange = false
     }
 
     private struct Line {
@@ -283,6 +287,10 @@ public enum WorkoutParser {
             var sets = lift.lines.flatMap(\.sets)
             if lift.lines.count == 1, !lift.lines[0].countsItself, let count = lift.header?.count, count > 1 {
                 sets = Array(repeating: sets[0], count: count)
+            } else if let header = lift.header, header.repeatsRound, header.count > 1,
+                      lift.lines.count > 1, header.isRange || lift.lines.count != header.count,
+                      !lift.lines.contains(where: \.countsItself) {
+                sets = Array(Array(repeating: sets, count: header.count).joined())
             }
             return StrengthBlock(
                 letter: letter,
@@ -309,8 +317,12 @@ public enum WorkoutParser {
            let every = Int(m.1), let minutes = Int(m.2), every > 0 {
             return Header(format: "E\(every)MOM", count: minutes / every)
         }
+        // "2-3 Sets" → 2 (DECISIONS 2026-10-14)
+        if let m = text.wholeMatch(of: #/(\d+)\s*(?:[-–]|to)\s*\d+\s*sets?/#.ignoresCase()), let n = Int(m.1) {
+            return Header(format: nil, count: n, repeatsRound: true, isRange: true)
+        }
         if let m = text.wholeMatch(of: #/(\d+)\s*sets?/#.ignoresCase()), let n = Int(m.1) {
-            return Header(format: nil, count: n)
+            return Header(format: nil, count: n, repeatsRound: true)
         }
         return nil
     }

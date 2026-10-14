@@ -55,7 +55,7 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 **14/10, two screenshots** (`-top` + `-bottom` `.vision.txt`, in either order)
 - A, B, C as 14/10 above (C's last two sets once, not twice)
 - D (power snatches and clean & jerks, fixed loads): ignored
-- E "After Party" · Deadlift · prLift `Deadlift` · `10@60`, `5@65`
+- E "After Party" · `2-3 Sets` (→ 2 rounds) · Deadlift · prLift `Deadlift` · `10@60`, `5@65`, `10@60`, `5@65`
 
 **13/10** (`.vision.txt`)
 - A · Split Jerk · EMOM · prLift `Split Jerk` · 6 × 1: `83, 83, 85, 85, 85–88, 85–88`
