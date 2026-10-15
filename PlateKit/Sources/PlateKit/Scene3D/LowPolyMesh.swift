@@ -46,6 +46,28 @@ public struct LowPolyMesh: Equatable, Sendable {
         return mesh
     }
 
+    /// A box centred on the origin.
+    public static func box(size: SIMD3<Float>) -> LowPolyMesh {
+        var mesh = LowPolyMesh()
+        let h = size / 2
+        let c: [SIMD3<Float>] = [
+            [-h.x, -h.y, -h.z], [h.x, -h.y, -h.z], [h.x, h.y, -h.z], [-h.x, h.y, -h.z],
+            [-h.x, -h.y, h.z], [h.x, -h.y, h.z], [h.x, h.y, h.z], [-h.x, h.y, h.z],
+        ]
+        mesh.addQuad(c[4], c[5], c[6], c[7])   // +Z
+        mesh.addQuad(c[1], c[0], c[3], c[2])   // -Z
+        mesh.addQuad(c[5], c[1], c[2], c[6])   // +X
+        mesh.addQuad(c[0], c[4], c[7], c[3])   // -X
+        mesh.addQuad(c[3], c[7], c[6], c[2])   // +Y
+        mesh.addQuad(c[0], c[1], c[5], c[4])   // -Y
+        return mesh
+    }
+
+    /// The same shape seen from inside (e.g. a backdrop box around the scene).
+    public func insideOut() -> LowPolyMesh {
+        hull(width: 0, roughness: 0, seed: 0)
+    }
+
     // MARK: - Faces
 
     public func faceCentre(_ triangle: Int) -> SIMD3<Float> {
@@ -174,8 +196,8 @@ extension SIMD3 where Scalar == Float {
 private func sine(_ x: Float) -> Float { Float(sinApprox(Double(x))) }
 private func cosine(_ x: Float) -> Float { Float(sinApprox(Double(x) + Double.pi / 2)) }
 
-/// Taylor series after reducing to −π…π: plenty for drawing 14-sided plates.
-private func sinApprox(_ value: Double) -> Double {
+/// Sine of radians: Taylor series after reducing to −π…π, plenty for drawing and placing the scene.
+func sinApprox(_ value: Double) -> Double {
     var x = value.truncatingRemainder(dividingBy: 2 * Double.pi)
     if x > Double.pi { x -= 2 * Double.pi }
     if x < -Double.pi { x += 2 * Double.pi }

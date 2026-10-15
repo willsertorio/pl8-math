@@ -71,6 +71,7 @@ struct TrainView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         NavigationLink("Test screen") { PlateCalculatorView() }
                         NavigationLink("3D test (M5)") { Spike3DView() }
+                        NavigationLink("3D room (M6)") { Room3DView() }
                         Button("Replay the first run") { hasFinishedFirstRun = false }
                     }
                     .font(.subheadline.weight(.semibold))
