@@ -6,11 +6,12 @@ import PlateKit
 /// M5: one plate on the bar in RealityKit with the target look (SPEC 2.5, Part 5 "risk to spike early").
 /// Compare outline and shading options on the phone; the chosen look is logged in DECISIONS.md.
 struct Spike3DView: View {
+    // Defaults: the look Will picked on 2026-10-15 (DECISIONS.md).
     @State private var outline: SpikeScene.Outline = .sketch
-    @State private var shading: SpikeScene.Shading = .toon
+    @State private var shading: SpikeScene.Shading = .smooth
     @State private var plateSize: Double = 25
     @State private var width: Double = 0.006
-    @State private var roughness: Double = 0.6
+    @State private var roughness: Double = 0.3
     @State private var yaw: Float = -0.7
     @State private var pitch: Float = 0.3
     @State private var dragStart: (yaw: Float, pitch: Float)?
@@ -109,6 +110,10 @@ enum SpikeScene {
 
     static let rootName = "spike-root"
 
+    /// Round enough to read as round, still a little faceted (Will, 2026-10-15: "no need to be super low poly").
+    static let plateSides = 32
+    static let barSides = 20
+
     /// The direction the "sun" shines (down, from the front right).
     static let light = SIMD3<Float>(-0.5, -1, -0.7)
 
@@ -126,12 +131,12 @@ enum SpikeScene {
         let shift = SIMD3<Float>(-0.78, 0, 0)
         let thickness = Float(config.plate.thickness)
         let parts: [(LowPolyMesh, UIColor)] = [
-            (LowPolyMesh.cylinder(radius: 0.014, length: 1.31, sides: 10), steel),
-            (LowPolyMesh.cylinder(radius: 0.04, length: 0.03, sides: 12).translated(by: [0.67, 0, 0]), steel),
-            (LowPolyMesh.cylinder(radius: 0.04, length: 0.03, sides: 12).translated(by: [-0.67, 0, 0]), steel),
-            (LowPolyMesh.cylinder(radius: 0.025, length: 0.415, sides: 12).translated(by: [0.8925, 0, 0]), steel),
-            (LowPolyMesh.cylinder(radius: 0.025, length: 0.415, sides: 12).translated(by: [-0.8925, 0, 0]), steel),
-            (LowPolyMesh.plate(radius: Float(config.plate.diameter) / 2, holeRadius: 0.026, thickness: thickness, sides: 14)
+            (LowPolyMesh.cylinder(radius: 0.014, length: 1.31, sides: barSides), steel),
+            (LowPolyMesh.cylinder(radius: 0.04, length: 0.03, sides: barSides).translated(by: [0.67, 0, 0]), steel),
+            (LowPolyMesh.cylinder(radius: 0.04, length: 0.03, sides: barSides).translated(by: [-0.67, 0, 0]), steel),
+            (LowPolyMesh.cylinder(radius: 0.025, length: 0.415, sides: barSides).translated(by: [0.8925, 0, 0]), steel),
+            (LowPolyMesh.cylinder(radius: 0.025, length: 0.415, sides: barSides).translated(by: [-0.8925, 0, 0]), steel),
+            (LowPolyMesh.plate(radius: Float(config.plate.diameter) / 2, holeRadius: 0.026, thickness: thickness, sides: plateSides)
                 .translated(by: [0.686 + thickness / 2, 0, 0]),
              UIColor(Color(hex: config.plate.colorHex))),
         ]

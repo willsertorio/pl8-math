@@ -100,7 +100,7 @@ Tab bar: **Train** · **PRs** · **Gym**.
 - **History** (not in the prototype yet): list of sessions → session detail (date, duration, gym, each lift's sets and loads). Placement to be decided (see Open decisions).
 
 ### 2.5 Look & feel
-- **Scene:** palette box light `#F0E2F3`, box dark `#6C3713`, flat background `#FF6200`. Toon shading, hand-drawn outline in the dark brown (double line, slight roughness). Plates are the only saturated colours.
+- **Scene:** palette box light `#F0E2F3`, box dark `#6C3713`, flat background `#FF6200`. Smooth lit shading on round-ish shapes (plates 32 sides, bar 20), with a hand-drawn sketch outline in the dark brown (two rough lines, ~6 mm, roughness 0.3) — chosen in the M5 spike, see DECISIONS 2026-10-15. Plates are the only saturated colours.
 - **Plates:** real sizes and IWF-style colours — table in 3.1.
 - **UI:** black on white. Space Grotesk (display 700, text 600), heading 25 pt. Drawers: square corners, 2 pt black border, rough hand-drawn edge. Buttons: solid black, square, 40 pt (big: 56 pt), rough edge. Fields: outline, 56 pt tall, radius 14. Exact values: `reference/scene-layout-and-look.json` → `uiLook`.
 - **Haptics:** `.selection` for picks and steppers · `.impact(.light)` for continue/toggles · `.success` for set done and workout read · `.impact(.medium)` for camera shutter · `.warning` for missing info.
@@ -209,7 +209,7 @@ Default PR list: Back squat, Front squat, Deadlift, Clean, Snatch, Bench press (
 - **Vision** (`VNRecognizeTextRequest`, accurate) for screenshots; **VisionKit** `DataScannerViewController` for the camera; `PhotosPicker` for uploads.
 - **RealityKit** `RealityView` for the room; procedural meshes (box, cylinder) like the prototype; `PhysicsBodyComponent` for the kit drop; a camera entity animated between shots.
 - Haptics: `.sensoryFeedback`. Sound: `AVAudioEngine` (bell can be a short bundled file).
-- **Risk to spike early**: the hand-drawn outline and toon look in RealityKit (needs a custom material or post-process). Fallback: flat toon colours without outline.
+- **Hand-drawn outline** (spiked in M5): an inverted hull — a slightly bigger, inside-out copy of each shape in the dark brown, two of them with noise-jittered corners for the sketch line — built by `PlateKit.LowPolyMesh`, drawn with `UnlitMaterial`. No custom shaders. Limits: silhouettes only (no inner lines or real gap between the two lines).
 
 ---
 
