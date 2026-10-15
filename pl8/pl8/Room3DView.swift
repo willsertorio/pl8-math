@@ -104,11 +104,12 @@ enum RoomScene {
 
         // Sun from the front right and a softer fill, fixed to the room.
         let sun = DirectionalLight()
-        sun.light.intensity = 2500
+        sun.light.intensity = 3500
+        sun.shadow = DirectionalLightComponent.Shadow(maximumDistance: 25, depthBias: 2)
         sun.look(at: .zero, from: [3, 6, 4], relativeTo: nil)
         world.addChild(sun)
         let fill = DirectionalLight()
-        fill.light.intensity = 900
+        fill.light.intensity = 1500
         fill.look(at: .zero, from: [-4, 3, -2], relativeTo: nil)
         world.addChild(fill)
 

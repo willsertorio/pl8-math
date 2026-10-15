@@ -24,7 +24,7 @@ struct PropModelsTests {
     @Test func twoTonesOnlyPlusSteelAndPlates() {
         // The prototype draws in black and white, recoloured to the palette's dark and light (SPEC 2.5).
         let tones = Set(RoomLayout.Object.allCases.flatMap { PropModels.parts(for: $0, plates: []) }.map(\.tone))
-        #expect(tones.isSubset(of: [.dark, .light, .steel]))
+        #expect(tones.isSubset(of: [.dark, .light, .steel, .faint]))
     }
 
     @Test func barbellOnTheRackIsSteel() {
@@ -56,7 +56,7 @@ struct PropModelsTests {
     @Test func roomHasFloorWallsAndLines() {
         let room = PropModels.room()
         #expect(room.contains { $0.tone == .light && $0.outlined })    // floor and walls
-        #expect(room.contains { $0.tone == .dark && !$0.outlined })    // tile seams
+        #expect(room.contains { $0.tone == .faint && !$0.outlined })   // tile seams: faint hairlines, like the prototype
     }
 
     @Test func shelfIsAlreadyInRoomSpace() {
@@ -64,5 +64,10 @@ struct PropModelsTests {
         #expect(PropModels.placement(for: .rack) == RoomLayout.objects[.rack])
         let xs = PropModels.parts(for: .shelf, plates: Plate.catalog(.kg)).flatMap { $0.mesh.positions.map(\.x) }
         #expect(abs((xs.min() ?? 0) - (RoomLayout.room.minX + 0.06)) < 0.01)     // against the left wall
+    }
+
+    @Test func rackUprightsHavePunchedHoles() {
+        let holes = PropModels.parts(for: .rack, plates: []).filter { $0.tone == .light && !$0.outlined }
+        #expect(holes.count >= 40)                                     // a column of holes on each upright
     }
 }

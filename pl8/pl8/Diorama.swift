@@ -97,9 +97,11 @@ enum Diorama {
     static func material(_ tone: PropPart.Tone) -> any RealityKit.Material {
         switch tone {
         case .dark:
-            return lit(ink)
+            return flat(ink)                                     // the prototype's dark is flat, not shaded
         case .light:
             return lit(boxLight)
+        case .faint:
+            return flat(UIColor(Color(hex: "#C8B4C2")))          // tile seams: a faint hairline
         case .steel:
             return SimpleMaterial(color: UIColor(Color(hex: "#D3D8DD")), roughness: 0.3, isMetallic: true)
         case .plate(let plate):

@@ -9,6 +9,8 @@ public struct PropPart: Equatable, Sendable {
         case steel
         /// A plate, in its own colour.
         case plate(Plate)
+        /// Hairlines like the floor's tile seams: a faint mix of dark into light.
+        case faint
     }
 
     public let mesh: LowPolyMesh
@@ -53,8 +55,8 @@ public enum PropModels {
         var b = Builder()
         let r = RoomLayout.room, c = r.centre, h = r.wallHeight, t = r.wallThickness
         b.box([r.width + 0.32, 0.3, r.depth + 0.32], [c.x, -0.15, c.z], .light)
-        for i in 1..<Int(r.width) { b.box([0.006, 0.002, r.depth], [r.minX + Float(i), 0.001, c.z], .dark, ink: false) }
-        for j in 1..<Int(r.depth) { b.box([r.width, 0.002, 0.006], [c.x, 0.001, r.minZ + Float(j)], .dark, ink: false) }
+        for i in 1..<Int(r.width) { b.box([0.006, 0.002, r.depth], [r.minX + Float(i), 0.001, c.z], .faint, ink: false) }
+        for j in 1..<Int(r.depth) { b.box([r.width, 0.002, 0.006], [c.x, 0.001, r.minZ + Float(j)], .faint, ink: false) }
         b.box([r.width + 2 * t, h, t], [c.x, h / 2, r.minZ - t / 2], .light)
         b.box([t, h, r.depth + 2 * t], [r.minX - t / 2, h / 2, c.z], .light)
         b.box([t, h, r.depth + 2 * t], [r.maxX + t / 2, h / 2, c.z], .light)
@@ -85,6 +87,11 @@ public enum PropModels {
             let x = side * 0.62
             b.box([0.09, top, 0.09], [x, top / 2, z], .dark)                 // upright
             b.box([0.22, 0.02, 0.22], [x, 0.01, z], .dark)                   // floor plate
+            var y: Float = 0.25
+            while y < top - 0.1 {                                             // punched holes
+                b.box([0.02, 0.02, 0.004], [x, y, z + 0.046], .light, ink: false)
+                y += 0.1
+            }
             b.box([0.1, 0.12, 0.1], [x, 1.22, z + 0.005], .dark)             // J-hook sleeve
             b.box([0.09, 0.03, 0.12], [x, 1.19, z + 0.1], .dark)             // hook seat
             b.box([0.09, 0.08, 0.02], [x, 1.24, z + 0.16], .dark)            // hook lip
