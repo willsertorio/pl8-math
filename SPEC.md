@@ -233,6 +233,6 @@ Each milestone ends with tests green and something Will can try on his iPhone.
 
 ## Open decisions
 1. ~~Where History lives~~ — decided 2026-10-14: a 4th tab (Train · PRs · Gym · History). The wall calendar in the room can link to it in M6.
-2. Does the opening box animation play on every launch, or only the first?
+2. ~~Does the opening box animation play on every launch, or only the first?~~ — for now every launch (decided 2026-10-15, for testing); revisit before TestFlight.
 3. ~~"Type it in"~~ — decided 2026-10-14: the simple form (lift, sets, reps, one %).
 4. Plate counts per gym (e.g. only two 2.5s) — currently out of scope.
