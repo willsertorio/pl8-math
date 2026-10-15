@@ -89,29 +89,29 @@ enum RoomScene {
         // Backdrop: the flat orange all around (inside-out box, exact colour).
         world.addChild(Diorama.flatPart(LowPolyMesh.box(size: [300, 300, 300]).insideOut(), colour: Diorama.background, at: room.centre))
 
-        world.addChild(Diorama.prop(PropModels.room(), line: 0.03,
+        world.addChild(Diorama.prop(PropModels.room(), line: 0.015,
                                     placement: RoomLayout.Placement(position: .zero, rotationDegrees: 0), name: "room"))
+        var casters = LowPolyMesh()
         for object in RoomLayout.Object.allCases {
             let parts = PropModels.parts(for: object, plates: plates)
             guard !parts.isEmpty else { continue }
+            let placement = PropModels.placement(for: object)
             world.addChild(Diorama.prop(parts, line: object == .shelf ? 0.006 : 0.012,
-                                        placement: PropModels.placement(for: object), name: object.rawValue))
+                                        placement: placement, name: object.rawValue))
+            for part in parts {
+                let mesh = part.mesh.placed(placement), shift = UInt32(casters.positions.count)
+                casters.positions += mesh.positions
+                casters.indices += mesh.indices.map { $0 + shift }
+            }
         }
+
+        // The sun's shadows, baked: the props pushed along the sun's rays onto the floor and walls, in the same
+        // lavender as the shaded faces. No RealityKit lights at all: everything is a flat, exact colour.
+        world.addChild(Diorama.flatPart(Sunlight.shadow(of: casters, in: room), colour: Diorama.shade))
 
         let camera = PerspectiveCamera()
         camera.name = cameraName
         camera.camera.fieldOfViewInDegrees = 50
-
-        // Sun from the front right and a softer fill, fixed to the room.
-        let sun = DirectionalLight()
-        sun.light.intensity = 3500
-        sun.shadow = DirectionalLightComponent.Shadow(maximumDistance: 25, depthBias: 2)
-        sun.look(at: .zero, from: [3, 6, 4], relativeTo: nil)
-        world.addChild(sun)
-        let fill = DirectionalLight()
-        fill.light.intensity = 1500
-        fill.look(at: .zero, from: [-4, 3, -2], relativeTo: nil)
-        world.addChild(fill)
 
         return [world, camera]
     }

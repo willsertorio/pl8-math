@@ -66,6 +66,24 @@ public enum PropModels {
         // A high window strip on the left wall.
         b.box([0.04, 0.5, 3.2], [r.minX + 0.02, 2.05, 0.6], .light)
         for i in 0..<5 { b.box([0.05, 0.5, 0.04], [r.minX + 0.03, 2.05, -1.0 + Float(i) * 0.8], .dark, ink: false) }
+        // The prototype's rough, grainy sketch border around the box: wall tops, the side walls' front corners and
+        // the bottom of the floor slab. A double line, like its sketch pass.
+        let x0 = r.minX - t, x1 = r.maxX + t, z0 = r.minZ - t, z1 = r.maxZ + t
+        let s = SIMD4<Float>(r.minX - 0.16, r.maxX + 0.16, r.minZ - 0.16, r.maxZ + 0.16)
+        let edges: [(SIMD3<Float>, SIMD3<Float>)] = [
+            ([x0, h, z0], [x1, h, z0]), ([x0, h, z0], [x0, h, z1]), ([x1, h, z0], [x1, h, z1]),
+            ([x0, 0, z1], [x0, h, z1]), ([x1, 0, z1], [x1, h, z1]),
+            ([s.x, -0.3, s.z], [s.y, -0.3, s.z]), ([s.x, -0.3, s.w], [s.y, -0.3, s.w]),
+            ([s.x, -0.3, s.z], [s.x, -0.3, s.w]), ([s.y, -0.3, s.z], [s.y, -0.3, s.w]),
+            ([s.x, -0.3, s.w], [s.x, 0, s.w]), ([s.y, -0.3, s.w], [s.y, 0, s.w]),
+        ]
+        var border = LowPolyMesh()
+        for (i, edge) in edges.enumerated() {
+            border = border
+                .combined(with: .roughEdge(from: edge.0, to: edge.1, width: 0.035, seed: UInt32(i * 2 + 1)))
+                .combined(with: .roughEdge(from: edge.0, to: edge.1, width: 0.02, seed: UInt32(i * 2 + 2)))
+        }
+        b.add(border, .dark, ink: false)
         return b.parts
     }
 

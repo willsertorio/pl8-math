@@ -64,22 +64,28 @@ enum Diorama {
     }
 
     /// A prop from PlateKit's recipe: parts of the same tone merged into one mesh, and one sketch outline around
-    /// the outlined parts. `line` is the outline width in metres.
+    /// the outlined parts. `line` is the outline width in metres. The placement is baked into the meshes so the
+    /// baked sunlight (PlateKit's `Sunlight`) sees each face the way it sits in the room.
     static func prop(_ parts: [PropPart], line: Float, placement: RoomLayout.Placement, name: String = "") -> Entity {
         let entity = Entity()
         entity.name = name
-        entity.position = placement.position
-        entity.orientation = simd_quatf(angle: placement.rotationDegrees * .pi / 180, axis: [0, 1, 0])
 
         var byTone: [PropPart.Tone: LowPolyMesh] = [:]
         var outlined = LowPolyMesh()
         for part in parts {
-            byTone[part.tone, default: LowPolyMesh()] = byTone[part.tone, default: LowPolyMesh()].combined(with: part.mesh)
-            if part.outlined { outlined = outlined.combined(with: part.mesh) }
+            let mesh = part.mesh.placed(placement)
+            byTone[part.tone, default: LowPolyMesh()] = byTone[part.tone, default: LowPolyMesh()].combined(with: mesh)
+            if part.outlined { outlined = outlined.combined(with: mesh) }
         }
         for (tone, mesh) in byTone {
-            if let body = try? ModelEntity(mesh: meshResource(mesh), materials: [material(tone)]) {
-                entity.addChild(body)
+            let bands: [Int: LowPolyMesh] = switch tone {
+            case .dark, .faint: [Sunlight.levels - 1: mesh]       // flat: the sun doesn't change them
+            default: Sunlight.bands(mesh)
+            }
+            for (level, band) in bands {
+                if let body = try? ModelEntity(mesh: meshResource(band), materials: [material(tone, level: level)]) {
+                    entity.addChild(body)
+                }
             }
         }
         if outlined.triangleCount > 0 {
@@ -93,20 +99,41 @@ enum Diorama {
         return entity
     }
 
-    /// The prototype's black and white become the palette's dark and light (SPEC 2.5); plates keep their colours.
-    static func material(_ tone: PropPart.Tone) -> any RealityKit.Material {
+    // Baked light, measured off the prototype's screenshots: white in full sun, and the soft lavender of faces
+    // turned away from the sun and of shadows.
+    static let sunWhite = UIColor(Color(hex: "#FEF9FF"))
+    static let shade = UIColor(Color(hex: "#DED4E2"))
+
+    /// The prototype's black and white become the palette's dark and the baked light (SPEC 2.5); plates keep
+    /// their colours, a little darker out of the sun. All flat: no RealityKit lights or tone mapping.
+    static func material(_ tone: PropPart.Tone, level: Int) -> UnlitMaterial {
+        let sun = Sunlight.brightness(level: level)
         switch tone {
         case .dark:
-            return flat(ink)                                     // the prototype's dark is flat, not shaded
-        case .light:
-            return lit(boxLight)
+            return flat(ink)
         case .faint:
             return flat(UIColor(Color(hex: "#C8B4C2")))          // tile seams: a faint hairline
+        case .light:
+            return flat(blend(shade, sunWhite, sun))
         case .steel:
-            return SimpleMaterial(color: UIColor(Color(hex: "#D3D8DD")), roughness: 0.3, isMetallic: true)
+            return flat(darken(UIColor(Color(hex: "#D3D8DD")), sun))
         case .plate(let plate):
-            return lit(UIColor(Color(hex: plate.colorHex)))
+            return flat(darken(UIColor(Color(hex: plate.colorHex)), sun))
         }
+    }
+
+    static func blend(_ a: UIColor, _ b: UIColor, _ t: Float) -> UIColor {
+        var (ar, ag, ab, aa): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (br, bg, bb, ba): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        a.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
+        b.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
+        let t = CGFloat(t)
+        return UIColor(red: ar + (br - ar) * t, green: ag + (bg - ag) * t, blue: ab + (bb - ab) * t, alpha: 1)
+    }
+
+    /// A colour out of the sun: shade is to sun-white what this is to the full colour.
+    static func darken(_ colour: UIColor, _ sun: Float) -> UIColor {
+        blend(blend(colour, .black, 0.12), colour, sun)
     }
 
     static func meshResource(_ mesh: LowPolyMesh) throws -> MeshResource {
