@@ -5,10 +5,14 @@ public struct LowPolyMesh: Equatable, Sendable {
     public var positions: [SIMD3<Float>]
     /// Three per triangle, counter-clockwise seen from outside.
     public var indices: [UInt32]
+    /// Texture coordinates, one per position, for the parts that show a picture (plate faces, the PR table).
+    /// Empty for plain colours.
+    public var uvs: [SIMD2<Float>]
 
-    public init(positions: [SIMD3<Float>] = [], indices: [UInt32] = []) {
+    public init(positions: [SIMD3<Float>] = [], indices: [UInt32] = [], uvs: [SIMD2<Float>] = []) {
         self.positions = positions
         self.indices = indices
+        self.uvs = uvs
     }
 
     public var triangleCount: Int { indices.count / 3 }
@@ -133,12 +137,24 @@ public struct LowPolyMesh: Equatable, Sendable {
     // MARK: - Placing
 
     public func translated(by offset: SIMD3<Float>) -> LowPolyMesh {
-        LowPolyMesh(positions: positions.map { $0 + offset }, indices: indices)
+        LowPolyMesh(positions: positions.map { $0 + offset }, indices: indices, uvs: uvs)
     }
 
     public func combined(with other: LowPolyMesh) -> LowPolyMesh {
+        var mesh = self
+        mesh.append(other)
+        return mesh
+    }
+
+    /// Adds `other`'s triangles in place (cheaper than `combined` in a loop).
+    public mutating func append(_ other: LowPolyMesh) {
+        guard other.triangleCount > 0 else { return }
+        let textured = !uvs.isEmpty || !other.uvs.isEmpty
+        if textured, uvs.count < positions.count { uvs += Array(repeating: .zero, count: positions.count - uvs.count) }
         let shift = UInt32(positions.count)
-        return LowPolyMesh(positions: positions + other.positions, indices: indices + other.indices.map { $0 + shift })
+        positions += other.positions
+        indices += other.indices.map { $0 + shift }
+        if textured { uvs += other.uvs.isEmpty ? Array(repeating: .zero, count: other.positions.count) : other.uvs }
     }
 
     // MARK: - Private
@@ -206,8 +222,6 @@ extension SIMD3 where Scalar == Float {
 }
 
 // Sine and cosine without Foundation, so the geometry stays plain Swift.
-private func sine(_ x: Float) -> Float { Float(sinApprox(Double(x))) }
-private func cosine(_ x: Float) -> Float { Float(sinApprox(Double(x) + Double.pi / 2)) }
 
 /// Sine of radians: Taylor series after reducing to −π…π, plenty for drawing and placing the scene.
 func sinApprox(_ value: Double) -> Double {

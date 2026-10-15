@@ -3,21 +3,15 @@ import SwiftUI
 import UIKit
 import PlateKit
 
-/// Shared pieces for the 3D box (SPEC 2.1, 2.5): palette, materials, and outlined parts built from
-/// PlateKit's low-poly meshes with the sketch outline chosen in M5 (DECISIONS 2026-10-15).
+/// Turns PlateKit's baked diorama (`SceneBake`) into RealityKit models. Every piece is an `UnlitMaterial` with
+/// tone mapping off, so the phone shows exactly the colours PlateKit worked out from the prototype's light.
 @MainActor
 enum Diorama {
-    // Palette (reference/scene-layout-and-look.json)
-    static let ink = UIColor(Color(hex: "#6C3713"))         // boxDark: the hand-drawn line
-    static let boxLight = UIColor(Color(hex: "#F0E2F3"))
-    static let background = UIColor(Color(hex: "#FF6200"))
-    static let paper = UIColor(Color(hex: "#FFFFFF"))
-    static let wood = UIColor(Color(hex: "#C89B6D"))
-    static let steel = UIColor(Color(hex: "#B9BEC6"))
-    static let rubber = UIColor(Color(hex: "#2B2B2B"))
+    static let background = uiColor(Look.background)
 
-    /// Outline roughness from M5.
-    static let roughness: Float = 0.3
+    static func uiColor(_ colour: RGB) -> UIColor {
+        UIColor(red: CGFloat(colour.r), green: CGFloat(colour.g), blue: CGFloat(colour.b), alpha: 1)
+    }
 
     /// A flat colour that keeps its exact value: RealityKit's tone mapping (which darkened the orange in M5) is off.
     static func flat(_ colour: UIColor) -> UnlitMaterial {
@@ -26,114 +20,40 @@ enum Diorama {
         return material
     }
 
-    /// The smooth, lit look chosen in M5.
-    static func lit(_ colour: UIColor) -> SimpleMaterial {
-        SimpleMaterial(color: colour, roughness: 0.85, isMetallic: false)
-    }
-
-    /// A shape with its sketch outline (two rough inverted hulls). `outline` is the line width in metres:
-    /// bigger things seen from further away need a thicker line.
-    static func part(_ mesh: LowPolyMesh, colour: UIColor, outline: Float, at position: SIMD3<Float> = .zero,
-                     rotationDegrees: Float = 0, name: String = "") -> Entity {
-        let entity = Entity()
-        entity.name = name
-        entity.position = position
-        entity.orientation = simd_quatf(angle: rotationDegrees * .pi / 180, axis: [0, 1, 0])
-        if let body = try? ModelEntity(mesh: meshResource(mesh), materials: [lit(colour)]) {
-            entity.addChild(body)
-        }
-        if outline > 0 {
-            let hulls = [
-                mesh.hull(width: outline, roughness: roughness, seed: 1),
-                mesh.hull(width: outline * 0.7, roughness: roughness, seed: 2),
-            ]
-            for hull in hulls {
-                if let line = try? ModelEntity(mesh: meshResource(hull), materials: [flat(ink)]) {
-                    entity.addChild(line)
+    /// One model per baked piece. Each is named after the walls it shows with ("walls:back,right"), so
+    /// `showWalls(from:in:)` can cut away the walls between the camera and the room.
+    static func entities(for pieces: [BakedPiece]) -> [Entity] {
+        var textures: [Picture: TextureResource] = [:]
+        return pieces.compactMap { piece in
+            let material: UnlitMaterial
+            switch piece.paint {
+            case .colour(let colour):
+                material = flat(uiColor(colour))
+            case .picture(let picture, let tint):
+                if textures[picture] == nil, let image = PictureArt.image(picture).cgImage {
+                    textures[picture] = try? TextureResource.generate(from: image, options: .init(semantic: .color))
                 }
-            }
-        }
-        return entity
-    }
-
-    /// A flat-coloured shape with no outline (lines on the floor, the backdrop).
-    static func flatPart(_ mesh: LowPolyMesh, colour: UIColor, at position: SIMD3<Float> = .zero) -> Entity {
-        guard let model = try? ModelEntity(mesh: meshResource(mesh), materials: [flat(colour)]) else { return Entity() }
-        model.position = position
-        return model
-    }
-
-    /// A prop from PlateKit's recipe: parts of the same tone merged into one mesh, and one sketch outline around
-    /// the outlined parts. `line` is the outline width in metres. The placement is baked into the meshes so the
-    /// baked sunlight (PlateKit's `Sunlight`) sees each face the way it sits in the room.
-    static func prop(_ parts: [PropPart], line: Float, placement: RoomLayout.Placement, name: String = "") -> Entity {
-        let entity = Entity()
-        entity.name = name
-
-        var byTone: [PropPart.Tone: LowPolyMesh] = [:]
-        var outlined = LowPolyMesh()
-        for part in parts {
-            let mesh = part.mesh.placed(placement)
-            byTone[part.tone, default: LowPolyMesh()] = byTone[part.tone, default: LowPolyMesh()].combined(with: mesh)
-            if part.outlined { outlined = outlined.combined(with: mesh) }
-        }
-        for (tone, mesh) in byTone {
-            let bands: [Int: LowPolyMesh] = switch tone {
-            case .dark, .faint: [Sunlight.levels - 1: mesh]       // flat: the sun doesn't change them
-            default: Sunlight.bands(mesh)
-            }
-            for (level, band) in bands {
-                if let body = try? ModelEntity(mesh: meshResource(band), materials: [material(tone, level: level)]) {
-                    entity.addChild(body)
+                var m = UnlitMaterial(applyPostProcessToneMap: false)
+                if let texture = textures[picture] {
+                    m.color = .init(tint: uiColor(tint), texture: .init(texture))
+                } else {
+                    m.color = .init(tint: uiColor(tint))
                 }
+                material = m
             }
-        }
-        if outlined.triangleCount > 0 {
-            for hull in [outlined.hull(width: line, roughness: roughness, seed: 1),
-                         outlined.hull(width: line * 0.7, roughness: roughness, seed: 2)] {
-                if let ink = try? ModelEntity(mesh: meshResource(hull), materials: [flat(Diorama.ink)]) {
-                    entity.addChild(ink)
-                }
-            }
-        }
-        return entity
-    }
-
-    // Baked light, measured off the prototype's screenshots: white in full sun, and the soft lavender of faces
-    // turned away from the sun and of shadows.
-    static let sunWhite = UIColor(Color(hex: "#FEF9FF"))
-    static let shade = UIColor(Color(hex: "#DED4E2"))
-
-    /// The prototype's black and white become the palette's dark and the baked light (SPEC 2.5); plates keep
-    /// their colours, a little darker out of the sun. All flat: no RealityKit lights or tone mapping.
-    static func material(_ tone: PropPart.Tone, level: Int) -> UnlitMaterial {
-        let sun = Sunlight.brightness(level: level)
-        switch tone {
-        case .dark:
-            return flat(ink)
-        case .faint:
-            return flat(UIColor(Color(hex: "#C8B4C2")))          // tile seams: a faint hairline
-        case .light:
-            return flat(blend(shade, sunWhite, sun))
-        case .steel:
-            return flat(darken(UIColor(Color(hex: "#D3D8DD")), sun))
-        case .plate(let plate):
-            return flat(darken(UIColor(Color(hex: plate.colorHex)), sun))
+            guard let model = try? ModelEntity(mesh: meshResource(piece.mesh), materials: [material]) else { return nil }
+            model.name = "walls:" + piece.walls.map(\.rawValue).sorted().joined(separator: ",")
+            return model
         }
     }
 
-    static func blend(_ a: UIColor, _ b: UIColor, _ t: Float) -> UIColor {
-        var (ar, ag, ab, aa): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
-        var (br, bg, bb, ba): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
-        a.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
-        b.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
-        let t = CGFloat(t)
-        return UIColor(red: ar + (br - ar) * t, green: ag + (bg - ag) * t, blue: ab + (bb - ab) * t, alpha: 1)
-    }
-
-    /// A colour out of the sun: shade is to sun-white what this is to the full colour.
-    static func darken(_ colour: UIColor, _ sun: Float) -> UIColor {
-        blend(blend(colour, .black, 0.12), colour, sun)
+    /// Hides every piece whose wall is between the camera (in room space) and the room, like the prototype's
+    /// cut-away.
+    static func showWalls(from camera: SIMD3<Float>, in world: Entity) {
+        for child in world.children where child.name.hasPrefix("walls:") {
+            let names = child.name.dropFirst("walls:".count).split(separator: ",")
+            child.isEnabled = names.allSatisfy { RoomLayout.Wall(rawValue: String($0))?.isVisible(from: camera) ?? true }
+        }
     }
 
     static func meshResource(_ mesh: LowPolyMesh) throws -> MeshResource {
@@ -145,15 +65,141 @@ enum Diorama {
             for corner in 0..<3 { normals[Int(mesh.indices[triangle * 3 + corner])] = normal }
         }
         descriptor.normals = MeshBuffers.Normals(normals)
+        if mesh.uvs.count == mesh.positions.count {
+            descriptor.textureCoordinates = MeshBuffers.TextureCoordinates(mesh.uvs)
+        }
         descriptor.primitives = .triangles(mesh.indices)
         return try MeshResource.generate(from: [descriptor])
     }
 
-    /// The room's transform that puts `shot` in front of a camera fixed at the origin looking down −Z.
-    /// Moving the world instead of the camera works whether or not RealityView uses our camera entity.
-    static func worldTransform(for shot: RoomLayout.Shot) -> Transform {
+    /// The room's transform that puts the camera at `position` looking at `target`, for a camera fixed at the
+    /// origin looking down −Z. Moving the world instead of the camera works whether or not RealityView uses our
+    /// camera entity.
+    static func worldTransform(target: SIMD3<Float>, position: SIMD3<Float>) -> Transform {
         let eye = Entity()
-        eye.look(at: shot.target, from: shot.position, relativeTo: nil)
+        eye.look(at: target, from: position, relativeTo: nil)
         return Transform(matrix: eye.transform.matrix.inverse)
+    }
+}
+
+/// The printed surfaces, drawn like the prototype's canvases (reference/prototype-app-logic.js faceTexture,
+/// buildPRWall, drawFlag) and recoloured to the palette the same way: its black becomes box dark, its white box
+/// light.
+@MainActor
+enum PictureArt {
+    static func image(_ picture: Picture) -> UIImage {
+        switch picture {
+        case .plateFace(let plate): plateFace(plate)
+        case .prTable: prTable()
+        case .flag(let text): flag(text)
+        }
+    }
+
+    /// A plate's face: a darker band at the edge, two fine rings, the number at the top and the unit at the
+    /// bottom; bumpers also say COMPETITION and Ø 450 MM down the sides.
+    static func plateFace(_ plate: Plate) -> UIImage {
+        let size: CGFloat = 512, c = size / 2, r = size / 2
+        let base = RGB(hex: plate.colorHex)
+        let bumper = plate.kind == .bumper
+        let label = plate.size.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(plate.size)) : String(plate.size)
+        let unit = plate.unit == .kg ? "KG" : "LB"
+        // Dark print on the light plates (yellow, white), white on the rest — the prototype's `ink`.
+        let lightPlate = ["#F3C318", "#F2F2EE"].contains(plate.colorHex.uppercased())
+        let ink = lightPlate ? UIColor(Color(hex: "#1A1A1A")) : UIColor.white
+        return draw(CGSize(width: size, height: size)) { g in
+            g.setFillColor(Diorama.uiColor(base).cgColor)
+            g.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            g.setStrokeColor(Diorama.uiColor(base.offsetLightness(-0.08)).cgColor)
+            g.setLineWidth(14)
+            g.strokeEllipse(in: circle(c, r * 0.955))
+            g.setStrokeColor(Diorama.uiColor(base.offsetLightness(-0.14)).withAlphaComponent(0.55).cgColor)
+            g.setLineWidth(3)
+            g.strokeEllipse(in: circle(c, r * 0.905))
+            g.strokeEllipse(in: circle(c, r * (bumper ? 0.40 : 0.52)))
+            if bumper {
+                text(label, size: 104, weight: .bold, colour: ink, at: CGPoint(x: c, y: c - r * 0.66), in: g)
+                text(unit, size: 60, weight: .bold, colour: ink, at: CGPoint(x: c, y: c + r * 0.66), in: g)
+                text("COMPETITION", size: 26, weight: .semibold, colour: ink, at: CGPoint(x: c - r * 0.66, y: c), angle: -.pi / 2, in: g)
+                text("Ø 450 MM", size: 26, weight: .semibold, colour: ink, at: CGPoint(x: c + r * 0.66, y: c), angle: .pi / 2, in: g)
+            } else {
+                text(label, size: 118, weight: .bold, colour: ink, at: CGPoint(x: c, y: c - r * 0.73), in: g)
+                text(unit, size: 70, weight: .bold, colour: ink, at: CGPoint(x: c, y: c + r * 0.75), in: g)
+            }
+        }
+    }
+
+    /// The PR board's empty table: "My PR's", a heavy rule, 8 ruled rows and 4 column lines.
+    static func prTable() -> UIImage {
+        let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
+        return draw(CGSize(width: 1024, height: 680)) { g in
+            g.setFillColor(light.cgColor)
+            g.fill(CGRect(x: 0, y: 0, width: 1024, height: 680))
+            text("My PR's", size: 58, weight: .bold, colour: dark, at: CGPoint(x: 40, y: 62), centred: false, in: g)
+            g.setFillColor(dark.cgColor)
+            g.fill(CGRect(x: 30, y: 164, width: 964, height: 6))
+            g.setStrokeColor(dark.cgColor)
+            g.setLineWidth(2)
+            for row in 0..<8 {
+                let y = CGFloat(224 + row * 60)
+                g.strokeLineSegments(between: [CGPoint(x: 30, y: y), CGPoint(x: 994, y: y)])
+            }
+            for x: CGFloat in [330, 500, 640, 820] {
+                g.strokeLineSegments(between: [CGPoint(x: x - 18, y: 112), CGPoint(x: x - 18, y: 644)])
+            }
+        }
+    }
+
+    /// The flag: the gym's name, as big as fits two-thirds of the width and 60 % of the height, in light on the
+    /// dark cloth. The prototype's Playfair Display 900; until that font is in the app, the system's heaviest
+    /// serif (New York Black) stands in.
+    static func flag(_ name: String) -> UIImage {
+        let size = CGSize(width: 740, height: 512)
+        let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
+        return draw(size) { g in
+            g.setFillColor(dark.cgColor)
+            g.fill(CGRect(origin: .zero, size: size))
+            guard !name.isEmpty else { return }
+            let probe = NSAttributedString(string: name, attributes: [.font: flagFont(300)]).size()
+            let points = 300 * min(size.width * 0.66 / max(1, probe.width), size.height * 0.6 / max(1, probe.height * 0.75))
+            text(name, font: flagFont(points), colour: light, at: CGPoint(x: size.width / 2, y: size.height / 2), in: g)
+        }
+    }
+
+    static func flagFont(_ size: CGFloat) -> UIFont {
+        let font = UIFont.systemFont(ofSize: size, weight: .black)
+        guard let serif = font.fontDescriptor.withDesign(.serif) else { return font }
+        return UIFont(descriptor: serif, size: size)
+    }
+
+    // MARK: - Drawing helpers
+
+    private static func draw(_ size: CGSize, _ body: (CGContext) -> Void) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { body($0.cgContext) }
+    }
+
+    private static func circle(_ centre: CGFloat, _ radius: CGFloat) -> CGRect {
+        CGRect(x: centre - radius, y: centre - radius, width: radius * 2, height: radius * 2)
+    }
+
+    private static func text(_ string: String, size: CGFloat, weight: UIFont.Weight, colour: UIColor, at point: CGPoint,
+                             angle: CGFloat = 0, centred: Bool = true, in g: CGContext) {
+        let font = UIFont(name: "Helvetica-Bold", size: size) ?? .systemFont(ofSize: size, weight: weight)
+        text(string, font: weight == .semibold ? (UIFont(name: "Helvetica", size: size) ?? font) : font,
+             colour: colour, at: point, angle: angle, centred: centred, in: g)
+    }
+
+    /// Draws `string` with its centre (or, when not `centred`, its left edge's middle) at `point`, turned by `angle`.
+    private static func text(_ string: String, font: UIFont, colour: UIColor, at point: CGPoint, angle: CGFloat = 0,
+                             centred: Bool = true, in g: CGContext) {
+        let attributed = NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: colour])
+        let bounds = attributed.size()
+        g.saveGState()
+        g.translateBy(x: point.x, y: point.y)
+        g.rotate(by: angle)
+        attributed.draw(at: CGPoint(x: centred ? -bounds.width / 2 : 0, y: -bounds.height / 2))
+        g.restoreGState()
     }
 }

@@ -4,35 +4,65 @@ import SwiftUI
 import UIKit
 import PlateKit
 
-/// M6 step 1: the room, its stations and the camera shots (SPEC 2.1), with stand-in furniture.
+/// The 3D box (M6): the room, its stations and camera shots (SPEC 2.1), copied from the prototype and baked by
+/// PlateKit. Drag to go round, pinch to zoom; a camera chip flies back to its shot.
 struct Room3DView: View {
     @State private var station: RoomLayout.Station = .overview
+    @State private var orbit = Orbit(RoomLayout.shots[.overview]!)
+    @State private var dragStart: Orbit?
+    @State private var pinchStart: Orbit?
     @Query private var gyms: [Gym]
+
+    private var gym: Gym? { gyms.first(where: { $0.isCurrent }) ?? gyms.first }
 
     /// The current gym's plates hang on the shelf.
     private var plates: [Plate] {
-        guard let gym = gyms.first(where: { $0.isCurrent }) ?? gyms.first else { return Plate.catalog(.kg) }
+        guard let gym else { return Plate.catalog(.kg) }
         return Plate.catalog(gym.unit).filter { gym.plateSizes.contains($0.size) }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             RealityView { content in
-                for entity in RoomScene.entities(plates: plates) {
+                let plates = plates, name = gym?.name ?? ""
+                // Baking takes a moment: do it off the main thread, then build the models.
+                let pieces = await Task.detached(priority: .userInitiated) {
+                    SceneBake.pieces(plates: plates, gymName: name)
+                }.value
+                for entity in RoomScene.entities(pieces: pieces) {
                     content.add(entity)
                 }
-                RoomScene.show(station, in: content.entities)
+                RoomScene.show(orbit, in: content.entities)
             } update: { content in
-                RoomScene.show(station, in: content.entities)
+                RoomScene.show(orbit, in: content.entities)
             }
             .background(Theme.background)
+            .gesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { value in
+                        let start = dragStart ?? orbit
+                        dragStart = start
+                        orbit = start.dragged(dx: Float(value.translation.width), dy: Float(value.translation.height))
+                    }
+                    .onEnded { _ in dragStart = nil }
+                    .simultaneously(with: MagnifyGesture()
+                        .onChanged { value in
+                            let start = pinchStart ?? orbit
+                            pinchStart = start
+                            orbit = start.zoomed(by: Float(value.magnification))
+                        }
+                        .onEnded { _ in pinchStart = nil })
+            )
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Camera").sectionLabel()
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(RoomLayout.Station.allCases, id: \.self) { item in
-                            Chip(isOn: item == station, action: { station = item }) {
+                            Chip(isOn: item == station, action: {
+                                station = item
+                                orbit = Orbit(RoomLayout.shots[item]!)
+                            }) {
                                 Text(RoomScene.title(item))
                             }
                             .fixedSize()
@@ -51,7 +81,7 @@ struct Room3DView: View {
     }
 }
 
-/// Builds the room from PlateKit's recipes (RoomLayout + PropModels), ported from the prototype.
+/// Builds the room from PlateKit's bake, and points the camera.
 @MainActor
 enum RoomScene {
     static let worldName = "world"
@@ -71,48 +101,32 @@ enum RoomScene {
         }
     }
 
-    /// Moves the room so `station`'s shot is in front of the camera, and sets the camera's field of view.
-    static func show(_ station: RoomLayout.Station, in entities: some Sequence<Entity>) {
-        guard let shot = RoomLayout.shots[station] else { return }
-        entities.first { $0.name == worldName }?.transform = Diorama.worldTransform(for: shot)
+    /// Moves the room so the camera sits where `orbit` says, sets the field of view, and cuts away the walls
+    /// between the camera and the room.
+    static func show(_ orbit: Orbit, in entities: some Sequence<Entity>) {
+        if let world = entities.first(where: { $0.name == worldName }) {
+            world.transform = Diorama.worldTransform(target: orbit.target, position: orbit.position)
+            Diorama.showWalls(from: orbit.position, in: world)
+        }
         if let camera = entities.first(where: { $0.name == cameraName }) as? PerspectiveCamera {
-            camera.camera.fieldOfViewInDegrees = shot.fieldOfView
+            camera.camera.fieldOfViewInDegrees = orbit.fieldOfView
         }
     }
 
-    /// - Parameter plates: the gym's plates, for the shelf piles.
-    static func entities(plates: [Plate]) -> [Entity] {
+    static func entities(pieces: [BakedPiece]) -> [Entity] {
         let world = Entity()
         world.name = worldName
-        let room = RoomLayout.room
-
         // Backdrop: the flat orange all around (inside-out box, exact colour).
-        world.addChild(Diorama.flatPart(LowPolyMesh.box(size: [300, 300, 300]).insideOut(), colour: Diorama.background, at: room.centre))
-
-        world.addChild(Diorama.prop(PropModels.room(), line: 0.015,
-                                    placement: RoomLayout.Placement(position: .zero, rotationDegrees: 0), name: "room"))
-        var casters = LowPolyMesh()
-        for object in RoomLayout.Object.allCases {
-            let parts = PropModels.parts(for: object, plates: plates)
-            guard !parts.isEmpty else { continue }
-            let placement = PropModels.placement(for: object)
-            world.addChild(Diorama.prop(parts, line: object == .shelf ? 0.006 : 0.012,
-                                        placement: placement, name: object.rawValue))
-            for part in parts {
-                let mesh = part.mesh.placed(placement), shift = UInt32(casters.positions.count)
-                casters.positions += mesh.positions
-                casters.indices += mesh.indices.map { $0 + shift }
-            }
+        if let sky = try? ModelEntity(mesh: Diorama.meshResource(LowPolyMesh.box(size: [300, 300, 300]).insideOut()),
+                                      materials: [Diorama.flat(Diorama.background)]) {
+            sky.position = RoomLayout.room.centre
+            world.addChild(sky)
         }
-
-        // The sun's shadows, baked: the props pushed along the sun's rays onto the floor and walls, in the same
-        // lavender as the shaded faces. No RealityKit lights at all: everything is a flat, exact colour.
-        world.addChild(Diorama.flatPart(Sunlight.shadow(of: casters, in: room), colour: Diorama.shade))
+        for entity in Diorama.entities(for: pieces) { world.addChild(entity) }
 
         let camera = PerspectiveCamera()
         camera.name = cameraName
         camera.camera.fieldOfViewInDegrees = 50
-
         return [world, camera]
     }
 }

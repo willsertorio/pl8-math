@@ -15,6 +15,43 @@ public enum RoomLayout {
 
     public enum Object: String, CaseIterable, Sendable {
         case platform, rack, bench, board, shelf, flag, prBoard, barHolder, kitPlates, wallFan, wallWindow
+
+        /// The wall this prop hangs on and hides with (prototype propsTick: the fan, bar holder and window go
+        /// with a wall they are within 0.35 m of). Other props always show.
+        public var wall: Wall? {
+            guard [.wallFan, .barHolder, .wallWindow].contains(self), let position = RoomLayout.objects[self]?.position
+            else { return nil }
+            return Wall.allCases.first { abs((position - $0.point).dot($0.normal)) < 0.35 }
+        }
+    }
+
+    /// The three walls. Like the prototype's cut-away, a wall hides while the camera is outside it, so you
+    /// always see into the box.
+    public enum Wall: String, CaseIterable, Sendable {
+        case back, left, right
+
+        /// Into the room.
+        public var normal: SIMD3<Float> {
+            switch self {
+            case .back: [0, 0, 1]
+            case .left: [1, 0, 0]
+            case .right: [-1, 0, 0]
+            }
+        }
+
+        /// A point on the wall's inside face.
+        public var point: SIMD3<Float> {
+            let r = room, c = r.centre
+            switch self {
+            case .back: return [c.x, 0, r.minZ]
+            case .left: return [r.minX, 0, c.z]
+            case .right: return [r.maxX, 0, c.z]
+            }
+        }
+
+        public func isVisible(from camera: SIMD3<Float>) -> Bool {
+            (camera - point).dot(normal) > 0
+        }
     }
 
     public struct Placement: Equatable, Sendable {

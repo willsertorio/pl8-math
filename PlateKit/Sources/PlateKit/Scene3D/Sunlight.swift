@@ -1,102 +1,96 @@
-/// The prototype's light, baked (reference/prototype-app-logic.js initScene): a bright, even sky (hemisphere 2.7)
-/// and one sun from (−8, 20, 12) at 1.5, with no tone mapping. White in full sun reads near-white; faces turned
-/// away from the sun and the shadows read the same soft lavender. Baking it into flat colours gives the exact look
-/// on every device, where RealityKit's own lights and tone mapping greyed it out.
+/// The prototype's sun (reference/prototype-app-logic.js initScene: a DirectionalLight at (−8, 20, 12) aimed at
+/// the origin, casting soft shadows), baked: the shadows are the props pushed along the sun's rays onto the
+/// surfaces the sun lights — the floor, the platform's top, the back wall and the right wall — and drawn there in
+/// the colour that surface has out of the sun.
 public enum Sunlight {
     /// Unit vector towards the sun.
     public static let towardsSun = SIMD3<Float>(-8, 20, 12).normalized
-    /// Shade steps: 0 = in shade (or shadow) … `levels − 1` = full sun, like the floor.
-    public static let levels = 4
-    /// How far shadows sit above the floor (under the 2 mm tile seams, so the seams still show) and off the walls.
+    /// How far shadows sit above a floor (under the 2 mm tile seams, so the seams still show) and off a wall.
     public static let floorLift: Float = 0.0015
     public static let wallLift: Float = 0.003
 
-    /// The shade step for a face. The floor gets full sun; the left wall, facing away, none.
-    public static func level(normal: SIMD3<Float>) -> Int {
-        let lit = max(0, normal.dot(towardsSun)) / towardsSun.y
-        return min(levels - 1, Int((lit * Float(levels - 1)).rounded()))
+    /// A flat, axis-aligned surface that takes shadows: the plane `position[axis] == plane`, bounded in its
+    /// other two axes, facing `normal`.
+    public struct Receiver: Sendable {
+        public let axis: Int, plane: Float, normal: SIMD3<Float>
+        public let u: Int, uRange: ClosedRange<Float>
+        public let v: Int, vRange: ClosedRange<Float>
+        /// What the surface is made of, for its shadow colour.
+        public let tone: PropPart.Tone
+        /// Shown only with this wall.
+        public let wall: RoomLayout.Wall?
+
+        var lift: Float { (axis == 1 ? floorLift : wallLift) * normal[axis] }
     }
 
-    /// 0 (shade) … 1 (full sun) for a step.
-    public static func brightness(level: Int) -> Float {
-        Float(level) / Float(levels - 1)
-    }
-
-    /// The mesh's faces split by shade step, so each step can get its own flat colour.
-    public static func bands(_ mesh: LowPolyMesh) -> [Int: LowPolyMesh] {
-        var bands: [Int: LowPolyMesh] = [:]
-        for triangle in 0..<mesh.triangleCount {
-            let level = level(normal: mesh.faceNormal(triangle))
-            let corners = (0..<3).map { mesh.positions[Int(mesh.indices[triangle * 3 + $0])] }
-            bands[level, default: LowPolyMesh()].append(corners[0], corners[1], corners[2])
-        }
-        return bands
-    }
-
-    /// The shadow `mesh` (in room space) casts on the floor, the back wall and the right wall — the surfaces the
-    /// sun shines on. Each face is pushed along the sun's rays onto each surface and cut to it; in a box room a
-    /// ray lands inside exactly one of them, so the pieces meet without overlapping walls. Props don't shadow
-    /// each other; at this size nobody notices.
-    public static func shadow(of mesh: LowPolyMesh, in room: RoomLayout.Room) -> LowPolyMesh {
-        let ray = -towardsSun
-        let receivers = [
-            Receiver(axis: 1, plane: 0, lift: floorLift, normal: [0, 1, 0],
-                     u: 0, uRange: room.minX...room.maxX, v: 2, vRange: room.minZ...room.maxZ),
-            Receiver(axis: 2, plane: room.minZ, lift: wallLift, normal: [0, 0, 1],
-                     u: 0, uRange: room.minX...room.maxX, v: 1, vRange: 0...room.wallHeight),
-            Receiver(axis: 0, plane: room.maxX, lift: -wallLift, normal: [-1, 0, 0],
-                     u: 2, uRange: room.minZ...room.maxZ, v: 1, vRange: 0...room.wallHeight),
+    /// The floor, the platform's light strip and mats, the back wall and the right wall (the left wall faces away
+    /// from the sun, so nothing shadows it).
+    public static var receivers: [Receiver] {
+        let r = RoomLayout.room
+        var list = [
+            Receiver(axis: 1, plane: 0, normal: [0, 1, 0], u: 0, uRange: r.minX...r.maxX, v: 2, vRange: r.minZ...r.maxZ,
+                     tone: .light, wall: nil),
+            Receiver(axis: 2, plane: r.minZ, normal: [0, 0, 1], u: 0, uRange: r.minX...r.maxX, v: 1, vRange: 0...r.wallHeight,
+                     tone: .light, wall: .back),
+            Receiver(axis: 0, plane: r.maxX, normal: [-1, 0, 0], u: 2, uRange: r.minZ...r.maxZ, v: 1, vRange: 0...r.wallHeight,
+                     tone: .light, wall: .right),
         ]
+        let platform = RoomLayout.objects[.platform]!.position
+        for top in PropModels.platformTops {
+            let c = platform + top.centre
+            list.append(Receiver(axis: 1, plane: c.y, normal: [0, 1, 0],
+                                 u: 0, uRange: (c.x - top.size.x / 2)...(c.x + top.size.x / 2),
+                                 v: 2, vRange: (c.z - top.size.y / 2)...(c.z + top.size.y / 2), tone: top.tone, wall: nil))
+        }
+        return list
+    }
+
+    /// The shadow `mesh` (in room space) casts on `receiver`: each face, cut to the part in front of the
+    /// surface, pushed along the sun's rays onto it and cut to its edges. In a box room a ray lands inside
+    /// exactly one wall or floor, so the pieces meet without overlapping. Props don't shadow each other except on
+    /// the platform; at this size nobody notices.
+    public static func shadow(of mesh: LowPolyMesh, on receiver: Receiver) -> LowPolyMesh {
+        let ray = -towardsSun
+        guard ray.dot(receiver.normal) < 0 else { return LowPolyMesh() }               // the sun can't reach it
         var shadow = LowPolyMesh()
         for triangle in 0..<mesh.triangleCount {
             let corners = (0..<3).map { mesh.positions[Int(mesh.indices[triangle * 3 + $0])] }
-            for receiver in receivers {
-                let projected = corners.map { corner -> SIMD3<Float> in
-                    let t = (receiver.plane - corner[receiver.axis]) / ray[receiver.axis]
-                    var point = corner + ray * t
-                    point[receiver.axis] = receiver.plane + receiver.lift
-                    return point
-                }
-                let piece = receiver.clip(projected)
-                guard piece.count >= 3 else { continue }
-                for i in 1..<(piece.count - 1) {
-                    var (a, b, c) = (piece[0], piece[i], piece[i + 1])
-                    let normal = (b - a).cross(c - a)
-                    guard normal.length > 1e-7 else { continue }
-                    if normal.dot(receiver.normal) < 0 { swap(&b, &c) }                // face into the room
-                    shadow.append(a, b, c)
-                }
+            // Only what's in front of the surface can shadow it (a rack upright standing on the platform).
+            let front = clip(corners) { ($0[receiver.axis] - receiver.plane) * receiver.normal[receiver.axis] - 0.001 }
+            guard front.count >= 3 else { continue }
+            let projected = front.map { corner -> SIMD3<Float> in
+                let t = (receiver.plane - corner[receiver.axis]) / ray[receiver.axis]
+                var point = corner + ray * t
+                point[receiver.axis] = receiver.plane + receiver.lift
+                return point
+            }
+            var piece = projected
+            for (index, bound, above) in [(receiver.u, receiver.uRange.lowerBound, true), (receiver.u, receiver.uRange.upperBound, false),
+                                          (receiver.v, receiver.vRange.lowerBound, true), (receiver.v, receiver.vRange.upperBound, false)] {
+                piece = clip(piece) { above ? $0[index] - bound : bound - $0[index] }
+            }
+            guard piece.count >= 3 else { continue }
+            for i in 1..<(piece.count - 1) {
+                var (a, b, c) = (piece[0], piece[i], piece[i + 1])
+                let normal = (b - a).cross(c - a)
+                guard normal.length > 1e-7 else { continue }
+                if normal.dot(receiver.normal) < 0 { swap(&b, &c) }                    // face into the room
+                shadow.append(a, b, c)
             }
         }
         return shadow
     }
 
-    /// A surface that takes shadows: the plane `position[axis] == plane`, bounded in two other axes.
-    private struct Receiver {
-        let axis: Int, plane: Float, lift: Float, normal: SIMD3<Float>
-        let u: Int, uRange: ClosedRange<Float>
-        let v: Int, vRange: ClosedRange<Float>
-
-        /// Sutherland–Hodgman: cuts the polygon to the surface's rectangle.
-        func clip(_ polygon: [SIMD3<Float>]) -> [SIMD3<Float>] {
-            var points = polygon
-            for (index, bound, keepAbove) in [(u, uRange.lowerBound, true), (u, uRange.upperBound, false),
-                                              (v, vRange.lowerBound, true), (v, vRange.upperBound, false)] {
-                guard !points.isEmpty else { break }
-                let inside = { (p: SIMD3<Float>) in keepAbove ? p[index] >= bound : p[index] <= bound }
-                var kept: [SIMD3<Float>] = []
-                for i in points.indices {
-                    let current = points[i], next = points[(i + 1) % points.count]
-                    if inside(current) { kept.append(current) }
-                    if inside(current) != inside(next) {
-                        let t = (bound - current[index]) / (next[index] - current[index])
-                        kept.append(current + (next - current) * t)
-                    }
-                }
-                points = kept
-            }
-            return points
+    /// Sutherland–Hodgman: keeps the part of the polygon where `inside` ≥ 0.
+    static func clip(_ polygon: [SIMD3<Float>], _ inside: (SIMD3<Float>) -> Float) -> [SIMD3<Float>] {
+        var kept: [SIMD3<Float>] = []
+        for i in polygon.indices {
+            let current = polygon[i], next = polygon[(i + 1) % polygon.count]
+            let dc = inside(current), dn = inside(next)
+            if dc >= 0 { kept.append(current) }
+            if (dc >= 0) != (dn >= 0) { kept.append(current + (next - current) * (dc / (dc - dn))) }
         }
+        return kept
     }
 }
 
@@ -136,7 +130,7 @@ extension LowPolyMesh {
         let s = Float(sinApprox(angle)), c = Float(sinApprox(angle + Double.pi / 2))
         return LowPolyMesh(positions: positions.map { p in
             SIMD3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c) + placement.position
-        }, indices: indices)
+        }, indices: indices, uvs: uvs)
     }
 
     mutating func append(_ a: SIMD3<Float>, _ b: SIMD3<Float>, _ c: SIMD3<Float>) {
