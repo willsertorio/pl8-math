@@ -15,7 +15,20 @@ public struct LowPolyMesh: Equatable, Sendable {
 
     // MARK: - Shapes (axis along X)
 
-    /// A closed n-sided prism, centred on the origin.
+    public enum Axis: Sendable { case x, y, z }
+
+    /// A closed n-sided prism along `axis`, centred on the origin.
+    public static func cylinder(radius: Float, length: Float, sides: Int, axis: Axis) -> LowPolyMesh {
+        let alongX = cylinder(radius: radius, length: length, sides: sides)
+        switch axis {
+        case .x: return alongX
+        // Cyclic swaps of the coordinates are rotations, so faces keep pointing out.
+        case .y: return LowPolyMesh(positions: alongX.positions.map { SIMD3($0.z, $0.x, $0.y) }, indices: alongX.indices)
+        case .z: return LowPolyMesh(positions: alongX.positions.map { SIMD3($0.y, $0.z, $0.x) }, indices: alongX.indices)
+        }
+    }
+
+    /// A closed n-sided prism along X, centred on the origin.
     public static func cylinder(radius: Float, length: Float, sides: Int) -> LowPolyMesh {
         var mesh = LowPolyMesh()
         let half = length / 2

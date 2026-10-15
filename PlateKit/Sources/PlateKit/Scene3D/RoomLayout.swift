@@ -37,10 +37,10 @@ public enum RoomLayout {
         .wallWindow: Placement(position: [5, -0.15, 1.2], rotationDegrees: -90),
     ]
 
-    /// Where the bar rests on the rack: the prototype's bar shot looks 0.77 m behind the rack, at 1.22 m.
+    /// Where the bar rests on the rack's J-hooks: 0.77 m behind the rack's origin, 1.265 m up (prototype).
     public static var barOnRack: SIMD3<Float> {
         let rack = objects[.rack]!.position
-        return SIMD3(rack.x, 1.22, rack.z - 0.77)
+        return SIMD3(rack.x, 1.265, rack.z - 0.77)
     }
 
     /// Camera shots (SPEC 2.1 stations).

@@ -63,6 +63,50 @@ enum Diorama {
         return model
     }
 
+    /// A prop from PlateKit's recipe: parts of the same tone merged into one mesh, and one sketch outline around
+    /// the outlined parts. `line` is the outline width in metres.
+    static func prop(_ parts: [PropPart], line: Float, placement: RoomLayout.Placement, name: String = "") -> Entity {
+        let entity = Entity()
+        entity.name = name
+        entity.position = placement.position
+        entity.orientation = simd_quatf(angle: placement.rotationDegrees * .pi / 180, axis: [0, 1, 0])
+
+        var byTone: [PropPart.Tone: LowPolyMesh] = [:]
+        var outlined = LowPolyMesh()
+        for part in parts {
+            byTone[part.tone, default: LowPolyMesh()] = byTone[part.tone, default: LowPolyMesh()].combined(with: part.mesh)
+            if part.outlined { outlined = outlined.combined(with: part.mesh) }
+        }
+        for (tone, mesh) in byTone {
+            if let body = try? ModelEntity(mesh: meshResource(mesh), materials: [material(tone)]) {
+                entity.addChild(body)
+            }
+        }
+        if outlined.triangleCount > 0 {
+            for hull in [outlined.hull(width: line, roughness: roughness, seed: 1),
+                         outlined.hull(width: line * 0.7, roughness: roughness, seed: 2)] {
+                if let ink = try? ModelEntity(mesh: meshResource(hull), materials: [flat(Diorama.ink)]) {
+                    entity.addChild(ink)
+                }
+            }
+        }
+        return entity
+    }
+
+    /// The prototype's black and white become the palette's dark and light (SPEC 2.5); plates keep their colours.
+    static func material(_ tone: PropPart.Tone) -> any RealityKit.Material {
+        switch tone {
+        case .dark:
+            return lit(ink)
+        case .light:
+            return lit(boxLight)
+        case .steel:
+            return SimpleMaterial(color: UIColor(Color(hex: "#D3D8DD")), roughness: 0.3, isMetallic: true)
+        case .plate(let plate):
+            return lit(UIColor(Color(hex: plate.colorHex)))
+        }
+    }
+
     static func meshResource(_ mesh: LowPolyMesh) throws -> MeshResource {
         var descriptor = MeshDescriptor(name: "part")
         descriptor.positions = MeshBuffers.Positions(mesh.positions)
