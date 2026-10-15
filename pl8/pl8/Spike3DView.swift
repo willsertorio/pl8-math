@@ -168,7 +168,7 @@ enum SpikeScene {
         case .toon:
             // Three flat shades of the colour, chosen per face by PlateKit's toon bands.
             let bands = mesh.toonBands(lightDirection: light, levels: 3)
-            let materials: [any Material] = [0.62, 0.82, 1.0].map { UnlitMaterial(color: shade(colour, $0)) }
+            let materials: [any RealityKit.Material] = [0.62, 0.82, 1.0].map { UnlitMaterial(color: shade(colour, $0)) }
             guard let resource = try? meshResource(mesh, faceMaterials: bands) else { return nil }
             return ModelEntity(mesh: resource, materials: materials)
         case .smooth:
