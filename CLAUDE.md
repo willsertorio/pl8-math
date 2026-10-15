@@ -38,4 +38,4 @@ SPEC.md  CLAUDE.md  DECISIONS.md
 - `reference/plate-math-web-prototype.html` — the earlier prototype whose plate rules were tested at the box; the golden values come from it.
 
 ## Current milestone
-M4 — the app in plain 2D. M0–M2 done 2026-10-13, M3 done 2026-10-14. (Update this line as milestones finish.)
+M5 — 3D spike. M4 built, waiting on a real class to be marked done. M0–M2 done 2026-10-13, M3 done 2026-10-14. (Update this line as milestones finish.)
