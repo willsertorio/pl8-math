@@ -21,6 +21,11 @@ public enum RoomLayout {
         public let position: SIMD3<Float>
         /// Around Y.
         public let rotationDegrees: Float
+
+        public init(position: SIMD3<Float>, rotationDegrees: Float) {
+            self.position = position
+            self.rotationDegrees = rotationDegrees
+        }
     }
 
     public static let objects: [Object: Placement] = [
@@ -54,6 +59,12 @@ public enum RoomLayout {
         public let position: SIMD3<Float>
         /// Vertical, degrees.
         public let fieldOfView: Float
+
+        public init(target: SIMD3<Float>, position: SIMD3<Float>, fieldOfView: Float) {
+            self.target = target
+            self.position = position
+            self.fieldOfView = fieldOfView
+        }
     }
 
     public static let shots: [Station: Shot] = {
