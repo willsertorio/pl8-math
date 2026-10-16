@@ -44,7 +44,7 @@ struct PropModelsTests {
 
     @Test func onlyTheGymsPlatesAreOnTheShelf() {
         let parts = PropModels.parts(for: .shelf, plates: [Plate.find(20, .kg)!])
-        #expect(parts.filter { $0.tone == .picture(.plateFace(Plate.find(20, .kg)!)) }.count == 6)
+        #expect(parts.filter { $0.tone == .picture(.plateFace(Plate.find(20, .kg)!)) }.count == 5)   // its own peg: 5 plates
     }
 
     @Test func platesHavePrintedFacesARimAndAChromeHub() {

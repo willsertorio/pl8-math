@@ -15,6 +15,11 @@ public struct BakedPiece: Sendable {
     public func isVisible(from camera: SIMD3<Float>) -> Bool {
         walls.allSatisfy { $0.isVisible(from: camera) }
     }
+
+    /// The same piece moved, e.g. to sit around a pivot the app scales it from.
+    public func translated(by offset: SIMD3<Float>) -> BakedPiece {
+        BakedPiece(mesh: mesh.translated(by: offset), paint: paint, walls: walls)
+    }
 }
 
 /// The whole diorama baked into flat-coloured pieces, the way the prototype renders it (reference/
@@ -25,11 +30,12 @@ public enum SceneBake {
     /// The ink lines' width in metres (the prototype's are one pixel).
     public static let inkWidth: Float = 0.007
 
-    public static func pieces(plates: [Plate], gymName: String) -> [BakedPiece] {
+    /// - Parameter except: props the caller bakes on its own (the ones the gym setup changes).
+    public static func pieces(plates: [Plate], gymName: String, except: Set<RoomLayout.Object> = []) -> [BakedPiece] {
         // Everything in room space, grouped by the wall it shows with.
         var groups: [(wall: RoomLayout.Wall?, parts: [PropPart])] = [(nil, PropModels.floor() + PropModels.border(nil))]
         for wall in RoomLayout.Wall.allCases { groups.append((wall, PropModels.wall(wall) + PropModels.border(wall))) }
-        for object in RoomLayout.Object.allCases {
+        for object in RoomLayout.Object.allCases where !except.contains(object) {
             let placement = PropModels.placement(for: object)
             let parts = PropModels.parts(for: object, plates: plates, gymName: gymName).map {
                 PropPart(mesh: $0.mesh.placed(placement), tone: $0.tone, inked: $0.inked, casts: $0.casts)
@@ -37,6 +43,16 @@ public enum SceneBake {
             if !parts.isEmpty { groups.append((object.wall, parts)) }
         }
 
+        return bake(groups)
+    }
+
+    /// One prop's parts (in its own space) placed in the room and baked with their ink and shadows; `wall` is
+    /// the wall it shows with. For the parts of the room that change as the gym is set up.
+    public static func bake(_ parts: [PropPart], placement: RoomLayout.Placement, wall: RoomLayout.Wall?) -> [BakedPiece] {
+        bake([(wall, parts.map { PropPart(mesh: $0.mesh.placed(placement), tone: $0.tone, inked: $0.inked, casts: $0.casts) })])
+    }
+
+    static func bake(_ groups: [(wall: RoomLayout.Wall?, parts: [PropPart])]) -> [BakedPiece] {
         var buckets: [Key: LowPolyMesh] = [:]
         var order: [Key] = []
         func add(_ mesh: LowPolyMesh, _ paint: BakedPiece.Paint, _ walls: Set<RoomLayout.Wall>) {

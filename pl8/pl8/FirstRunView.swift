@@ -3,7 +3,7 @@ import SwiftUI
 import PlateKit
 
 /// First run (SPEC 2.2): opening → gym setup, one question per sheet → PRs.
-/// In 2D, a card behind the sheet stands in for the room being built.
+/// The room sits above the sheet and builds itself from the answers: the flag, the plate shelf, the bar.
 struct FirstRunView: View {
     var onFinish: () -> Void
 
@@ -17,22 +17,39 @@ struct FirstRunView: View {
 
     private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
 
+    /// Where each question looks in the room (SPEC 2.1, 2.2).
+    private var station: RoomLayout.Station {
+        switch step {
+        case .opening: .overview
+        case .name: .nameFlag
+        case .unit, .plates: .corner
+        case .bar: .bar
+        case .prChoice, .prList: .pr
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             Theme.background.ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                Text("pl8(math)")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-                if step == .opening {
+            if step == .opening {
+                VStack(spacing: 24) {
+                    Text("pl8(math)")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundStyle(Theme.ink)
                     Text("Tap to start").font(.headline).foregroundStyle(Theme.ink)
-                } else if let gym {
-                    GymPreview(gym: gym, step: step)
                 }
+                .padding(.top, 60)
+                .padding(.horizontal, 16)
+            } else {
+                // The sheet covers the bottom half; the room fills the top.
+                GeometryReader { geometry in
+                    RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
+                              plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20)
+                        .frame(height: geometry.size.height * 0.55)
+                }
+                .ignoresSafeArea(edges: .top)
             }
-            .padding(.top, 60)
-            .padding(.horizontal, 16)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -149,38 +166,5 @@ private struct UnitList: View {
             }
         }
         .sensoryFeedback(.selection, trigger: gym.unit)
-    }
-}
-
-/// Stands in for the room: each answer shows up as it's given.
-private struct GymPreview: View {
-    @Bindable var gym: Gym
-    let step: FirstRunView.Step
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(gym.name.isEmpty ? "YOUR BOX" : gym.name)
-                .font(.system(size: 40, weight: .heavy))
-                .foregroundStyle(Theme.paper)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Theme.ink)
-
-            if step.rawValue >= FirstRunView.Step.unit.rawValue {
-                Text(gym.unit == .kg ? "Kilograms" : "Pounds").font(.headline)
-            }
-            if step.rawValue >= FirstRunView.Step.plates.rawValue {
-                HStack(spacing: 4) {
-                    ForEach(Plate.catalog(gym.unit).filter { gym.plateSizes.contains($0.size) }, id: \.size) { plate in
-                        PlateDot(plate: plate)
-                    }
-                }
-            }
-            if step.rawValue >= FirstRunView.Step.bar.rawValue {
-                Text("Bar \(WeightUnit.trimmed(gym.barWeight)) \(gym.unit.rawValue)").font(.headline)
-            }
-        }
-        .drawer()
-        .animation(.snappy, value: step)
     }
 }

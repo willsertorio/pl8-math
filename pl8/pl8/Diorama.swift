@@ -51,9 +51,13 @@ enum Diorama {
     /// Hides every piece whose wall is between the camera (in room space) and the room, like the prototype's
     /// cut-away.
     static func showWalls(from camera: SIMD3<Float>, in world: Entity) {
-        for child in world.children where child.name.hasPrefix("walls:") {
-            let names = child.name.dropFirst("walls:".count).split(separator: ",")
-            child.isEnabled = names.allSatisfy { RoomLayout.Wall(rawValue: String($0))?.isVisible(from: camera) ?? true }
+        for child in world.children {
+            if child.name.hasPrefix("walls:") {
+                let names = child.name.dropFirst("walls:".count).split(separator: ",")
+                child.isEnabled = names.allSatisfy { RoomLayout.Wall(rawValue: String($0))?.isVisible(from: camera) ?? true }
+            } else {
+                showWalls(from: camera, in: child)                     // the setup's own groups (flag, shelf, piles)
+            }
         }
     }
 

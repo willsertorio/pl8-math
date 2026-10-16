@@ -5,65 +5,25 @@ import UIKit
 import PlateKit
 
 /// The 3D box (M6): the room, its stations and camera shots (SPEC 2.1), copied from the prototype and baked by
-/// PlateKit. Drag to go round, pinch to zoom; a camera chip flies back to its shot.
+/// PlateKit. Drag to go round, pinch to zoom; a camera chip flies to its shot.
 struct Room3DView: View {
     @State private var station: RoomLayout.Station = .overview
-    @State private var orbit = Orbit(RoomLayout.shots[.overview]!)
-    @State private var dragStart: Orbit?
-    @State private var pinchStart: Orbit?
-    @State private var flight: Task<Void, Never>?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var gyms: [Gym]
 
     private var gym: Gym? { gyms.first(where: { $0.isCurrent }) ?? gyms.first }
 
-    /// The current gym's plates hang on the shelf.
-    private var plates: [Plate] {
-        guard let gym else { return Plate.catalog(.kg) }
-        return Plate.catalog(gym.unit).filter { gym.plateSizes.contains($0.size) }
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            RealityView { content in
-                let plates = plates, name = gym?.name ?? ""
-                // Baking takes a moment: do it off the main thread, then build the models.
-                let pieces = await Task.detached(priority: .userInitiated) {
-                    SceneBake.pieces(plates: plates, gymName: name)
-                }.value
-                for entity in RoomScene.entities(pieces: pieces) {
-                    content.add(entity)
-                }
-                RoomScene.show(orbit, in: content.entities)
-            } update: { content in
-                RoomScene.show(orbit, in: content.entities)
-            }
-            .background(Theme.background)
-            .gesture(
-                DragGesture(minimumDistance: 2)
-                    .onChanged { value in
-                        flight?.cancel()
-                        let start = dragStart ?? orbit
-                        dragStart = start
-                        orbit = start.dragged(dx: Float(value.translation.width), dy: Float(value.translation.height))
-                    }
-                    .onEnded { _ in dragStart = nil }
-                    .simultaneously(with: MagnifyGesture()
-                        .onChanged { value in
-                            flight?.cancel()
-                            let start = pinchStart ?? orbit
-                            pinchStart = start
-                            orbit = start.zoomed(by: Float(value.magnification))
-                        }
-                        .onEnded { _ in pinchStart = nil })
-            )
+            RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
+                      plateSizes: gym?.plateSizes ?? Plate.catalog(.kg).map(\.size),
+                      barWeight: gym?.barWeight ?? 20, interactive: true)
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Camera").sectionLabel()
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(RoomLayout.Station.allCases, id: \.self) { item in
-                            Chip(isOn: item == station, action: { fly(to: item) }) {
+                            Chip(isOn: item == station, action: { station = item }) {
                                 Text(RoomScene.title(item))
                             }
                             .fixedSize()
@@ -79,28 +39,6 @@ struct Room3DView: View {
         .background(Theme.background)
         .navigationTitle("3D room")
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear { flight?.cancel() }
-    }
-
-    /// Flies the camera to `item`'s shot like the prototype (SPEC 2.5); with Reduce Motion, cuts straight there.
-    private func fly(to item: RoomLayout.Station) {
-        station = item
-        flight?.cancel()
-        let destination = Orbit(RoomLayout.shots[item]!)
-        if reduceMotion {
-            orbit = destination
-            return
-        }
-        let path = Flight(from: orbit, to: destination, duration: Flight.duration(to: item))
-        flight = Task { @MainActor in
-            let start = ContinuousClock.now
-            while !Task.isCancelled {
-                let elapsed = (ContinuousClock.now - start) / .seconds(1)
-                orbit = path.orbit(at: elapsed)
-                if path.isFinished(at: elapsed) { break }
-                try? await Task.sleep(for: .milliseconds(8))       // about one step per screen refresh
-            }
-        }
     }
 }
 

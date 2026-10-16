@@ -51,14 +51,23 @@ public enum PropModels {
     /// - Parameters:
     ///   - plates: the gym's plates, for the shelf piles.
     ///   - gymName: on the flag.
-    public static func parts(for object: RoomLayout.Object, plates: [Plate], gymName: String = "") -> [PropPart] {
+    ///   - barWeight, unit: the gym's bar, on the rack (lighter bars are shorter and thinner).
+    public static func parts(for object: RoomLayout.Object, plates: [Plate], gymName: String = "",
+                             barWeight: Double? = nil, unit: WeightUnit? = nil) -> [PropPart] {
         var b = Builder()
         switch object {
         case .platform: platform(&b)
-        case .rack: rack(&b)
+        case .rack:
+            let u = unit ?? plates.first?.unit ?? .kg
+            rack(&b, barScale: barScale(barWeight ?? Bar.weights(u)[0], unit: u))
         case .bench: bench(&b)
         case .board: board(&b)
-        case .shelf: shelf(&b, plates: plates)
+        case .shelf:
+            b.parts = shelf(unit: unit ?? plates.first?.unit ?? .kg)
+            for plate in plates {
+                let pile = pile(plate)
+                b.parts += pile.parts.map { PropPart(mesh: $0.mesh.translated(by: pile.pivot), tone: $0.tone, inked: $0.inked, casts: $0.casts) }
+            }
         case .flag: flag(&b, text: gymName)
         case .prBoard: prBoard(&b)
         case .barHolder: barHolder(&b)
@@ -150,7 +159,14 @@ public enum PropModels {
     ]
 
     /// Wall-mounted rack: two uprights, J-hooks, arms back to the wall, a pull-up bar, and the barbell on the hooks.
-    private static func rack(_ b: inout Builder) {
+    /// How much shorter (x) and thinner (y) the gym's bar is than the full Olympic bar: the prototype's
+    /// setBarModel, by the bar's place in the unit's list (20/15/10 kg, 45/35/15 lb).
+    public static func barScale(_ weight: Double, unit: WeightUnit) -> SIMD2<Float> {
+        let index = max(0, Bar.weights(unit).firstIndex(of: weight) ?? 0)
+        return [SIMD2<Float>(1, 1), SIMD2(0.914, 0.88), SIMD2(0.8, 0.8)][min(index, 2)]
+    }
+
+    private static func rack(_ b: inout Builder, barScale: SIMD2<Float> = [1, 1]) {
         let z: Float = -0.85, top: Float = 2.35, wallZ: Float = -1.69
         for side: Float in [-1, 1] {
             let x = side * 0.62
@@ -169,7 +185,13 @@ public enum PropModels {
             b.box([0.14, 0.24, 0.02], [x, 2.02, wallZ + 0.01], .dark)        // wall plate
         }
         b.cylinder(0.02, 1.33, .x, 12, [0, top - 0.06, z], .dark)            // pull-up bar
-        barbell(&b, at: [0, 1.265, z + 0.08])
+        let bar = SIMD3<Float>(0, 1.265, z + 0.08)
+        var barbellParts = Builder()
+        barbell(&barbellParts, at: .zero)
+        b.parts += barbellParts.parts.map { part in
+            PropPart(mesh: part.mesh.mapped { SIMD3($0.x * barScale.x, $0.y * barScale.y, $0.z * barScale.y) + bar },
+                     tone: part.tone, inked: part.inked, casts: part.casts)
+        }
     }
 
     /// An Olympic bar along X, in the prototype's steels: smooth centre, knurled hand sections, collars,
@@ -239,36 +261,63 @@ public enum PropModels {
         }
     }
 
-    /// Plate piles on pegs off the left wall: bumpers on a low rail, change plates on a high one, heaviest first.
-    /// The layout's shelf position offsets the piles from the wall (x), floor (y) and along it (z).
-    private static func shelf(_ b: inout Builder, plates: [Plate]) {
-        // In room space: see `placement(for:)`.
+    // MARK: - The plate shelf (buildPlatePiles)
+
+    /// Bumpers hang on a low rail, change plates on a high one, heaviest first; the layout's shelf position
+    /// offsets them from the wall (x), floor (y) and along it (z). Every size of the unit has its peg.
+    private struct ShelfSpot {
+        let y: Float, z: Float, peg: Float, count: Int
+    }
+
+    private static func spots(_ unit: WeightUnit) -> [(Plate, ShelfSpot)] {
         let offset = RoomLayout.objects[.shelf]!.position
         let z0 = -3.5 + offset.z, z1 = -1.2 + offset.z
-        let wallX = RoomLayout.room.minX + offset.x
-        var seed: UInt32 = 1
-        func row(_ list: [Plate], y: Float, counts: [Int], peg: Float) {
-            guard !list.isEmpty else { return }
-            b.box([0.035, 0.09, z1 - z0 + 0.3], [wallX + 0.0175, y, (z0 + z1) / 2], .dark)          // rail
+        let sorted = Plate.catalog(unit).sorted { $0.size > $1.size }
+        var result: [(Plate, ShelfSpot)] = []
+        for (list, y, counts, peg) in [(sorted.filter { $0.kind == .bumper }, 0.6 + offset.y, [6, 5, 6, 5], Float(0.42)),
+                                       (sorted.filter { $0.kind == .change }, 1.3 + offset.y, [8, 6, 8, 6, 8, 6], Float(0.26))] {
             for (j, plate) in list.enumerated() {
                 let z = z1 - (z1 - z0) * (Float(j) + 0.5) / Float(list.count)
-                b.cylinder(0.022, peg, .x, 10, [wallX + 0.035 + peg / 2, y, z], .dark)            // peg
-                b.cylinder(0.045, 0.02, .x, 12, [wallX + 0.045, y, z], .dark)                      // its base plate
-                let thickness = Float(plate.thickness)
-                for i in 0..<counts[j % counts.count] {
-                    let x = wallX + 0.06 + Float(i) * (thickness + 0.003) + thickness / 2
-                    seed &+= 1
-                    let turn = Float(seed &* 2_654_435_761 % 10_000) / 10_000 * 2 * Float.pi   // each hangs at its own angle
-                    for part in plateParts(plate, turn: turn) {
-                        b.parts.append(PropPart(mesh: part.mesh.translated(by: [x, y, z]), tone: part.tone,
-                                                inked: false, casts: true))
-                    }
-                }
+                result.append((plate, ShelfSpot(y: y, z: z, peg: peg, count: counts[j % counts.count])))
             }
         }
-        let sorted = plates.sorted { $0.size > $1.size }
-        row(sorted.filter { $0.kind == .bumper }, y: 0.6 + offset.y, counts: [6, 5, 6, 5], peg: 0.42)
-        row(sorted.filter { $0.kind == .change }, y: 1.3 + offset.y, counts: [8, 6, 8, 6, 8, 6], peg: 0.26)
+        return result
+    }
+
+    private static var wallX: Float { RoomLayout.room.minX + RoomLayout.objects[.shelf]!.position.x }
+
+    /// The rails and a peg (with its base plate) for every plate size of `unit`. In room space.
+    public static func shelf(unit: WeightUnit) -> [PropPart] {
+        var b = Builder()
+        let offset = RoomLayout.objects[.shelf]!.position
+        let z0 = -3.5 + offset.z, z1 = -1.2 + offset.z
+        for y in Set(spots(unit).map(\.1.y)).sorted() {
+            b.box([0.035, 0.09, z1 - z0 + 0.3], [wallX + 0.0175, y, (z0 + z1) / 2], .dark)          // rail
+        }
+        for (_, spot) in spots(unit) {
+            b.cylinder(0.022, spot.peg, .x, 10, [wallX + 0.035 + spot.peg / 2, spot.y, spot.z], .dark)   // peg
+            b.cylinder(0.045, 0.02, .x, 12, [wallX + 0.045, spot.y, spot.z], .dark)                       // its base plate
+        }
+        return b.parts
+    }
+
+    /// One plate size's pile on its peg: `pivot` is where it hangs at the wall (room space), the parts are
+    /// around it, so the app can pop the pile in and out from there.
+    public static func pile(_ plate: Plate) -> (pivot: SIMD3<Float>, parts: [PropPart]) {
+        guard let spot = spots(plate.unit).first(where: { $0.0 == plate })?.1 else { return (.zero, []) }
+        let pivot = SIMD3<Float>(wallX + 0.06, spot.y, spot.z)
+        let thickness = Float(plate.thickness)
+        var parts: [PropPart] = []
+        for i in 0..<spot.count {
+            let x = Float(i) * (thickness + 0.003) + thickness / 2
+            // Each hangs at its own angle on the peg, the same every time.
+            let seed = UInt32(plate.size * 4) &* 2_654_435_761 &+ UInt32(i) &* 40_503
+            let turn = Float(seed % 10_000) / 10_000 * 2 * Float.pi
+            for part in plateParts(plate, turn: turn) {
+                parts.append(PropPart(mesh: part.mesh.translated(by: [x, 0, 0]), tone: part.tone, inked: false, casts: true))
+            }
+        }
+        return (pivot, parts)
     }
 
     /// A plate along X, centred on the origin (the prototype's `assets`): printed faces from the hub out, a
