@@ -8,7 +8,11 @@ import PlateKit
 /// The 3D box (M6): the room, its stations and camera shots (SPEC 2.1), copied from the prototype and baked by
 /// PlateKit. Drag to go round, pinch to zoom; a camera chip flies to its shot.
 struct Room3DView: View {
-    @State private var station: RoomLayout.Station = .overview
+    @State private var station: RoomLayout.Station
+
+    init(station: RoomLayout.Station = .overview) {
+        _station = State(initialValue: station)
+    }
     @Query private var gyms: [Gym]
     @Query private var records: [PersonalRecord]
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]

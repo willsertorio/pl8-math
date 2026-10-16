@@ -2,12 +2,21 @@ import Foundation
 import Testing
 @testable import PlateKit
 
-/// Writes the baked scene as JSON when PL8_SCENE_DUMP names a file, so it can be rendered next to the prototype
-/// in a browser (three.js, unlit, the same as the phone). Does nothing otherwise.
+/// Writes the baked scene (ours.json) and the camera shots (shots.json) into the folder PL8_SCENE_DUMP names, so
+/// tools/visual-check can render them next to the prototype in a browser (three.js, unlit, like the phone).
+/// Does nothing otherwise.
 @Suite("Scene dump for visual comparison")
 struct SceneDumpTests {
     @Test func dumpBakedScene() throws {
-        guard let path = ProcessInfo.processInfo.environment["PL8_SCENE_DUMP"] else { return }
+        guard let folder = ProcessInfo.processInfo.environment["PL8_SCENE_DUMP"] else { return }
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        let path = folder + "/ours.json"
+        let shots = RoomLayout.Station.allCases.map { station -> String in
+            let shot = RoomLayout.shots[station]!
+            func v(_ p: SIMD3<Float>) -> String { "[\(p.x),\(p.y),\(p.z)]" }
+            return "\"\(station.rawValue)\":{\"T\":\(v(shot.target)),\"P\":\(v(shot.position)),\"fov\":\(shot.fieldOfView)}"
+        }
+        try ("{" + shots.joined(separator: ",") + "}").write(toFile: folder + "/shots.json", atomically: true, encoding: .utf8)
         let pieces = SceneBake.pieces(plates: Plate.catalog(.kg), gymName: "79")
         var out = "["
         for (n, piece) in pieces.enumerated() {

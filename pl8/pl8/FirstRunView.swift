@@ -14,7 +14,12 @@ struct FirstRunView: View {
 
     @Query private var gyms: [Gym]
     @Query private var records: [PersonalRecord]
-    @State private var step: Step = .opening
+    @State private var step: Step
+
+    init(startAt step: Step = .opening, onFinish: @escaping () -> Void) {
+        self.onFinish = onFinish
+        _step = State(initialValue: step)
+    }
     /// The sheet's height, measured from its content, so the room gets the rest of the screen.
     @State private var sheetHeight: CGFloat = 320
     /// The keyboard's height, so the room shows above it and the sheet while you type the name.
