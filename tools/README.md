@@ -10,6 +10,8 @@ Every push runs `.github/workflows/ci.yml` on GitHub:
 - **App build + screenshots** (macOS): builds the app for the iPhone Simulator and takes screenshots of its main
   screens in screenshot mode (`-pl8Shot <screen>`, demo data in memory; see `pl8/pl8/ScreenshotMode.swift`). They are
   in the `screenshots` artifact with the build log.
+- For pull requests, both sets of pictures (and the build log) are also pushed to the `ci-screens` branch, replaced
+  on every run, so Claude's session can fetch them with git (its network can't reach the artifact downloads).
 
 Run the prototype check locally:
 

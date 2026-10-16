@@ -1,12 +1,13 @@
 # Checks every push so Will doesn't have to (DECISIONS 2026-10-16):
 #   platekit  — PlateKit's tests, then the 3D room compared with the prototype, station by station
 #   app       — the app built for the iPhone Simulator, then screenshots of its main screens
-# Results: the run's summary, and the "prototype-check" and "screenshots" artifacts.
+# Results: the run's summary, the "prototype-check" and "screenshots" artifacts, and (for pull requests) the
+# pictures on the ci-screens branch, where Claude's session can fetch them with git.
 name: CI
 
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -63,7 +64,12 @@ jobs:
   app:
     name: App build + screenshots
     runs-on: macos-26
+    needs: platekit
+    if: always()
     timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
 
@@ -107,3 +113,29 @@ jobs:
             screens/*.png
             build.log
           if-no-files-found: ignore
+
+      - name: Fetch the prototype check's pictures
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: prototype-check
+          path: prototype-check
+        continue-on-error: true
+
+      - name: Publish the pictures on the ci-screens branch
+        if: always() && github.event_name == 'pull_request'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p publish/screens publish/prototype-check
+          cp screens/*.png publish/screens/ 2>/dev/null || true
+          cp prototype-check/*.png publish/prototype-check/ 2>/dev/null || true
+          cp build.log publish/ 2>/dev/null || true
+          echo "$SHA" > publish/SHA
+          cd publish
+          git init -q
+          git checkout -q -b ci-screens
+          git add .
+          git -c user.name="pl8 CI" -c user.email="ci@users.noreply.github.com" commit -qm "Pictures for $SHA"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screens
