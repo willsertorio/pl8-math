@@ -48,11 +48,17 @@ public enum SceneBake {
 
     /// One prop's parts (in its own space) placed in the room and baked with their ink and shadows; `wall` is
     /// the wall it shows with. For the parts of the room that change as the gym is set up.
-    public static func bake(_ parts: [PropPart], placement: RoomLayout.Placement, wall: RoomLayout.Wall?) -> [BakedPiece] {
-        bake([(wall, parts.map { PropPart(mesh: $0.mesh.placed(placement), tone: $0.tone, inked: $0.inked, casts: $0.casts) })])
+    /// What to bake: everything, or the shape and its shadow apart (a plate dropping onto the floor gets its
+    /// shadow when it lands).
+    public enum Content: Sendable { case all, withoutShadows, shadowsOnly }
+
+    public static func bake(_ parts: [PropPart], placement: RoomLayout.Placement, wall: RoomLayout.Wall?,
+                            content: Content = .all) -> [BakedPiece] {
+        bake([(wall, parts.map { PropPart(mesh: $0.mesh.placed(placement), tone: $0.tone, inked: $0.inked, casts: $0.casts) })],
+             content: content)
     }
 
-    static func bake(_ groups: [(wall: RoomLayout.Wall?, parts: [PropPart])]) -> [BakedPiece] {
+    static func bake(_ groups: [(wall: RoomLayout.Wall?, parts: [PropPart])], content: Content = .all) -> [BakedPiece] {
         var buckets: [Key: LowPolyMesh] = [:]
         var order: [Key] = []
         func add(_ mesh: LowPolyMesh, _ paint: BakedPiece.Paint, _ walls: Set<RoomLayout.Wall>) {
@@ -67,11 +73,13 @@ public enum SceneBake {
             let walls: Set<RoomLayout.Wall> = group.wall.map { [$0] } ?? []
             var casters = LowPolyMesh()
             for part in group.parts {
-                for (paint, mesh) in shaded(part) { add(mesh, paint, walls) }
-                if part.inked { add(part.mesh.inkLines(width: inkWidth), .colour(Look.ink), walls) }
+                if content != .shadowsOnly {
+                    for (paint, mesh) in shaded(part) { add(mesh, paint, walls) }
+                    if part.inked { add(part.mesh.inkLines(width: inkWidth), .colour(Look.ink), walls) }
+                }
                 if part.casts { casters.append(part.mesh) }
             }
-            for receiver in receivers {
+            for receiver in receivers where content != .withoutShadows {
                 let shadow = Sunlight.shadow(of: casters, on: receiver)
                 let shadowWalls = walls.union(receiver.wall.map { [$0] } ?? [])
                 add(shadow, .colour(Look.lit(albedo(receiver.tone), sun: 0)), shadowWalls)

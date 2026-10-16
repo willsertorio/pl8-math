@@ -76,7 +76,7 @@ While reading: a spinning plate loader. Then the whiteboard in the room shows th
 Before Start, the app asks for anything it's missing (see 3.6): a PR it doesn't have ("What's your Snatch PR?", saved to PRs) and any % it couldn't read ("What % for Back Squat?").
 
 ### 2.3 A session
-**4–6 · The session page.** One page you scroll; two buttons pinned at the top, **Plate kit** and **Sets**, jump between its two parts.
+**4–6 · The session page.** One page you scroll; two buttons pinned at the top, **Plate kit** and **Sets**, jump between its two parts. The room is a strip across the top third and follows the page: while the kit is at the top it shows the kit floor, where the session's plates dropped (heaviest first) when the session opened; while a set is at the top it shows the rack, its bar carrying that set's plates, which slide off and on between sets. Plates on the bar are missing from the floor.
 - **Plate kit** first: one chip per plate size, e.g. **2 × 45 LB**, plus the bar, which you tick off as you collect them. (3D: camera to the kit floor; the plates drop with a little physics and dust.)
 - **Sets** below, every set of the session in order, grouped by block (`WARM-UP · SNATCH`, `SNATCH`). Each set shows **"Set 3 of 6" and "1 rep"** as the biggest text (learned at the box), the load in the PR's unit and the % (`145 lb · 75–80%`), the change from the set before (*"Take off 5, then add 10 each side"*, *"Add 15 + 5 each side"* for the first), the bar diagram and the plates each side. (3D: on the rack the plates slide off and on to match.)
 - After the last set: *"Take off … each side, then put the bar back"*, then a big **End session** button.

@@ -1,0 +1,53 @@
+import Testing
+@testable import PlateKit
+
+@Suite("Session in 3D: kit floor and loaded bar (M6 step 5)")
+struct SessionSceneTests {
+    let kit = Kit(bar: 20, loads: [Load(total: 100, perSide: [25, 15]), Load(total: 60, perSide: [20])])
+
+    @Test func everyKitPlateLiesOnTheKitFloor() {
+        let placed = SessionScene.kitFloor(kit, unit: .kg)
+        #expect(placed.count == kit.plates.map(\.count).reduce(0, +))
+        let centre = RoomLayout.objects[.kitPlates]!.position
+        for p in placed {
+            #expect(p.axis == .y)                                                       // lying flat
+            #expect(abs(p.centre.y - Float(p.plate.thickness) / 2) < 0.001)              // on the floor
+            #expect(SIMD2(p.centre.x - centre.x, p.centre.z - centre.z).length < 2)
+        }
+        // Side by side, not on top of each other.
+        for (i, a) in placed.enumerated() {
+            for b in placed[(i + 1)...] {
+                let gap = SIMD2(a.centre.x - b.centre.x, a.centre.z - b.centre.z).length
+                #expect(gap >= Float(a.plate.diameter + b.plate.diameter) / 2 - 0.001)
+            }
+        }
+    }
+
+    @Test func platesGoOnBothSleevesFromTheCollarOut() {
+        let placed = SessionScene.barPlates(perSide: [25, 15], unit: .kg, barWeight: 20)
+        #expect(placed.count == 4)
+        let bar = RoomLayout.barOnRack
+        let right = placed.filter { $0.centre.x > bar.x }.sorted { $0.centre.x < $1.centre.x }
+        #expect(right.map(\.plate.size) == [25, 15])                                    // heaviest inside
+        #expect(abs(right[0].centre.x - bar.x - (0.695 + 0.028)) < 0.001)               // the 25's middle
+        #expect(placed.allSatisfy { $0.axis == .x && abs($0.centre.y - bar.y) < 0.001 })
+        let left = placed.filter { $0.centre.x < bar.x }
+        #expect(left.count == 2)
+    }
+
+    @Test func aLighterBarHasShorterSleeves() {
+        let full = SessionScene.barPlates(perSide: [5], unit: .kg, barWeight: 20)
+        let technique = SessionScene.barPlates(perSide: [5], unit: .kg, barWeight: 10)
+        let bar = RoomLayout.barOnRack.x
+        #expect(technique.map { abs($0.centre.x - bar) }.max()! < full.map { abs($0.centre.x - bar) }.max()!)
+    }
+
+    @Test func shadowsCanBeBakedApart() {
+        let plate = SessionScene.kitFloor(kit, unit: .kg)[0]
+        let parts = SessionScene.parts(plate)
+        let body = SceneBake.bake(parts, placement: .init(position: plate.centre, rotationDegrees: 0), wall: nil, content: .withoutShadows)
+        let shadow = SceneBake.bake(parts, placement: .init(position: plate.centre, rotationDegrees: 0), wall: nil, content: .shadowsOnly)
+        #expect(!body.isEmpty && !shadow.isEmpty)
+        #expect(shadow.allSatisfy { piece in piece.mesh.positions.allSatisfy { $0.y < 0.01 } })
+    }
+}

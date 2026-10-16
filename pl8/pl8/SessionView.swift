@@ -10,12 +10,12 @@ struct SessionView: View {
     let session: Session
     var onFinish: () -> Void
 
-    private enum Anchor: Hashable { case kit, sets }
 
     @Environment(\.modelContext) private var context
     @State private var collected: Set<Double> = []
     @State private var barCollected = false
-    @State private var jump: Anchor?
+    /// The row at the top of the scroll.
+    @State private var topRow: String? = "kit"
     @State private var jumps = 0
     @State private var endCount = 0
 
@@ -42,40 +42,85 @@ struct SessionView: View {
 
     // MARK: - The page
 
-    private var sessionPage: some View {
-        let logs = session.orderedLogs
-        return ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    kitCard(logs: logs).id(Anchor.kit)
-                    Text("Sets").font(Theme.heading).padding(.top, 8).id(Anchor.sets)
-                    ForEach(groups(logs), id: \.first!.order) { group in
-                        groupView(group, all: logs)
-                    }
-                    stripCard(logs: logs)
-                    Button("End session") { endSession() }
-                        .buttonStyle(.bigBlack)
-                        .padding(.top, 8)
-                }
-                .padding(16)
-            }
-            .safeAreaInset(edge: .top) {
-                HStack(spacing: 8) {
-                    Chip(isOn: false, action: { jump = .kit; jumps += 1 }) { Text("Plate kit") }.fixedSize()
-                    Chip(isOn: false, action: { jump = .sets; jumps += 1 }) { Text("Sets") }.fixedSize()
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Theme.background)
-                .sensoryFeedback(.selection, trigger: jumps)
-            }
-            .onChange(of: jump) { _, target in
-                guard let target else { return }
-                withAnimation(.snappy) { proxy.scrollTo(target, anchor: .top) }
-                jump = nil
+    /// One thing on the page; its id is what the room follows while it's at the top of the scroll.
+    private struct PageRow: Identifiable {
+        enum Kind { case kit, setsTitle, header(String), set(SetLog, number: Int, of: Int, previous: [Double]), strip, end }
+        let id: String
+        let kind: Kind
+        /// The plates on the bar while this row is at the top.
+        let perSide: [Double]
+    }
+
+    private func rows(_ logs: [SetLog]) -> [PageRow] {
+        var rows = [PageRow(id: "kit", kind: .kit, perSide: [])]
+        rows.append(PageRow(id: "sets", kind: .setsTitle, perSide: logs.first?.perSide ?? []))
+        for group in groups(logs) {
+            let first = group[0]
+            let name = session.liftName(for: first.blockIndex).uppercased()
+            rows.append(PageRow(id: "h-\(first.order)", kind: .header(first.isWarmUp ? "WARM-UP · \(name)" : name), perSide: first.perSide))
+            for (index, log) in group.enumerated() {
+                rows.append(PageRow(id: "s-\(log.order)", kind: .set(log, number: index + 1, of: group.count, previous: previous(log, in: logs)),
+                                    perSide: log.perSide))
             }
         }
+        rows.append(PageRow(id: "strip", kind: .strip, perSide: []))
+        rows.append(PageRow(id: "end", kind: .end, perSide: []))
+        return rows
+    }
+
+    private var sessionPage: some View {
+        let logs = session.orderedLogs
+        let rows = rows(logs)
+        let top = rows.first { $0.id == (topRow ?? "kit") } ?? rows[0]
+        let onKit = top.id == "kit"
+        return VStack(spacing: 0) {
+            // The room follows the page: the kit floor while the kit is in view, the loaded bar for a set.
+            RoomStage(station: onKit ? .kit : .setv, gymName: session.gymName, unit: session.gymUnit,
+                      plateSizes: session.plateSizes, barWeight: session.barWeight,
+                      session: SessionProps(kit: Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) }),
+                                            unit: session.gymUnit, barWeight: session.barWeight, perSide: top.perSide))
+                .containerRelativeFrame(.vertical) { length, _ in length * 0.35 }
+
+            HStack(spacing: 8) {
+                Chip(isOn: onKit, action: { jump(to: "kit") }) { Text("Plate kit") }.fixedSize()
+                Chip(isOn: !onKit, action: { jump(to: "sets") }) { Text("Sets") }.fixedSize()
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .sensoryFeedback(.selection, trigger: jumps)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ForEach(rows) { row in
+                        rowView(row, logs: logs).id(row.id)
+                    }
+                }
+                .scrollTargetLayout()
+                .padding(16)
+            }
+            .scrollPosition(id: $topRow, anchor: .top)
+        }
+    }
+
+    @ViewBuilder
+    private func rowView(_ row: PageRow, logs: [SetLog]) -> some View {
+        switch row.kind {
+        case .kit: kitCard(logs: logs)
+        case .setsTitle: Text("Sets").font(Theme.heading).padding(.top, 8)
+        case .header(let label): Text(label).sectionLabel()
+        case .set(let log, let number, let count, let previous): setCard(log, number: number, of: count, previous: previous)
+        case .strip: stripCard(logs: logs)
+        case .end:
+            Button("End session") { endSession() }
+                .buttonStyle(.bigBlack)
+                .padding(.top, 8)
+        }
+    }
+
+    private func jump(to id: String) {
+        jumps += 1
+        withAnimation(.snappy) { topRow = id }
     }
 
     // MARK: - Plate kit (SPEC 2.3 step 4)
@@ -126,17 +171,6 @@ struct SessionView: View {
             }
         }
         return groups
-    }
-
-    private func groupView(_ group: [SetLog], all: [SetLog]) -> some View {
-        let first = group[0]
-        let name = session.liftName(for: first.blockIndex).uppercased()
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(first.isWarmUp ? "WARM-UP · \(name)" : name).sectionLabel()
-            ForEach(Array(group.enumerated()), id: \.element.order) { index, log in
-                setCard(log, number: index + 1, of: group.count, previous: previous(log, in: all))
-            }
-        }
     }
 
     private func previous(_ log: SetLog, in all: [SetLog]) -> [Double] {

@@ -13,6 +13,8 @@ struct RoomStage: View {
     var plateSizes: [Double]
     var barWeight: Double
     var boards = Boards()
+    /// During a session: the kit on the floor and the set's plates on the bar.
+    var session: SessionProps?
     var interactive = false
 
     @State private var orbit: Orbit
@@ -23,8 +25,9 @@ struct RoomStage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(station: RoomLayout.Station, gymName: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double,
-         boards: Boards = Boards(), interactive: Bool = false) {
+         boards: Boards = Boards(), session: SessionProps? = nil, interactive: Bool = false) {
         self.boards = boards
+        self.session = session
         self.station = station
         self.gymName = gymName
         self.unit = unit
@@ -46,10 +49,12 @@ struct RoomStage: View {
             if let world = entities.first(where: { $0.name == RoomScene.worldName }) {
                 props.attach(to: world)
                 props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, boards: boards, animate: false)
+                props.syncSession(session, animate: !reduceMotion)
             }
             RoomScene.show(orbit, in: content.entities)
         } update: { content in
             props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, boards: boards, animate: !reduceMotion)
+            props.syncSession(session, animate: !reduceMotion)
             RoomScene.show(orbit, in: content.entities)
         }
         .background(Theme.background)
@@ -107,12 +112,17 @@ final class SetupProps {
 
     private let flag = Entity(), rack = Entity(), shelf = Entity(), prBoard = Entity(), board = Entity()
     private var boards: Boards?
+    private let kitFloor = Entity(), barPlates = Entity()
+    private var kit: Kit?
+    private var kitItems: [(size: Double, entity: Entity)] = []
+    private var onBar: [(size: Double, entity: Entity, k: Int)] = []
+    private var barSide: [Double] = []
     private var piles: [Double: Entity] = [:]
     private var name: String?, unit: WeightUnit?, barWeight: Double?
     private var attached = false
 
     func attach(to world: Entity) {
-        for group in [flag, rack, shelf, prBoard, board] { world.addChild(group) }
+        for group in [flag, rack, shelf, prBoard, board, kitFloor, barPlates] { world.addChild(group) }
         attached = true
     }
 
@@ -197,8 +207,141 @@ final class SetupProps {
         }
     }
 
+    // MARK: - Session (SPEC 2.3)
+
+    /// The kit drops onto the kit floor (heaviest first) the first time it's shown; the bar on the rack carries
+    /// the set's plates, sliding off and on between sets like the prototype's showSet. Plates on the bar are
+    /// missing from the floor.
+    func syncSession(_ session: SessionProps?, animate: Bool) {
+        guard attached else { return }
+        guard let session else {
+            for child in Array(kitFloor.children) + Array(barPlates.children) { child.removeFromParent() }
+            kitItems = []; onBar = []; barSide = []; kit = nil
+            return
+        }
+        if session.kit != kit {
+            kit = session.kit
+            for child in Array(kitFloor.children) { child.removeFromParent() }
+            let placed = SessionScene.kitFloor(session.kit, unit: session.unit)
+            // Each plate sits in a holder: the holder hides it while it's on the bar, the plate itself drops.
+            let plates = placed.map { Self.plateEntity($0) }
+            kitItems = zip(placed, plates).map { placed, plate in
+                let holder = Entity()
+                holder.addChild(plate)
+                kitFloor.addChild(holder)
+                return (placed.plate.size, holder)
+            }
+            // Heaviest first, a beat apart, from a few metres up.
+            if animate {
+                let order = placed.indices.sorted { placed[$0].plate.size > placed[$1].plate.size }
+                for (n, index) in order.enumerated() {
+                    drop(plates[index], to: placed[index].centre, after: 0.4 + Double(n) * 0.12, from: 6 + Float(n % 3))
+                }
+            }
+        }
+        if session.perSide != barSide { load(session.perSide, unit: session.unit, barWeight: session.barWeight, animate: animate) }
+        // What's on the bar isn't on the floor.
+        var onBarCount: [Double: Int] = [:]
+        for plate in onBar { onBarCount[plate.size, default: 0] += 1 }
+        var seen: [Double: Int] = [:]
+        for item in kitItems {
+            seen[item.size, default: 0] += 1
+            item.entity.isEnabled = seen[item.size]! > (onBarCount[item.size] ?? 0)
+        }
+    }
+
+    /// A plate as an entity at its spot: its body, and its shadow (hidden while it moves).
+    private static func plateEntity(_ placed: SessionScene.PlacedPlate) -> Entity {
+        let parts = SessionScene.parts(placed)
+        let at = RoomLayout.Placement(position: placed.centre, rotationDegrees: 0)
+        let entity = Entity()
+        entity.position = placed.centre
+        let body = Entity(), shadow = Entity()
+        shadow.name = "shadow"
+        for child in Diorama.entities(for: SceneBake.bake(parts, placement: at, wall: nil, content: .withoutShadows).map { $0.translated(by: -placed.centre) }) {
+            body.addChild(child)
+        }
+        for child in Diorama.entities(for: SceneBake.bake(parts, placement: at, wall: nil, content: .shadowsOnly).map { $0.translated(by: -placed.centre) }) {
+            shadow.addChild(child)
+        }
+        entity.addChild(body)
+        entity.addChild(shadow)
+        return entity
+    }
+
+    /// Changes the bar to `perSide`: the plates that differ come off from the outside in, then the new ones go on.
+    private func load(_ perSide: [Double], unit: WeightUnit, barWeight: Double, animate: Bool) {
+        let kept = zip(barSide, perSide).prefix { $0 == $1 }.count
+        let sleeveEnd = RoomLayout.barOnRack.x
+        for plate in onBar where plate.k >= kept {
+            let entity = plate.entity
+            if animate {
+                let outward: Float = entity.position.x > sleeveEnd ? 1 : -1
+                slide(entity, to: SIMD3(sleeveEnd + outward * 1.5, entity.position.y, entity.position.z),
+                      after: Double(plate.k - kept) * 0.05, removing: true)
+            } else {
+                entity.removeFromParent()
+            }
+        }
+        onBar.removeAll { $0.k >= kept }
+        let placed = SessionScene.barPlates(perSide: perSide, unit: unit, barWeight: barWeight)
+        for (index, plate) in placed.enumerated() where index / 2 >= kept {
+            let entity = Self.plateEntity(plate)
+            barPlates.addChild(entity)
+            onBar.append((plate.plate.size, entity, index / 2))
+            if animate {
+                let outward: Float = plate.centre.x > sleeveEnd ? 1 : -1
+                let target = plate.centre
+                entity.position = SIMD3(sleeveEnd + outward * 1.5, target.y, target.z)
+                entity.findEntity(named: "shadow")?.isEnabled = false
+                slide(entity, to: target, after: 0.3 + Double(index / 2 - kept) * 0.2, removing: false)
+            }
+        }
+        barSide = perSide
+    }
+
+    private func drop(_ entity: Entity, to target: SIMD3<Float>, after delay: Double, from height: Float) {
+        entity.position = target + SIMD3(0, height, 0)
+        entity.isEnabled = false
+        entity.findEntity(named: "shadow")?.isEnabled = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            entity.isEnabled = true
+            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target), relativeTo: entity.parent,
+                            duration: 0.55, timingFunction: .easeIn)
+            try? await Task.sleep(for: .seconds(0.55))
+            entity.findEntity(named: "shadow")?.isEnabled = true
+            // A small bounce as it lands.
+            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target + [0, 0.05, 0]),
+                            relativeTo: entity.parent, duration: 0.1, timingFunction: .easeOut)
+            try? await Task.sleep(for: .seconds(0.1))
+            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target), relativeTo: entity.parent,
+                            duration: 0.1, timingFunction: .easeIn)
+        }
+    }
+
+    private func slide(_ entity: Entity, to target: SIMD3<Float>, after delay: Double, removing: Bool) {
+        Task { @MainActor in
+            entity.findEntity(named: "shadow")?.isEnabled = false
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target), relativeTo: entity.parent,
+                            duration: 0.35, timingFunction: .easeInOut)
+            try? await Task.sleep(for: .seconds(0.35))
+            if removing { entity.removeFromParent() } else { entity.findEntity(named: "shadow")?.isEnabled = true }
+        }
+    }
+
     private func rebuild(_ group: Entity, _ pieces: [BakedPiece]) {
         for child in Array(group.children) { child.removeFromParent() }
         for child in Diorama.entities(for: pieces) { group.addChild(child) }
     }
+}
+
+/// What the stage shows during a session.
+struct SessionProps: Equatable {
+    var kit: Kit
+    var unit: WeightUnit
+    var barWeight: Double
+    /// The plates on the bar now (the set in view); empty for an empty bar.
+    var perSide: [Double]
 }
