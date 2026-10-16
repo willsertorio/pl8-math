@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 import PlateKit
 
 /// First run (SPEC 2.2): opening → gym setup, one question per sheet → PRs.
@@ -16,6 +17,9 @@ struct FirstRunView: View {
     @State private var step: Step = .opening
     /// The sheet's height, measured from its content, so the room gets the rest of the screen.
     @State private var sheetHeight: CGFloat = 320
+    @FocusState private var typingName: Bool
+    /// The keyboard's height, so the room shows above it and the sheet while you type the name.
+    @State private var keyboardHeight: CGFloat = 0
     @State private var editingPR: PRTarget?
 
     private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
@@ -59,7 +63,7 @@ struct FirstRunView: View {
                     RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
                               plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
                               boards: Boards(prs: Planner.boardRows(records)))
-                        .frame(height: max(200, geometry.size.height - visibleSheet(of: geometry.size.height) + 24))
+                        .frame(height: max(200, geometry.size.height - keyboardHeight - visibleSheet(of: geometry.size.height) + 24))
                 }
                 .ignoresSafeArea()
             }
@@ -69,6 +73,10 @@ struct FirstRunView: View {
             if step == .opening { step = .name }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: step)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            withAnimation(.snappy) { keyboardHeight = max(0, UIScreen.main.bounds.height - frame.minY) }
+        }
         .sheet(isPresented: Binding(get: { step != .opening }, set: { _ in })) {
             sheet
                 .presentationDetents(fitsContent ? [.height(sheetHeight)] : [.medium, .large])
@@ -87,9 +95,23 @@ struct FirstRunView: View {
                 EmptyView()
 
             case .name:
+                // No field on screen: the keyboard types straight onto the flag in the room.
                 question("Where are you training now?")
-                if let gym { GymNameField(gym: gym) }
-                Spacer(minLength: 0)
+                Text("Type your box's name — it goes on the flag. Up to \(GymSetup.maxNameLength) letters.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let gym {
+                    TextField("", text: Binding(get: { gym.name }, set: { gym.name = GymSetup.normalizedName($0) }))
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .focused($typingName)
+                        .submitLabel(.continue)
+                        .onSubmit { if !gym.name.isEmpty { step = .unit } }
+                        .frame(width: 1, height: 1)
+                        .opacity(0.01)
+                        .accessibilityLabel("Box name")
+                        .onAppear { typingName = true }
+                }
                 Button("Continue") { step = .unit }
                     .buttonStyle(.bigBlack)
                     .disabled(gym?.name.isEmpty ?? true)

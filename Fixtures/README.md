@@ -111,3 +111,7 @@ Format: `reps @ total [plates per side]`. Totals in the gym's unit.
 - (The prototype gave `5@125 [25+15]` for round 2 because it only tried totals in steps of 2 × the smallest plate. Changed to follow SPEC 3.3 — see DECISIONS.md 2026-10-13.)
 
 These numbers come from `reference/plate-math-web-prototype.html`, the web prototype Will tested at the box. If a Swift result differs, check the rule in `SPEC.md` 3.3–3.5 before changing either.
+
+## PR screenshots
+
+- `prs/2026-10-16-app.webp` — the box app's "Recordes pessoais" list, in lb with decimals; `.screen.txt` is its text as Vision reads it (name line, then weight line). Expected: Back Squat 185.19, Bench Press 88.18, Clean & Jerk 125, Clean Pull 132.28, Deadlift 253.53, Front Squat 170, Muscle Snatch 70.55 (all lb). Will can replace the `.screen.txt` with real Vision text.

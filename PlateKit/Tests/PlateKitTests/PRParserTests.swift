@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import PlateKit
 
@@ -64,5 +65,41 @@ struct PRParserTests {
     @Test func lookalikeLettersAreReadAsLatin() {
         // "Snatch 85 kg" with a Cyrillic а and к.
         #expect(PRParser.parse("Sn\u{0430}tch 85 \u{043A}g") == [PREntry(lift: "Snatch", value: 85, unit: .kg)])
+    }
+}
+
+/// Bug from real use, 2026-10-16: the box app's "Recordes pessoais" screen (Fixtures/prs/2026-10-16-app).
+/// Each row is a name with its category in brackets and the weight on the right, which Vision reads as two lines.
+@Suite("PR screenshot from the box app")
+struct PRAppScreenshotTests {
+    static let expected = [
+        PREntry(lift: "Back Squat", value: 185.19, unit: .lb),
+        PREntry(lift: "Bench Press", value: 88.18, unit: .lb),
+        PREntry(lift: "Clean & Jerk", value: 125, unit: .lb),
+        PREntry(lift: "Clean Pull", value: 132.28, unit: .lb),
+        PREntry(lift: "Deadlift", value: 253.53, unit: .lb),
+        PREntry(lift: "Front Squat", value: 170, unit: .lb),
+        PREntry(lift: "Muscle Snatch", value: 70.55, unit: .lb),
+    ]
+
+    static func fixture() throws -> String {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("../../../Fixtures/prs/2026-10-16-app.screen.txt")
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    @Test func nameThenWeightOnTheNextLine() throws {
+        #expect(PRParser.parse(try Self.fixture()) == Self.expected)          // no "5G 30" from the status bar
+    }
+
+    @Test func namesColumnThenWeightsColumn() throws {
+        let lines = try Self.fixture().split(separator: "\n").map(String.init)
+        let names = lines.filter { $0.contains("(Barbell)") }
+        let weights = lines.filter { $0.hasSuffix(" Lb") }
+        #expect(PRParser.parse((["Meus recordes", "Barbell"] + names + weights).joined(separator: "\n")) == Self.expected)
+    }
+
+    @Test func nameAndWeightOnOneLine() {
+        #expect(PRParser.parse("Back Squat (Barbell) 185.19 Lb") == [PREntry(lift: "Back Squat", value: 185.19, unit: .lb)])
     }
 }
