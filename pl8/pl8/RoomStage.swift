@@ -12,6 +12,7 @@ struct RoomStage: View {
     var unit: WeightUnit
     var plateSizes: [Double]
     var barWeight: Double
+    var boards = Boards()
     var interactive = false
 
     @State private var orbit: Orbit
@@ -22,7 +23,8 @@ struct RoomStage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(station: RoomLayout.Station, gymName: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double,
-         interactive: Bool = false) {
+         boards: Boards = Boards(), interactive: Bool = false) {
+        self.boards = boards
         self.station = station
         self.gymName = gymName
         self.unit = unit
@@ -43,11 +45,11 @@ struct RoomStage: View {
             for entity in entities { content.add(entity) }
             if let world = entities.first(where: { $0.name == RoomScene.worldName }) {
                 props.attach(to: world)
-                props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, animate: false)
+                props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, boards: boards, animate: false)
             }
             RoomScene.show(orbit, in: content.entities)
         } update: { content in
-            props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, animate: !reduceMotion)
+            props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, boards: boards, animate: !reduceMotion)
             RoomScene.show(orbit, in: content.entities)
         }
         .background(Theme.background)
@@ -96,24 +98,35 @@ struct RoomStage: View {
     }
 }
 
-/// The props the gym setup changes, rebuilt only when their answer changes: the flag (name), the rack's bar
-/// (bar), the shelf's pegs (unit) and one pile per plate size, which pops in and out from its peg.
+/// The props the gym setup and the user's data change, rebuilt only when their input changes: the flag (name),
+/// the rack's bar (bar), the shelf's pegs (unit), one pile per plate size, which pops in and out from its peg, and
+/// what's written on the PR board and the whiteboard.
 @MainActor
 final class SetupProps {
-    nonisolated static let objects: Set<RoomLayout.Object> = [.flag, .rack, .shelf]
+    nonisolated static let objects: Set<RoomLayout.Object> = [.flag, .rack, .shelf, .prBoard, .board]
 
-    private let flag = Entity(), rack = Entity(), shelf = Entity()
+    private let flag = Entity(), rack = Entity(), shelf = Entity(), prBoard = Entity(), board = Entity()
+    private var boards: Boards?
     private var piles: [Double: Entity] = [:]
     private var name: String?, unit: WeightUnit?, barWeight: Double?
     private var attached = false
 
     func attach(to world: Entity) {
-        for group in [flag, rack, shelf] { world.addChild(group) }
+        for group in [flag, rack, shelf, prBoard, board] { world.addChild(group) }
         attached = true
     }
 
-    func sync(name: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double, animate: Bool) {
+    func sync(name: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double, boards: Boards, animate: Bool) {
         guard attached else { return }
+        if boards.prs != self.boards?.prs {
+            rebuild(prBoard, SceneBake.bake(PropModels.parts(for: .prBoard, plates: [], boards: boards),
+                                            placement: PropModels.placement(for: .prBoard), wall: nil))
+        }
+        if boards.workout != self.boards?.workout {
+            rebuild(board, SceneBake.bake(PropModels.parts(for: .board, plates: [], boards: boards),
+                                          placement: PropModels.placement(for: .board), wall: nil))
+        }
+        self.boards = boards
         if name != self.name {
             // No name yet: no flag. With the first letter it unrolls down from its rod (SPEC 2.2).
             let unrolls = (self.name ?? "").isEmpty && !name.isEmpty && self.name != nil

@@ -36,10 +36,58 @@ public struct PropPart: Equatable, Sendable {
 public enum Picture: Hashable, Sendable {
     /// A plate's face: its number and unit.
     case plateFace(Plate)
-    /// The PR board's empty table: "My PR's", a heavy rule, 8 ruled rows, 4 columns.
-    case prTable
+    /// The PR board: "My PR's" and one row per PR, or the empty ruled table when there are none.
+    case prTable([BoardRow])
+    /// The whiteboard: "Today's sesh" in marker, then each lift with its sets and first working load.
+    case whiteboard([BoardLine])
     /// The flag: the gym's name in light on the dark cloth.
     case flag(String)
+}
+
+/// A row on the PR board: the lift, and the PR on the right ("100 kg").
+public struct BoardRow: Hashable, Sendable {
+    public let left: String
+    public let right: String
+
+    public init(left: String, right: String) {
+        self.left = left
+        self.right = right
+    }
+}
+
+/// A lift on the whiteboard (prototype drawWB): "A. BACK SQUAT", its sets ("5 × 3") and "→ 80 kg".
+public struct BoardLine: Hashable, Sendable {
+    public let name: String
+    public let format: String
+    public let load: String
+
+    public init(name: String, format: String, load: String) {
+        self.name = name
+        self.format = format
+        self.load = load
+    }
+
+    /// One line per lift: sets × reps (or the reps of each set, "5-3-1"), and the first working set's total in
+    /// the PR's unit.
+    public static func lines(for plan: SessionPlan) -> [BoardLine] {
+        plan.lifts.compactMap { lift in
+            guard let first = lift.sets.first else { return nil }
+            let reps = lift.sets.map(\.reps)
+            let format = Set(reps).count == 1 ? "\(reps.count) × \(reps[0])" : reps.map(String.init).joined(separator: "-")
+            return BoardLine(name: lift.name, format: format, load: plan.displayTotal(first))
+        }
+    }
+}
+
+/// What's written on the room's boards.
+public struct Boards: Hashable, Sendable {
+    public var prs: [BoardRow]
+    public var workout: [BoardLine]
+
+    public init(prs: [BoardRow] = [], workout: [BoardLine] = []) {
+        self.prs = prs
+        self.workout = workout
+    }
 }
 
 /// The diorama's props, copied from the prototype's builders (reference/prototype-app-logic.js: applyLayout,
@@ -53,7 +101,7 @@ public enum PropModels {
     ///   - gymName: on the flag.
     ///   - barWeight, unit: the gym's bar, on the rack (lighter bars are shorter and thinner).
     public static func parts(for object: RoomLayout.Object, plates: [Plate], gymName: String = "",
-                             barWeight: Double? = nil, unit: WeightUnit? = nil) -> [PropPart] {
+                             barWeight: Double? = nil, unit: WeightUnit? = nil, boards: Boards = Boards()) -> [PropPart] {
         var b = Builder()
         switch object {
         case .platform: platform(&b)
@@ -61,7 +109,7 @@ public enum PropModels {
             let u = unit ?? plates.first?.unit ?? .kg
             rack(&b, barScale: barScale(barWeight ?? Bar.weights(u)[0], unit: u))
         case .bench: bench(&b)
-        case .board: board(&b)
+        case .board: board(&b, workout: boards.workout)
         case .shelf:
             b.parts = shelf(unit: unit ?? plates.first?.unit ?? .kg)
             for plate in plates {
@@ -69,7 +117,7 @@ public enum PropModels {
                 b.parts += pile.parts.map { PropPart(mesh: $0.mesh.translated(by: pile.pivot), tone: $0.tone, inked: $0.inked, casts: $0.casts) }
             }
         case .flag: flag(&b, text: gymName)
-        case .prBoard: prBoard(&b)
+        case .prBoard: prBoard(&b, prs: boards.prs)
         case .barHolder: barHolder(&b)
         case .wallFan: wallFan(&b)
         case .wallWindow: wallWindow(&b)
@@ -224,7 +272,7 @@ public enum PropModels {
     }
 
     /// Whiteboard on wheeled legs, with a tray, a marker and an eraser.
-    private static func board(_ b: inout Builder) {
+    private static func board(_ b: inout Builder, workout: [BoardLine]) {
         for x: Float in [-0.68, 0.68] {
             b.box([0.05, 1.75, 0.05], [x, 0.875, 0], .dark)
             b.box([0.05, 0.04, 0.5], [x, 0.055, 0], .dark)
@@ -232,16 +280,18 @@ public enum PropModels {
         }
         b.box([1.42, 0.98, 0.05], [0, 1.25, 0], .dark)                      // frame
         b.box([1.34, 0.9, 0.02], [0, 1.25, 0.03], .light, ink: false)       // writing surface
+        b.add(LowPolyMesh.sheet(width: 1.33, height: 0.89, columns: 1, rows: 1).translated(by: [0, 1.25, 0.042]),
+              .picture(.whiteboard(workout)), ink: false, casts: false)       // what's written on it
         b.box([1.2, 0.03, 0.08], [0, 0.77, 0.06], .dark)                    // tray
         b.box([0.12, 0.02, 0.02], [-0.3, 0.795, 0.07], .dark, ink: false)   // marker
         b.box([0.1, 0.035, 0.05], [0.25, 0.8, 0.07], .light)                // eraser
     }
 
     /// The PR board: a frame, the printed table, a ledge and a marker.
-    private static func prBoard(_ b: inout Builder) {
+    private static func prBoard(_ b: inout Builder, prs: [BoardRow]) {
         b.box([1.7, 1.16, 0.04], [0, 0, 0], .dark)
         b.add(LowPolyMesh.sheet(width: 1.6, height: 1.06, columns: 1, rows: 1).translated(by: [0, 0, 0.022]),
-              .picture(.prTable), ink: false, casts: false)
+              .picture(.prTable(prs)), ink: false, casts: false)
         b.box([1.5, 0.03, 0.07], [0, -0.6, 0.04], .dark)
         b.box([0.12, 0.02, 0.02], [0.35, -0.575, 0.05], .dark, ink: false)
     }

@@ -22,6 +22,7 @@ struct SceneDumpTests {
                     let label = plate.size.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(plate.size)) : String(plate.size)
                     what = "{\"kind\":\"plate\",\"label\":\"\(label)\",\"colour\":\"\(plate.colorHex)\",\"bumper\":\(plate.kind == .bumper),\"unit\":\"\(plate.unit == .kg ? "KG" : "LB")\"}"
                 case .prTable: what = "{\"kind\":\"pr\"}"
+                case .whiteboard: what = "{\"kind\":\"wb\"}"
                 case .flag(let text): what = "{\"kind\":\"flag\",\"text\":\"\(text)\"}"
                 }
                 paint = "{\"picture\":\(what),\"tint\":\"\(tint.hex)\"}"

@@ -12,10 +12,21 @@ struct FirstRunView: View {
     }
 
     @Query private var gyms: [Gym]
+    @Query private var records: [PersonalRecord]
     @State private var step: Step = .opening
+    /// The sheet's height, measured from its content, so the room gets the rest of the screen.
+    @State private var sheetHeight: CGFloat = 320
     @State private var editingPR: PRTarget?
 
     private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+
+    /// The PR list can grow long, so it keeps the half/full sheet; every other question fits its content.
+    private var fitsContent: Bool { step != .prList }
+
+    /// How much of a screen `height` tall the sheet covers.
+    private func visibleSheet(of height: CGFloat) -> CGFloat {
+        fitsContent ? sheetHeight : height / 2
+    }
 
     /// Where each question looks in the room (SPEC 2.1, 2.2).
     private var station: RoomLayout.Station {
@@ -42,13 +53,15 @@ struct FirstRunView: View {
                 .padding(.top, 60)
                 .padding(.horizontal, 16)
             } else {
-                // The sheet covers the bottom half; the room fills the top.
+                // The sheet is only as tall as its question; the room fills the rest, a little behind the sheet's
+                // rounded top.
                 GeometryReader { geometry in
                     RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
-                              plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20)
-                        .frame(height: geometry.size.height * 0.55)
+                              plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
+                              boards: Boards(prs: Planner.boardRows(records)))
+                        .frame(height: max(200, geometry.size.height - visibleSheet(of: geometry.size.height) + 24))
                 }
-                .ignoresSafeArea(edges: .top)
+                .ignoresSafeArea()
             }
         }
         .contentShape(Rectangle())
@@ -58,8 +71,8 @@ struct FirstRunView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: step)
         .sheet(isPresented: Binding(get: { step != .opening }, set: { _ in })) {
             sheet
-                .presentationDetents([.medium, .large])
-                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                .presentationDetents(fitsContent ? [.height(sheetHeight)] : [.medium, .large])
+                .presentationBackgroundInteraction(.enabled)
                 .interactiveDismissDisabled()
         }
     }
@@ -91,7 +104,7 @@ struct FirstRunView: View {
             case .plates:
                 question("Which plates does your gym have?")
                 if let gym {
-                    ScrollView { PlateChips(gym: gym).padding(2) }
+                    PlateChips(gym: gym).padding(2)
                 }
                 Button("Continue") { step = .bar }
                     .buttonStyle(.bigBlack)
@@ -130,6 +143,11 @@ struct FirstRunView: View {
             }
         }
         .padding(20)
+        .padding(.top, 8)
+        .fixedSize(horizontal: false, vertical: fitsContent)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+            if fitsContent { sheetHeight = height }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .foregroundStyle(Theme.ink)
         .background(Theme.paper)

@@ -40,4 +40,20 @@ enum Planner {
         let name = LiftNames.canonical(lift)
         return records.first { $0.lift == name }
     }
+
+    // MARK: - What the room's boards say (M6)
+
+    /// The PR board: every PR with a value, by lift name, e.g. "100 kg".
+    static func boardRows(_ records: [PersonalRecord]) -> [BoardRow] {
+        records
+            .filter { ($0.value ?? 0) > 0 }
+            .sorted { $0.lift < $1.lift }
+            .map { BoardRow(left: $0.lift, right: "\(WeightUnit.trimmed((($0.value ?? 0) * 10).rounded() / 10)) \($0.unit.rawValue)") }
+    }
+
+    /// The whiteboard: today's workout, one line per lift.
+    static func boardLines(for workout: Workout?, gym: Gym?, records: [PersonalRecord]) -> [BoardLine] {
+        guard let workout else { return [] }
+        return BoardLine.lines(for: plan(blocks: workout.blocks, gym: gym, records: records))
+    }
 }

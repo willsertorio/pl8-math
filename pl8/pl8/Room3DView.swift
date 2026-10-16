@@ -1,3 +1,4 @@
+import Foundation
 import RealityKit
 import SwiftData
 import SwiftUI
@@ -9,14 +10,22 @@ import PlateKit
 struct Room3DView: View {
     @State private var station: RoomLayout.Station = .overview
     @Query private var gyms: [Gym]
+    @Query private var records: [PersonalRecord]
+    @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
 
     private var gym: Gym? { gyms.first(where: { $0.isCurrent }) ?? gyms.first }
+
+    /// Your PRs on the board, today's workout on the whiteboard.
+    private var boards: Boards {
+        let today = workouts.first { Calendar.current.isDateInToday($0.date) }
+        return Boards(prs: Planner.boardRows(records), workout: Planner.boardLines(for: today, gym: gym, records: records))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
                       plateSizes: gym?.plateSizes ?? Plate.catalog(.kg).map(\.size),
-                      barWeight: gym?.barWeight ?? 20, interactive: true)
+                      barWeight: gym?.barWeight ?? 20, boards: boards, interactive: true)
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("Camera").sectionLabel()

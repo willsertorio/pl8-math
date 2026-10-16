@@ -95,7 +95,8 @@ enum PictureArt {
     static func image(_ picture: Picture) -> UIImage {
         switch picture {
         case .plateFace(let plate): plateFace(plate)
-        case .prTable: prTable()
+        case .prTable(let rows): prTable(rows)
+        case .whiteboard(let lines): whiteboard(lines)
         case .flag(let text): flag(text)
         }
     }
@@ -133,25 +134,73 @@ enum PictureArt {
         }
     }
 
-    /// The PR board's empty table: "My PR's", a heavy rule, 8 ruled rows and 4 column lines.
-    static func prTable() -> UIImage {
+    /// The PR board (prototype drawPR): "My PR's", then one lift per row with its PR on the right; with no PRs
+    /// yet, the empty ruled table.
+    static func prTable(_ rows: [BoardRow]) -> UIImage {
         let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
         return draw(CGSize(width: 1024, height: 680)) { g in
             g.setFillColor(light.cgColor)
             g.fill(CGRect(x: 0, y: 0, width: 1024, height: 680))
             text("My PR's", size: 58, weight: .bold, colour: dark, at: CGPoint(x: 40, y: 62), centred: false, in: g)
             g.setFillColor(dark.cgColor)
-            g.fill(CGRect(x: 30, y: 164, width: 964, height: 6))
             g.setStrokeColor(dark.cgColor)
             g.setLineWidth(2)
-            for row in 0..<8 {
-                let y = CGFloat(224 + row * 60)
-                g.strokeLineSegments(between: [CGPoint(x: 30, y: y), CGPoint(x: 994, y: y)])
+            if rows.isEmpty {
+                // No PRs yet: the empty ruled table.
+                g.fill(CGRect(x: 30, y: 164, width: 964, height: 6))
+                for row in 0..<8 {
+                    let y = CGFloat(224 + row * 60)
+                    g.strokeLineSegments(between: [CGPoint(x: 30, y: y), CGPoint(x: 994, y: y)])
+                }
+                for x: CGFloat in [330, 500, 640, 820] {
+                    g.strokeLineSegments(between: [CGPoint(x: x - 18, y: 112), CGPoint(x: x - 18, y: 644)])
+                }
+                return
             }
-            for x: CGFloat in [330, 500, 640, 820] {
-                g.strokeLineSegments(between: [CGPoint(x: x - 18, y: 112), CGPoint(x: x - 18, y: 644)])
+            // One lift per row, best weight on the right (prototype drawPR).
+            g.fill(CGRect(x: 30, y: 112, width: 964, height: 6))
+            for (i, row) in rows.prefix(8).enumerated() {
+                let y = CGFloat(150 + i * 64)
+                text(row.left.uppercased(), size: 34, weight: .bold, colour: dark, at: CGPoint(x: 40, y: y + 4), centred: false, in: g)
+                text(row.right, font: UIFont(name: "Helvetica", size: 40) ?? .systemFont(ofSize: 40), colour: dark,
+                     at: CGPoint(x: 984, y: y + 4), alignRight: true, in: g)
+                g.strokeLineSegments(between: [CGPoint(x: 30, y: y + 34), CGPoint(x: 994, y: y + 34)])
             }
         }
+    }
+
+    /// The whiteboard (prototype drawWB): "Today's sesh" underlined in marker, then up to four lifts —
+    /// "A. BACK SQUAT", its sets, and "→ 80 kg" for the first working set. Blank with no workout yet.
+    static func whiteboard(_ lines: [BoardLine]) -> UIImage {
+        let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
+        return draw(CGSize(width: 1024, height: 688)) { g in
+            g.setFillColor(light.cgColor)
+            g.fill(CGRect(x: 0, y: 0, width: 1024, height: 688))
+            let title = "Today's sesh"
+            let titleWidth = marker(title, size: 64, colour: dark, baseline: CGPoint(x: 40, y: 92))
+            g.setStrokeColor(dark.cgColor)
+            g.setLineWidth(5)
+            g.setLineCap(.round)
+            g.strokeLineSegments(between: [CGPoint(x: 40, y: 118), CGPoint(x: 40 + titleWidth, y: 112)])
+            let letters = Array("ABCDEFGH")
+            var y: CGFloat = 196
+            let gap: CGFloat = lines.count > 3 ? 104 : 132
+            for (i, line) in lines.prefix(4).enumerated() {
+                _ = marker("\(letters[i]). \(line.name.uppercased())", size: 46, colour: dark, baseline: CGPoint(x: 40, y: y))
+                _ = marker(line.format, size: 36, colour: dark, baseline: CGPoint(x: 86, y: y + 50))
+                _ = marker("→ \(line.load)", size: 36, colour: dark, baseline: CGPoint(x: 560, y: y + 50))
+                y += gap
+            }
+        }
+    }
+
+    /// Permanent Marker (Apache License 2.0, Fonts/PermanentMarker-LICENSE.txt) on its baseline; returns the width.
+    private static func marker(_ string: String, size: CGFloat, colour: UIColor, baseline: CGPoint) -> CGFloat {
+        _ = registerFonts
+        let font = UIFont(name: "PermanentMarker-Regular", size: size) ?? .systemFont(ofSize: size, weight: .heavy)
+        let attributed = NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: colour])
+        attributed.draw(at: CGPoint(x: baseline.x, y: baseline.y - font.ascender))
+        return attributed.size().width
     }
 
     /// The flag: the gym's name, as big as fits two-thirds of the width and 60 % of the height, in light on the
@@ -185,16 +234,19 @@ enum PictureArt {
     }
 
     static func flagFont(_ size: CGFloat) -> UIFont {
-        _ = registerPlayfair
+        _ = registerFonts
         if let playfair = UIFont(name: "PlayfairDisplayRoman-Black", size: size) { return playfair }
         let font = UIFont.systemFont(ofSize: size, weight: .black)
         guard let serif = font.fontDescriptor.withDesign(.serif) else { return font }
         return UIFont(descriptor: serif, size: size)
     }
 
-    private static let registerPlayfair: Void = {
-        if let url = Bundle.main.url(forResource: "PlayfairDisplay-Black", withExtension: "ttf") {
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    /// The prototype's fonts that iOS doesn't have, loaded from the app once.
+    private static let registerFonts: Void = {
+        for name in ["PlayfairDisplay-Black", "PermanentMarker-Regular"] {
+            if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
+                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            }
         }
     }()
 
@@ -220,13 +272,14 @@ enum PictureArt {
 
     /// Draws `string` with its centre (or, when not `centred`, its left edge's middle) at `point`, turned by `angle`.
     private static func text(_ string: String, font: UIFont, colour: UIColor, at point: CGPoint, angle: CGFloat = 0,
-                             centred: Bool = true, in g: CGContext) {
+                             centred: Bool = true, alignRight: Bool = false, in g: CGContext) {
         let attributed = NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: colour])
         let bounds = attributed.size()
         g.saveGState()
         g.translateBy(x: point.x, y: point.y)
         g.rotate(by: angle)
-        attributed.draw(at: CGPoint(x: centred ? -bounds.width / 2 : 0, y: -bounds.height / 2))
+        let x = alignRight ? -bounds.width : (centred ? -bounds.width / 2 : 0)
+        attributed.draw(at: CGPoint(x: x, y: -bounds.height / 2))
         g.restoreGState()
     }
 }
