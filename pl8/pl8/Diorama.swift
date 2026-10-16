@@ -32,7 +32,7 @@ enum Diorama {
                 material = flat(uiColor(colour))
             case .picture(let picture, let tint):
                 if textures[picture] == nil, let image = PictureArt.image(picture).cgImage {
-                    textures[picture] = try? TextureResource.generate(from: image, options: .init(semantic: .color))
+                    textures[picture] = try? TextureResource(image: image, options: .init(semantic: .color))
                 }
                 var m = UnlitMaterial(applyPostProcessToneMap: false)
                 if let texture = textures[picture] {

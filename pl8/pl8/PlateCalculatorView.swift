@@ -42,7 +42,7 @@ struct PlateCalculatorView: View {
     private var blocks: [StrengthBlock] { savedWorkout?.blocks ?? [] }
 
     private var workouts: [SampleWorkout] {
-        savedWorkouts.map(SampleWorkout.from) + SampleWorkout.all
+        savedWorkouts.map { SampleWorkout.from($0) } + SampleWorkout.all
     }
 
     private var workout: SampleWorkout {
