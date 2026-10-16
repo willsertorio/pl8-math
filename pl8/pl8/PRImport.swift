@@ -19,6 +19,8 @@ struct PRScreenshotPicker<Label: View>: View {
     @State private var askUnit = false
     @State private var message: String?
     @State private var savedCount = 0
+    /// What Vision read, to check (and copy) when a screenshot doesn't come through right.
+    @State private var readText: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -35,6 +37,15 @@ struct PRScreenshotPicker<Label: View>: View {
             }
             if let message {
                 Text(message).font(.footnote).foregroundStyle(.secondary)
+            }
+            if let readText {
+                DisclosureGroup("Show the text it read") {
+                    Text(readText)
+                        .font(.footnote.monospaced())
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.footnote)
             }
         }
         .sensoryFeedback(.success, trigger: savedCount)
@@ -58,8 +69,14 @@ struct PRScreenshotPicker<Label: View>: View {
                 message = "Couldn't open that image."
                 return
             }
-            let text = try await TextReader.lines(in: data).joined(separator: "\n")
-            let entries = PRParser.parse(text)
+            // Rows joined first (a box app's list puts the weight beside the lift); the plain lines if that finds nothing.
+            var text = try await TextReader.lines(in: data, joiningRows: true).joined(separator: "\n")
+            var entries = PRParser.parse(text)
+            if entries.isEmpty {
+                text = try await TextReader.lines(in: data).joined(separator: "\n")
+                entries = PRParser.parse(text)
+            }
+            readText = text
             if entries.isEmpty {
                 message = "No PRs found. Lines should look like \"Back Squat 140 kg\"."
             } else if PRParser.needsUnit(entries) {

@@ -15,22 +15,30 @@ public struct PREntry: Hashable, Codable, Sendable {
 
 /// Reads PRs from text: `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb` (SPEC 3.7).
 /// Box apps list a lift with its weight on the right, which OCR reads as two lines (`Back Squat (Barbell)`,
-/// `185.19 Lb`), row by row or as a column of names then a column of weights: each weight-only line goes to the
-/// earliest lift name still waiting for one.
+/// `185.19 Lb`), row by row (weight first or name first) or as a column of names and a column of weights: each
+/// weight-only line pairs with the earliest lift name waiting for one, and the other way round.
 public enum PRParser {
     public static func parse(_ text: String) -> [PREntry] {
         var entries: [PREntry] = []
-        var waiting: [String] = []
+        var waitingNames: [String] = []
+        var waitingWeights: [(value: Double, unit: WeightUnit?)] = []
         for raw in OCRText.latinized(text).split(whereSeparator: \.isNewline) {
             let line = withoutBrackets(String(raw))
             if let entry = parseLine(line) {
                 entries.append(entry)
             } else if let weight = weightOnly(line) {
-                if !waiting.isEmpty {
-                    entries.append(PREntry(lift: LiftNames.canonical(waiting.removeFirst()), value: weight.value, unit: weight.unit))
+                if waitingNames.isEmpty {
+                    waitingWeights.append(weight)                       // its name may come next
+                } else {
+                    entries.append(PREntry(lift: LiftNames.canonical(waitingNames.removeFirst()), value: weight.value, unit: weight.unit))
                 }
             } else if isLiftName(line) {
-                waiting.append(line)
+                if waitingWeights.isEmpty {
+                    waitingNames.append(line)
+                } else {
+                    let weight = waitingWeights.removeFirst()
+                    entries.append(PREntry(lift: LiftNames.canonical(line), value: weight.value, unit: weight.unit))
+                }
             }
         }
         // One PR per lift: a lift named twice keeps its last value.
@@ -51,9 +59,10 @@ public enum PRParser {
 
     // MARK: - Private
 
-    /// "Back Squat (Barbell)" → "Back Squat": the app's category isn't part of the lift.
+    /// "Back Squat (Barbell)" → "Back Squat": the app's category isn't part of the lift; nor is the row's arrow.
     private static func withoutBrackets(_ line: String) -> String {
-        line.replacing(#/\s*\([^)]*\)/#, with: "").trimmingCharacters(in: .whitespaces)
+        line.replacing(#/\s*\([^)]*\)/#, with: "")
+            .trimmingCharacters(in: .whitespaces.union(CharacterSet(charactersIn: ">›»〉❯")))
     }
 
     /// "185.19 Lb", "88 kg": a weight with nothing else.

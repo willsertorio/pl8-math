@@ -121,3 +121,19 @@ struct OneNamePerLiftTests {
         #expect(prs == [PREntry(lift: "Back Squat", value: 132.28, unit: .lb)])
     }
 }
+
+/// 2026-10-16 again: on the phone only Back Squat came through. Vision can put a row's weight a hair above its
+/// name, so the weight comes first; the row's arrow may be read too.
+@Suite("PR screenshot, other reading orders")
+struct PRReadingOrderTests {
+    @Test func weightBeforeItsName() throws {
+        let rows = PRAppScreenshotTests.expected.map { "\(WeightUnit.trimmed($0.value)) Lb\n\($0.lift) (Barbell)" }
+        #expect(PRParser.parse(rows.joined(separator: "\n")).map(\.lift) == PRAppScreenshotTests.expected.map(\.lift))
+        #expect(PRParser.parse(rows.joined(separator: "\n")) == PRAppScreenshotTests.expected)
+    }
+
+    @Test func rowArrowsAreIgnored() {
+        #expect(PRParser.parse("Back Squat (Barbell)\n185.19 Lb >") == [PREntry(lift: "Back Squat", value: 185.19, unit: .lb)])
+        #expect(PRParser.parse("Deadlift (Barbell) 253.53 Lb ›") == [PREntry(lift: "Deadlift", value: 253.53, unit: .lb)])
+    }
+}
