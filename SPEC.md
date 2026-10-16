@@ -76,21 +76,13 @@ While reading: a spinning plate loader. Then the whiteboard in the room shows th
 Before Start, the app asks for anything it's missing (see 3.6): a PR it doesn't have ("What's your Snatch PR?", saved to PRs) and any % it couldn't read ("What % for Back Squat?").
 
 ### 2.3 A session
-**4 · Plate kit.** Camera to the kit floor; the session's plates drop onto the floor with a little physics and dust. Floating card: one chip per plate size, e.g. **2 × 45 LB**, which you tick off as you collect them. Button: **Start session**.
+**4–6 · The session page.** One page you scroll; two buttons pinned at the top, **Plate kit** and **Sets**, jump between its two parts.
+- **Plate kit** first: one chip per plate size, e.g. **2 × 45 LB**, plus the bar, which you tick off as you collect them. (3D: camera to the kit floor; the plates drop with a little physics and dust.)
+- **Sets** below, every set of the session in order, grouped by block (`WARM-UP · SNATCH`, `SNATCH`). Each set shows **"Set 3 of 6" and "1 rep"** as the biggest text (learned at the box), the load in the PR's unit and the % (`145 lb · 75–80%`), the change from the set before (*"Take off 5, then add 10 each side"*, *"Add 15 + 5 each side"* for the first), the bar diagram and the plates each side. (3D: on the rack the plates slide off and on to match.)
+- After the last set: *"Take off … each side, then put the bar back"*, then a big **End session** button.
+Nothing to tick off per set and no "How much did you lift?" (Will's first real class, 2026-10-16).
 
-**5 · Set by set.** Camera to the rack. Floating card at the bottom:
-- small label: block name, e.g. `WARM-UP · SNATCH` or `SNATCH`
-- **big: "Set 3 of 6" and "1 rep"** — set number and reps are the most prominent text (learned at the box)
-- secondary: the load in the PR's unit, e.g. `145 lb`, and the % (`75–80%`)
-- the change from the last set: *"Take off 5, then add 10 each side"* / *"Same plates as the last set"*
-- progress dots for this block (done = green, current = dark)
-- big **Done** button; a small **Plates** button returns to the kit and back without losing your place.
-On the rack, the plates slide off and on the sleeves to match the set. For pulls from the floor (snatch, clean, deadlift) the camera aims lower.
-**Done** → success haptic → next unchecked set.
-
-**6 · Last set of each lift** → "How much did you lift?" prefilled with the planned load (one tap to confirm). If it beats the PR → "New PR! Update Snatch to 90 kg?" → yes updates the PR and rings the bell.
-
-**7 · Session over.** After the last set: the bell rings (three strikes) and a "scale" weighs the session's heaviest set (its plates and bar, total, label *Heaviest set*). Tap → kit is put away, camera to overview, tab bar appears. The session is saved to history.
+**7 · Session over.** After **End session**: the bell rings (three strikes) and a "scale" weighs the session's heaviest set (its plates and bar, total, label *Heaviest set*). Tap → kit is put away, camera to overview, tab bar appears. The session is saved to history.
 
 ### 2.4 Home (after first run)
 Tab bar: **Train** · **PRs** · **Gym**.
@@ -160,6 +152,7 @@ Each round = nearest loadable total. Drop a round if it isn't heavier than the p
 Label each round "Round n", with "≈N% 1RM".
 
 ### 3.5 Kit and changes
+- **Plates per set**: always the fewest plates per side (SPEC 3.3). When several combinations are equally few, choose them across the whole session so the kit is as small as possible; among equally small kits, the fewest plates to change between sets. Totals never change.
 - **Kit**: for each plate size, the most of it any single set (warm-up included) needs on one side, × 2. Plus the bar. Sorted heaviest first.
 - **Change between sets** (same bar, consecutive sets): keep the longest common inner part of the two per-side lists; the rest of the old list comes off (outer first), the rest of the new list goes on.
   Text: *"Take off A + B, then add C each side"*, *"Add C each side"*, *"Take off A each side"*, *"Same plates as the last set"*.
@@ -185,9 +178,8 @@ Input: text lines (from Vision OCR, or typed). Output: strength blocks, each `{n
 Lines like `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb`. Unit from the line; if missing, ask once for the whole screenshot.
 
 ### 3.8 Session data
-- **Duration** = first check to last check.
-- **History stores the planned loads**, except the last set of each lift, which stores what the user said they lifted.
-- **New PR**: after the last set of each lift (and any "plus" set), compare the reported weight (converted) with the PR; if higher, offer to update.
+- **Duration** = from opening the session to **End session**.
+- **History stores the planned loads.** The app doesn't ask what was lifted and doesn't check for new PRs during a session; PRs are updated on the PRs tab.
 
 ---
 

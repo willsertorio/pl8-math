@@ -3,187 +3,183 @@ import SwiftData
 import SwiftUI
 import PlateKit
 
-/// A session (SPEC 2.3): the plate kit to collect, then set by set with Done.
+/// A session (SPEC 2.3): one scrolling page — the plate kit at the top, then every set in order with its bar
+/// and what to put on or take off, then stripping the bar and **End session**. Two buttons at the top jump
+/// between the kit and the sets. Nothing to tick off set by set, nothing to report (Will's first class, 2026-10-16).
 struct SessionView: View {
     let session: Session
     var onFinish: () -> Void
 
-    /// A new PR waiting for "Update?".
-    private struct NewPR {
-        let lift: String
-        let value: Double
-        let unit: WeightUnit
-    }
+    private enum Anchor: Hashable { case kit, sets }
 
     @Environment(\.modelContext) private var context
-    @Query private var records: [PersonalRecord]
-    @State private var showKit: Bool
     @State private var collected: Set<Double> = []
     @State private var barCollected = false
-    @State private var doneCount = 0
-    @State private var reporting: SetLog?
-    @State private var newPR: NewPR?
-    @State private var prCount = 0
-
-    init(session: Session, onFinish: @escaping () -> Void) {
-        self.session = session
-        self.onFinish = onFinish
-        // A fresh session opens on the kit; a resumed one goes straight to the next set.
-        _showKit = State(initialValue: !session.setLogs.contains { $0.checkedAt != nil })
-    }
+    @State private var jump: Anchor?
+    @State private var jumps = 0
+    @State private var endCount = 0
 
     var body: some View {
-        let logs = session.orderedLogs
-        let cursor = SessionCursor(items: logs.map {
-            SessionCursor.Item(blockIndex: $0.blockIndex, isWarmUp: $0.isWarmUp, isDone: $0.checkedAt != nil)
-        })
-
         ZStack {
             Theme.background.ignoresSafeArea()
-            if showKit {
-                kitView(logs: logs, hasStarted: logs.contains { $0.checkedAt != nil })
-            } else if let index = cursor.current {
-                setView(logs: logs, cursor: cursor, index: index)
-            } else {
+            if session.endedAt != nil {
                 finishedView
+            } else {
+                sessionPage
             }
         }
         .navigationTitle(session.gymName)
         .navigationBarTitleDisplayMode(.inline)
-        .sensoryFeedback(.success, trigger: doneCount)
-        .sensoryFeedback(.success, trigger: prCount)
-        .sheet(item: $reporting) { log in
-            LiftedSheet(
-                liftName: session.liftName(for: log.blockIndex),
-                planned: log.plannedTotal,
-                unit: session.gymUnit,
-                step: 2 * (session.plateSizes.min() ?? (session.gymUnit == .kg ? 1.25 : 2.5))
-            ) { lifted in
-                reporting = nil
-                report(lifted, for: log)
+        .sensoryFeedback(.success, trigger: endCount)
+        .onAppear {
+            // The clock starts when the session opens (SPEC 3.8).
+            if session.startedAt == nil {
+                session.startedAt = .now
+                try? context.save()
             }
         }
-        .alert("New PR!", isPresented: Binding(get: { newPR != nil }, set: { if !$0 { newPR = nil } }), presenting: newPR) { pr in
-            Button("Update") { savePR(pr) }
-            Button("Not now", role: .cancel) {}
-        } message: { pr in
-            Text("Update \(pr.lift) to \(WeightUnit.trimmed((pr.value * 10).rounded() / 10)) \(pr.unit.rawValue)?")
+    }
+
+    // MARK: - The page
+
+    private var sessionPage: some View {
+        let logs = session.orderedLogs
+        return ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    kitCard(logs: logs).id(Anchor.kit)
+                    Text("Sets").font(Theme.heading).padding(.top, 8).id(Anchor.sets)
+                    ForEach(groups(logs), id: \.first!.order) { group in
+                        groupView(group, all: logs)
+                    }
+                    stripCard(logs: logs)
+                    Button("End session") { endSession() }
+                        .buttonStyle(.bigBlack)
+                        .padding(.top, 8)
+                }
+                .padding(16)
+            }
+            .safeAreaInset(edge: .top) {
+                HStack(spacing: 8) {
+                    Chip(isOn: false, action: { jump = .kit; jumps += 1 }) { Text("Plate kit") }.fixedSize()
+                    Chip(isOn: false, action: { jump = .sets; jumps += 1 }) { Text("Sets") }.fixedSize()
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Theme.background)
+                .sensoryFeedback(.selection, trigger: jumps)
+            }
+            .onChange(of: jump) { _, target in
+                guard let target else { return }
+                withAnimation(.snappy) { proxy.scrollTo(target, anchor: .top) }
+                jump = nil
+            }
         }
     }
 
     // MARK: - Plate kit (SPEC 2.3 step 4)
 
-    private func kitView(logs: [SetLog], hasStarted: Bool) -> some View {
+    private func kitCard(logs: [SetLog]) -> some View {
         let kit = Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) })
         let unit = session.gymUnit
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Plate kit").font(Theme.heading)
-                    Text("Take these from the rack. Tap each one as you collect it.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
-                        Chip(isOn: barCollected, action: { barCollected.toggle() }) {
-                            Text("BAR \(WeightUnit.trimmed(kit.bar)) \(unit.rawValue.uppercased())")
-                        }
-                        ForEach(kit.plates, id: \.size) { item in
-                            let isOn = collected.contains(item.size)
-                            Chip(isOn: isOn, action: { toggle(item.size) }) {
-                                HStack(spacing: 6) {
-                                    if let plate = Plate.find(item.size, unit) {
-                                        PlateDot(plate: plate, outline: isOn ? Theme.paper : Theme.ink)
-                                    }
-                                    Text("\(item.count) × \(WeightUnit.trimmed(item.size)) \(unit.rawValue.uppercased())")
-                                }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Plate kit").font(Theme.heading)
+            Text("Take these from the rack. Tap each one as you collect it.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                Chip(isOn: barCollected, action: { barCollected.toggle() }) {
+                    Text("BAR \(WeightUnit.trimmed(kit.bar)) \(unit.rawValue.uppercased())")
+                }
+                ForEach(kit.plates, id: \.size) { item in
+                    let isOn = collected.contains(item.size)
+                    Chip(isOn: isOn, action: { toggle(item.size) }) {
+                        HStack(spacing: 6) {
+                            if let plate = Plate.find(item.size, unit) {
+                                PlateDot(plate: plate, outline: isOn ? Theme.paper : Theme.ink)
                             }
+                            Text("\(item.count) × \(WeightUnit.trimmed(item.size)) \(unit.rawValue.uppercased())")
                         }
                     }
-                    .sensoryFeedback(.impact(weight: .light), trigger: collected)
                 }
-                .drawer()
-
-                Button(hasStarted ? "Back to the set" : "Start session") { showKit = false }
-                    .buttonStyle(.bigBlack)
             }
-            .padding(16)
+            .sensoryFeedback(.impact(weight: .light), trigger: collected)
         }
+        .drawer()
     }
 
     private func toggle(_ size: Double) {
         if collected.contains(size) { collected.remove(size) } else { collected.insert(size) }
     }
 
-    // MARK: - Set by set (SPEC 2.3 step 5)
+    // MARK: - Every set (SPEC 2.3 step 5)
 
-    private func setView(logs: [SetLog], cursor: SessionCursor, index: Int) -> some View {
-        let log = logs[index]
-        let position = cursor.position(of: index)
-        let liftName = session.liftName(for: log.blockIndex).uppercased()
-        let previous = index > 0 ? logs[index - 1].perSide : []
-        let change = SetChange(from: previous, to: log.perSide)
-        let total = session.gymUnit.display(log.plannedTotal, in: session.prUnit(for: log.blockIndex))
-
-        return VStack(spacing: 16) {
-            BarDiagram(perSide: log.perSide, unit: session.gymUnit)
-                .frame(height: 180)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
-            Spacer(minLength: 0)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text(log.isWarmUp ? "WARM-UP · \(liftName)" : liftName).sectionLabel()
-
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(log.isWarmUp ? "Round" : "Set") \(position.number) of \(position.count)")
-                    Spacer()
-                    Text("\(log.reps) \(log.reps == 1 ? "rep" : "reps")")
-                }
-                .font(.system(size: 36, weight: .bold))
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-
-                Text("\(total) · \(log.pctText)")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Text(platesText(log.perSide)).font(.subheadline)
-
-                Text(change.text).font(.headline)
-
-                HStack(spacing: 6) {
-                    ForEach(cursor.group(of: index), id: \.self) { item in
-                        Circle()
-                            .fill(dotColor(item: item, current: index, cursor: cursor))
-                            .overlay(Circle().stroke(Theme.ink, lineWidth: 1.5))
-                            .frame(width: 12, height: 12)
-                    }
-                }
-
-                Button("Done") {
-                    if PRCheck.asksWhatWasLifted(isLastOfLift: cursor.isLastOfLift(index), isWarmUp: log.isWarmUp, pctText: log.pctText) {
-                        reporting = log
-                    } else {
-                        markDone(log)
-                    }
-                }
-                    .buttonStyle(.bigBlack)
-
-                Button("Plates") { showKit = true }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
+    /// The warm-up, then each lift: runs of logs with the same block and warm-up flag.
+    private func groups(_ logs: [SetLog]) -> [[SetLog]] {
+        var groups: [[SetLog]] = []
+        for log in logs {
+            if let last = groups.last?.last, last.blockIndex == log.blockIndex, last.isWarmUp == log.isWarmUp {
+                groups[groups.count - 1].append(log)
+            } else {
+                groups.append([log])
             }
-            .drawer()
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
         }
-        .animation(.snappy, value: index)
+        return groups
     }
 
-    private func dotColor(item: Int, current: Int, cursor: SessionCursor) -> Color {
-        if cursor.items[item].isDone { return Color(hex: "#2E8A4B") }
-        return item == current ? Theme.ink : Theme.paper
+    private func groupView(_ group: [SetLog], all: [SetLog]) -> some View {
+        let first = group[0]
+        let name = session.liftName(for: first.blockIndex).uppercased()
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(first.isWarmUp ? "WARM-UP · \(name)" : name).sectionLabel()
+            ForEach(Array(group.enumerated()), id: \.element.order) { index, log in
+                setCard(log, number: index + 1, of: group.count, previous: previous(log, in: all))
+            }
+        }
+    }
+
+    private func previous(_ log: SetLog, in all: [SetLog]) -> [Double] {
+        guard let index = all.firstIndex(where: { $0.order == log.order }), index > 0 else { return [] }
+        return all[index - 1].perSide
+    }
+
+    private func setCard(_ log: SetLog, number: Int, of count: Int, previous: [Double]) -> some View {
+        let change = SetChange(from: previous, to: log.perSide)
+        let total = session.gymUnit.display(log.plannedTotal, in: session.prUnit(for: log.blockIndex))
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(log.isWarmUp ? "Round" : "Set") \(number) of \(count)")
+                Spacer()
+                Text("\(log.reps) \(log.reps == 1 ? "rep" : "reps")")
+            }
+            .font(.system(size: 28, weight: .bold))
+            .minimumScaleFactor(0.6)
+            .lineLimit(1)
+
+            Text("\(total) · \(log.pctText)")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Text(change.text).font(.headline)
+
+            BarDiagram(perSide: log.perSide, unit: session.gymUnit)
+                .frame(height: 90)
+
+            Text(platesText(log.perSide)).font(.subheadline)
+        }
+        .drawer()
+    }
+
+    /// After the last set: everything comes off.
+    private func stripCard(logs: [SetLog]) -> some View {
+        let last = logs.last?.perSide ?? []
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Done lifting").sectionLabel()
+            Text(last.isEmpty ? "Put the bar back" : SetChange(from: last, to: []).text + ", then put the bar back")
+                .font(.headline)
+        }
+        .drawer()
     }
 
     private func platesText(_ perSide: [Double]) -> String {
@@ -191,38 +187,14 @@ struct SessionView: View {
         return perSide.map(WeightUnit.trimmed).joined(separator: " + ") + " \(session.gymUnit.rawValue) each side"
     }
 
-    /// Checks the set off; the first check starts the clock and the last one stops it (SPEC 3.8).
-    private func markDone(_ log: SetLog) {
+    /// Saves the session to history with its planned loads (SPEC 3.8).
+    private func endSession() {
         let now = Date.now
-        log.checkedAt = now
+        for log in session.setLogs where log.checkedAt == nil { log.checkedAt = now }
         if session.startedAt == nil { session.startedAt = now }
-        if session.setLogs.allSatisfy({ $0.checkedAt != nil }) { session.endedAt = now }
+        session.endedAt = now
         try? context.save()
-        doneCount += 1
-    }
-
-    /// "How much did you lift?" answered: keep it in history, check the set, then check for a new PR (SPEC 3.8).
-    private func report(_ lifted: Double, for log: SetLog) {
-        log.reportedTotal = lifted
-        markDone(log)
-        let lift = session.prLift(for: log.blockIndex)
-        let record = Planner.record(for: lift, in: records)
-        let prUnit = record?.unit ?? session.prUnit(for: log.blockIndex)
-        if let value = PRCheck.newPR(lifted: lifted, in: session.gymUnit, pr: record?.value, prUnit: prUnit) {
-            newPR = NewPR(lift: lift, value: value, unit: prUnit)
-        }
-    }
-
-    private func savePR(_ pr: NewPR) {
-        if let record = Planner.record(for: pr.lift, in: records) {
-            record.update(value: pr.value, unit: pr.unit)
-        } else {
-            let record = PersonalRecord(lift: pr.lift)
-            context.insert(record)
-            record.update(value: pr.value, unit: pr.unit)
-        }
-        try? context.save()
-        prCount += 1
+        endCount += 1
     }
 
     // MARK: - Finished (SPEC 2.3 step 7)
@@ -233,7 +205,7 @@ struct SessionView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Session done").font(Theme.heading)
                     if let duration = session.duration {
-                        Text("\(Duration.seconds(duration).formatted(.time(pattern: .hourMinute))) from first to last set")
+                        Text("\(Duration.seconds(duration).formatted(.time(pattern: .hourMinute))) in the box")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -264,56 +236,6 @@ struct SessionView: View {
             }
             .padding(16)
         }
-    }
-}
-
-/// "How much did you lift?", prefilled with the planned load: one tap to confirm (SPEC 2.3 step 6).
-struct LiftedSheet: View {
-    let liftName: String
-    let unit: WeightUnit
-    let step: Double
-    var onConfirm: (Double) -> Void
-
-    @State private var value: Double?
-
-    init(liftName: String, planned: Double, unit: WeightUnit, step: Double, onConfirm: @escaping (Double) -> Void) {
-        self.liftName = liftName
-        self.unit = unit
-        self.step = step
-        self.onConfirm = onConfirm
-        _value = State(initialValue: planned)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(liftName.uppercased()).sectionLabel()
-            Text("How much did you lift?").font(Theme.heading)
-            HStack(spacing: 8) {
-                Button("−") { value = max(0, (value ?? 0) - step) }
-                    .buttonStyle(.bigBlack)
-                    .frame(width: 64)
-                TextField("0", value: $value, format: .number)
-                    .textFieldStyle(OutlineFieldStyle())
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.center)
-                Text(unit.rawValue).font(.title2.weight(.bold))
-                Button("+") { value = (value ?? 0) + step }
-                    .buttonStyle(.bigBlack)
-                    .frame(width: 64)
-            }
-            .sensoryFeedback(.selection, trigger: value)
-            Button("Confirm") {
-                if let value, value > 0 { onConfirm(value) }
-            }
-            .buttonStyle(.bigBlack)
-            .disabled((value ?? 0) <= 0)
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .foregroundStyle(Theme.ink)
-        .background(Theme.paper)
-        .presentationDetents([.medium])
-        .interactiveDismissDisabled()
     }
 }
 

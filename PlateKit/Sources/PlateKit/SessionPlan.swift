@@ -24,6 +24,7 @@ public struct LiftInput: Hashable, Sendable {
 }
 
 /// A whole session in a gym: warm-up, every working set, what changes before each set, and the plate kit (SPEC 3.3–3.5).
+/// Each set's plates are chosen so the whole session needs the fewest plates (`KitOptimizer`).
 public struct SessionPlan: Hashable, Sendable {
     public struct WarmUpSet: Hashable, Sendable {
         public let round: WarmUpRound
@@ -71,16 +72,26 @@ public struct SessionPlan: Hashable, Sendable {
             lift.sets.map { solver.load(for: $0.target, pr: lift.pr, prUnit: lift.prUnit) }
         }
 
-        var warmUp: [WarmUpSet] = []
+        var rounds: [WarmUpRound] = []
         if let first = inputs.first, let firstSet = first.sets.first {
-            let rounds = solver.warmUp(before: loads[0][0], reps: firstSet.reps, pr: first.pr, prUnit: first.prUnit)
-            warmUp = rounds.map { WarmUpSet(round: $0, change: change(to: $0.load)) }
+            rounds = solver.warmUp(before: loads[0][0], reps: firstSet.reps, pr: first.pr, prUnit: first.prUnit)
+        }
+
+        // Make every set from the fewest plates overall (same totals), in session order.
+        var arranged = KitOptimizer.arrange(rounds.map(\.load) + loads.flatMap { $0 }, plates: gym.plateSizes)[...]
+        func nextLoad() -> Load { arranged.removeFirst() }
+
+        let warmUp = rounds.map { round in
+            let load = nextLoad()
+            let arrangedRound = WarmUpRound(number: round.number, reps: round.reps, load: load, percentOfMax: round.percentOfMax)
+            return WarmUpSet(round: arrangedRound, change: change(to: load))
         }
 
         var lifts: [Lift] = []
-        for (input, liftLoads) in zip(inputs, loads) {
+        for input in inputs {
             var sets: [WorkingSet] = []
-            for (index, (workSet, load)) in zip(input.sets, liftLoads).enumerated() {
+            for (index, workSet) in input.sets.enumerated() {
+                let load = nextLoad()
                 sets.append(WorkingSet(number: index + 1, reps: workSet.reps, target: workSet.target, load: load, prUnit: input.prUnit, change: change(to: load)))
             }
             lifts.append(Lift(name: input.name, prUnit: input.prUnit, sets: sets))
@@ -89,7 +100,7 @@ public struct SessionPlan: Hashable, Sendable {
         self.gym = gym
         self.warmUp = warmUp
         self.lifts = lifts
-        self.kit = Kit(bar: gym.barWeight, loads: warmUp.map(\.load) + loads.flatMap { $0 })
+        self.kit = Kit(bar: gym.barWeight, loads: warmUp.map(\.load) + lifts.flatMap { $0.sets.map(\.load) })
     }
 
     /// A set's total in its PR's unit, e.g. "77.1 kg" for 170 lb (SPEC 3.2).

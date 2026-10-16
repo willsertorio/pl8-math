@@ -67,6 +67,8 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 Gym plate sets used below — **lb**: 55, 45, 35, 25, 15, 10, 5, 2.5 · **kg**: 25, 20, 15, 10, 5, 2.5, 2, 1.5, 1, 0.5.
 Format: `reps @ total [plates per side]`. Totals in the gym's unit.
 
+> **2026-10-16:** the totals below are the golden values tested at the box and still hold. The plates per side and the kits are the web prototype's (fewest plates per set, larger plates on a tie); the app now picks, among equally short combinations, the ones that need the smallest kit (SPEC 3.5), so some arrangements and kits differ. `PlateKit/Tests/PlateKitTests/GoldenTests.swift` has the current ones.
+
 ### 01/10 · Back Squat PR 100 kg · lb gym, 45 lb bar
 - Warm-up: `5@85 [15+5]` · `3@120 [35+2.5]` · `3@145 [45+5]`
 - Back Squat: `3@170 [55+5+2.5]` · `3@170 [55+5+2.5]` · `3@175 [55+10]` · `3@175 [55+10]` · `3@180 [55+10+2.5]`

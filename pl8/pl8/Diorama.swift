@@ -1,6 +1,7 @@
 import RealityKit
 import SwiftUI
 import UIKit
+import CoreText
 import PlateKit
 
 /// Turns PlateKit's baked diorama (`SceneBake`) into RealityKit models. Every piece is an `UnlitMaterial` with
@@ -150,8 +151,7 @@ enum PictureArt {
     }
 
     /// The flag: the gym's name, as big as fits two-thirds of the width and 60 % of the height, in light on the
-    /// dark cloth. The prototype's Playfair Display 900; until that font is in the app, the system's heaviest
-    /// serif (New York Black) stands in.
+    /// dark cloth, in the prototype's Playfair Display Black.
     static func flag(_ name: String) -> UIImage {
         let size = CGSize(width: 740, height: 512)
         let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
@@ -165,11 +165,21 @@ enum PictureArt {
         }
     }
 
+    /// Playfair Display Black (SIL Open Font License, Fonts/PlayfairDisplay-OFL.txt), loaded from the app on first
+    /// use; the system's heaviest serif if it's missing.
     static func flagFont(_ size: CGFloat) -> UIFont {
+        _ = registerPlayfair
+        if let playfair = UIFont(name: "PlayfairDisplayRoman-Black", size: size) { return playfair }
         let font = UIFont.systemFont(ofSize: size, weight: .black)
         guard let serif = font.fontDescriptor.withDesign(.serif) else { return font }
         return UIFont(descriptor: serif, size: size)
     }
+
+    private static let registerPlayfair: Void = {
+        if let url = Bundle.main.url(forResource: "PlayfairDisplay-Black", withExtension: "ttf") {
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        }
+    }()
 
     // MARK: - Drawing helpers
 

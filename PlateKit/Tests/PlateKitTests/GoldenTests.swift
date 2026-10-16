@@ -35,12 +35,14 @@ struct GoldenTests {
     static func kit(_ plan: SessionPlan) -> [String] { plan.kit.plates.map { "\($0.count)×\(WeightUnit.trimmed($0.size))" } }
 
     // MARK: - Cases
+    // Totals are the box-tested golden values. Since 2026-10-16 the plates per side are chosen for the smallest
+    // kit with the fewest plates per set (KitOptimizer), so some arrangements differ from the web prototype's.
 
     @Test func backSquat0110PoundGym() {
         let plan = SessionPlan(gym: Self.lbGym, lifts: [Self.backSquat0110])
-        #expect(Self.warmUp(plan) == ["5@85 [15+5]", "3@120 [35+2.5]", "3@145 [45+5]"])
+        #expect(Self.warmUp(plan) == ["5@85 [15+5]", "3@120 [35+2.5]", "3@145 [35+15]"])
         #expect(Self.lift(plan, 0) == ["3@170 [55+5+2.5]", "3@170 [55+5+2.5]", "3@175 [55+10]", "3@175 [55+10]", "3@180 [55+10+2.5]"])
-        #expect(Self.kit(plan) == ["2×55", "2×45", "2×35", "2×15", "2×10", "2×5", "2×2.5"])
+        #expect(Self.kit(plan) == ["2×55", "2×35", "2×15", "2×10", "2×5", "2×2.5"])   // no 45s: 35+15 for 145
         #expect(plan.kit.bar == 45)
         // Display: set 1 shows 77.1 kg (PR unit), plates in lb
         #expect(plan.displayTotal(plan.lifts[0].sets[0]) == "77.1 kg")
@@ -56,20 +58,20 @@ struct GoldenTests {
 
     @Test func snatch0210PoundGym() {
         let plan = SessionPlan(gym: Self.lbGym, lifts: Self.session0210)
-        #expect(Self.warmUp(plan) == ["5@75 [15]", "3@105 [25+5]", "1@125 [35+5]"])
+        #expect(Self.warmUp(plan) == ["5@75 [15]", "3@105 [25+5]", "1@125 [25+15]"])
         #expect(Self.lift(plan, 0) == ["1@150 [45+5+2.5]", "1@150 [45+5+2.5]", "1@160 [55+2.5]", "1@160 [55+2.5]", "1@165 [55+5]", "1@165 [55+5]"])
-        #expect(Self.lift(plan, 1) == ["1@125 [35+5]", "1@125 [35+5]", "1@130 [35+5+2.5]", "1@135 [45]", "1@140 [45+2.5]", "1@140 [45+2.5]", "1@145 [45+5]", "1@145 [45+5]"])
-        #expect(Self.kit(plan) == ["2×55", "2×45", "2×35", "2×25", "2×15", "2×5", "2×2.5"])
+        #expect(Self.lift(plan, 1) == ["1@125 [25+15]", "1@125 [25+15]", "1@130 [25+15+2.5]", "1@135 [45]", "1@140 [45+2.5]", "1@140 [45+2.5]", "1@145 [45+5]", "1@145 [45+5]"])
+        #expect(Self.kit(plan) == ["2×55", "2×45", "2×25", "2×15", "2×5", "2×2.5"])   // no 35s
     }
 
     @Test func snatch0510PoundGym() {
         let plan = SessionPlan(gym: Self.lbGym, lifts: Self.session0510)
-        #expect(Self.warmUp(plan) == ["5@70 [10+2.5]", "3@100 [25+2.5]", "1@125 [35+5]"])
-        #expect(Self.lift(plan, 0) == ["1@145 [45+5]", "1@145 [45+5]", "1@145 [45+5]", "1@155 [55]", "1@155 [55]", "1@155 [55]"])
-        #expect(Self.lift(plan, 1) == Array(repeating: "2@260 [55+45+5+2.5]", count: 5))
-        #expect(Self.kit(plan) == ["2×55", "2×45", "2×35", "2×25", "2×10", "2×5", "2×2.5"])
+        #expect(Self.warmUp(plan) == ["5@70 [10+2.5]", "3@100 [25+2.5]", "1@125 [25+15]"])
+        #expect(Self.lift(plan, 0) == ["1@145 [25+25]", "1@145 [25+25]", "1@145 [25+25]", "1@155 [55]", "1@155 [55]", "1@155 [55]"])
+        #expect(Self.lift(plan, 1) == Array(repeating: "2@260 [55+25+25+2.5]", count: 5))
+        #expect(Self.kit(plan) == ["2×55", "4×25", "2×15", "2×10", "2×2.5"])   // 12 plates instead of 14
         // Change text, Snatch set 3 → 4
-        #expect(plan.lifts[0].sets[3].change.text == "Take off 5 + 45, then add 55 each side")
+        #expect(plan.lifts[0].sets[3].change.text == "Take off 25 + 25, then add 55 each side")
     }
 
     @Test func snatch0510KilogramGym() {
@@ -95,8 +97,8 @@ struct GoldenTests {
         let squat = LiftInput(name: "Back Squat", pr: 100, prUnit: .kg, sets: Self.sets(5, [.range(75, 78)]))
         let plan = SessionPlan(gym: gym, lifts: [squat])
         #expect(Self.warmUp(plan) == ["5@85 [10+10]", "5@115 [35]", "5@145 [35+15]"])
-        #expect(Self.lift(plan, 0) == ["5@165 [45+15]"])
-        #expect(Self.kit(plan) == ["2×45", "2×35", "2×15", "4×10"])
+        #expect(Self.lift(plan, 0) == ["5@165 [35+25]"])
+        #expect(Self.kit(plan) == ["2×35", "2×25", "2×15", "4×10"])
     }
 }
 
@@ -105,7 +107,7 @@ struct SessionPlanTests {
     @Test func everySetSaysWhatChangesFromTheOneBefore() {
         let plan = SessionPlan(gym: GymSetup(unit: .lb), lifts: [GoldenTests.backSquat0110])
         #expect(plan.warmUp[0].change.text == "Add 15 + 5 each side")      // from the empty bar
-        #expect(plan.lifts[0].sets[0].change.text == "Take off 5 + 45, then add 55 + 5 + 2.5 each side")
+        #expect(plan.lifts[0].sets[0].change.text == "Take off 15 + 35, then add 55 + 5 + 2.5 each side")
         #expect(plan.lifts[0].sets[1].change.isSame)
     }
 
@@ -140,7 +142,7 @@ struct SetRecordTests {
         #expect(squat.reps == 2)
         #expect(squat.pctText == "83–85%")
         #expect(squat.plannedTotal == 260)
-        #expect(squat.perSide == [55, 45, 5, 2.5])
+        #expect(squat.perSide == [55, 25, 25, 2.5])
 
         #expect(records.last?.setIndex == 4)
     }
