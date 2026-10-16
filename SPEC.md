@@ -177,6 +177,7 @@ Input: text lines (from Vision OCR, or typed). Output: strength blocks, each `{n
 ### 3.7 Reading PRs
 Lines like `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb`. Unit from the line; if missing, ask once for the whole screenshot.
 Box apps put the weight on the right of the lift (`Back Squat (Barbell)` … `185.19 Lb`), which OCR reads as two lines, row by row or column by column: a weight-only line goes to the earliest known lift name still waiting for one. Brackets (the app's category) aren't part of the lift; a "name" needs two letters in a row (not the status bar's `5G 30`).
+**One PR per lift.** Spellings that differ only in spaces, dashes, case or `&`/`and` are the same lift (`backsquat` = `Back Squat`); unknown lifts are tidied the same way each time (`pull ups` → `Pull Ups`). A screenshot or edit for a lift that already has a PR updates it; a screenshot naming a lift twice keeps the last value.
 
 ### 3.8 Session data
 - **Duration** = from opening the session to **End session**.

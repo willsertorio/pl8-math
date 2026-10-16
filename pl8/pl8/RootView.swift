@@ -18,7 +18,11 @@ struct RootView: View {
                 FirstRunView { hasFinishedFirstRun = true }
             }
         }
-        .task { seedIfNeeded() }
+        .onChange(of: hasFinishedFirstRun) { seedIfNeeded() }
+        .task {
+            seedIfNeeded()
+            DataCleanup.mergeDuplicatePRs(in: context)
+        }
     }
 
     private var tabs: some View {
@@ -42,7 +46,7 @@ struct RootView: View {
             context.insert(Gym(name: "", unit: .lb))
         }
         let existing = (try? context.fetch(FetchDescriptor<PersonalRecord>())) ?? []
-        for lift in LiftNames.defaultPRLifts where !existing.contains(where: { $0.lift == lift }) {
+        for lift in LiftNames.defaultPRLifts where Planner.record(for: lift, in: existing) == nil {
             context.insert(PersonalRecord(lift: lift))
         }
         try? context.save()

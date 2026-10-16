@@ -20,6 +20,8 @@ struct TrainView: View {
     @Query private var gyms: [Gym]
     @Query private var records: [PersonalRecord]
     @AppStorage("hasFinishedFirstRun") private var hasFinishedFirstRun = true
+    @AppStorage("didSeedDefaults") private var didSeedDefaults = true
+    @State private var confirmReplay = false
     @State private var sheet: TrainSheet?
     @State private var activeSession: Session?
 
@@ -72,7 +74,17 @@ struct TrainView: View {
                         NavigationLink("Test screen") { PlateCalculatorView() }
                         NavigationLink("3D test (M5)") { Spike3DView() }
                         NavigationLink("3D room (M6)") { Room3DView() }
-                        Button("Replay the first run") { hasFinishedFirstRun = false }
+                        Button("Replay the first run") { confirmReplay = true }
+                            .confirmationDialog("Replay the first run?", isPresented: $confirmReplay, titleVisibility: .visible) {
+                                Button("Erase everything and replay", role: .destructive) {
+                                    // A clean start: no gym, PRs, workouts or history left from before.
+                                    DataCleanup.eraseEverything(in: context)
+                                    didSeedDefaults = false
+                                    hasFinishedFirstRun = false
+                                }
+                            } message: {
+                                Text("Your gym, PRs, workouts and history are deleted.")
+                            }
                     }
                     .font(.subheadline.weight(.semibold))
                     .tint(Theme.ink)

@@ -33,7 +33,10 @@ public enum PRParser {
                 waiting.append(line)
             }
         }
-        return entries
+        // One PR per lift: a lift named twice keeps its last value.
+        var latest: [String: Int] = [:]
+        for (index, entry) in entries.enumerated() { latest[LiftNames.key(entry.lift)] = index }
+        return entries.enumerated().filter { latest[LiftNames.key($0.element.lift)] == $0.offset }.map(\.element)
     }
 
     /// True when some line had no unit: ask once for the whole screenshot.

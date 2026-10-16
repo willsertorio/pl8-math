@@ -18,13 +18,9 @@ struct PRParserTests {
     }
 
     @Test func namesAndUnitSpellings() {
-        let prs = PRParser.parse("""
-        back squat 140kgs
-        BS: 315 lbs
-        Clean – 100 kilos
-        Bench Press 225 pounds
-        Zercher Squat 120 kg
-        """)
+        // Each on its own screenshot: one screenshot keeps one PR per lift.
+        let prs = ["back squat 140kgs", "BS: 315 lbs", "Clean – 100 kilos", "Bench Press 225 pounds", "Zercher Squat 120 kg"]
+            .flatMap { PRParser.parse($0) }
         #expect(prs.map(\.lift) == ["Back Squat", "Back Squat", "Clean", "Bench Press", "Zercher Squat"])
         #expect(prs.map(\.unit) == [.kg, .lb, .kg, .lb, .kg])
     }
@@ -101,5 +97,27 @@ struct PRAppScreenshotTests {
 
     @Test func nameAndWeightOnOneLine() {
         #expect(PRParser.parse("Back Squat (Barbell) 185.19 Lb") == [PREntry(lift: "Back Squat", value: 185.19, unit: .lb)])
+    }
+}
+
+/// Bug from real use, 2026-10-16: "backsquat" and "Back Squat" became two PRs.
+@Suite("One name per lift")
+struct OneNamePerLiftTests {
+    @Test func spacingAndCaseDoNotMakeANewLift() {
+        #expect(LiftNames.canonical("backsquat") == "Back Squat")
+        #expect(LiftNames.canonical("BACK-SQUAT") == "Back Squat")
+        #expect(LiftNames.canonical("clean&jerk") == "Clean & Jerk")
+        #expect(LiftNames.canonical("snatchbalance") == "Snatch Balance")
+    }
+
+    @Test func unknownLiftsAreTidiedTheSameWayEachTime() {
+        #expect(LiftNames.canonical("pull ups") == "Pull Ups")
+        #expect(LiftNames.canonical("PULL UPS") == "Pull Ups")
+        #expect(LiftNames.key("Pull-Ups") == LiftNames.key("pull ups"))
+    }
+
+    @Test func aScreenshotNamingALiftTwiceKeepsTheLastOne() {
+        let prs = PRParser.parse("backsquat 120 kg\nBack Squat 132.28 lb")
+        #expect(prs == [PREntry(lift: "Back Squat", value: 132.28, unit: .lb)])
     }
 }

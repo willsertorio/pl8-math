@@ -97,7 +97,7 @@ struct PREditor: View {
     private func save() {
         guard let value, value > 0, !liftName.isEmpty else { return }
         // A "new" lift that already exists updates that PR instead of making a second one.
-        if let target = record ?? records.first(where: { $0.lift == liftName }) {
+        if let target = record ?? Planner.record(for: liftName, in: records) {
             if target.value != value || target.unit != unit {
                 target.update(value: value, unit: unit)
             }

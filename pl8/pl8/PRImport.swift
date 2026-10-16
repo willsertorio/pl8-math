@@ -77,7 +77,7 @@ struct PRScreenshotPicker<Label: View>: View {
     private func save(_ entries: [PREntry]) {
         for entry in entries {
             let unit = entry.unit ?? .kg
-            if let record = records.first(where: { $0.lift == entry.lift }) {
+            if let record = Planner.record(for: entry.lift, in: records) {
                 if record.value != entry.value || record.unit != unit {
                     record.update(value: entry.value, unit: unit)
                 }

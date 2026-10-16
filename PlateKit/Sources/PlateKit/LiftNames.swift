@@ -18,10 +18,22 @@ public enum LiftNames {
         "clean and jerk": "Clean & Jerk",
     ]
 
-    /// "  back   squat " → "Back Squat", "BS" → "Back Squat". Unknown lifts keep their own spelling, tidied.
+    /// "  back   squat " → "Back Squat", "BS" → "Back Squat", "backsquat" → "Back Squat" (spaces, dashes and
+    /// case don't make a new lift). Unknown lifts are tidied the same way every time: "pull ups" → "Pull Ups".
     public static func canonical(_ name: String) -> String {
         let tidy = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return lookup[tidy.lowercased()] ?? tidy
+        if let known = lookup[tidy.lowercased()] ?? compactLookup[key(tidy)] { return known }
+        // Only all-lowercase or ALL-CAPS names get capitalised; "Clean to Parallel" is left as written.
+        guard tidy == tidy.lowercased() || tidy == tidy.uppercased() else { return tidy }
+        return tidy.split(separator: " ").map { word in
+            word.first!.isLetter ? word.prefix(1).uppercased() + word.dropFirst().lowercased() : String(word)
+        }.joined(separator: " ")
+    }
+
+    /// The same for every spelling of a lift: letters and digits only, lowercased ("Pull-Ups" → "pullups";
+    /// "&" counts as "and"). Use it to find a lift's one PR.
+    public static func key(_ name: String) -> String {
+        name.lowercased().replacingOccurrences(of: "&", with: "and").filter { $0.isLetter || $0.isNumber }
     }
 
     /// The known lift `text` starts with (longest match, whole words) and what follows it.
@@ -62,6 +74,12 @@ public enum LiftNames {
     private static let lookup: [String: String] = {
         var table = aliases
         for name in known { table[name.lowercased()] = name }
+        return table
+    }()
+
+    private static let compactLookup: [String: String] = {
+        var table: [String: String] = [:]
+        for (alias, name) in lookup { table[key(alias)] = name }
         return table
     }()
 

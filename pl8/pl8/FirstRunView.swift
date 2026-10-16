@@ -17,7 +17,6 @@ struct FirstRunView: View {
     @State private var step: Step = .opening
     /// The sheet's height, measured from its content, so the room gets the rest of the screen.
     @State private var sheetHeight: CGFloat = 320
-    @FocusState private var typingName: Bool
     /// The keyboard's height, so the room shows above it and the sheet while you type the name.
     @State private var keyboardHeight: CGFloat = 0
     @State private var editingPR: PRTarget?
@@ -97,20 +96,8 @@ struct FirstRunView: View {
             case .name:
                 // No field on screen: the keyboard types straight onto the flag in the room.
                 question("Where are you training now?")
-                Text("Type your box's name — it goes on the flag. Up to \(GymSetup.maxNameLength) letters.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
                 if let gym {
-                    TextField("", text: Binding(get: { gym.name }, set: { gym.name = GymSetup.normalizedName($0) }))
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .focused($typingName)
-                        .submitLabel(.continue)
-                        .onSubmit { if !gym.name.isEmpty { step = .unit } }
-                        .frame(width: 1, height: 1)
-                        .opacity(0.01)
-                        .accessibilityLabel("Box name")
-                        .onAppear { typingName = true }
+                    NameTyper(gym: gym) { step = .unit }
                 }
                 Button("Continue") { step = .unit }
                     .buttonStyle(.bigBlack)
@@ -206,5 +193,40 @@ private struct UnitList: View {
             }
         }
         .sensoryFeedback(.selection, trigger: gym.unit)
+    }
+}
+
+/// The gym's name, typed with no field on screen: it shows on the flag. The field keeps its own focus (focus
+/// doesn't carry into a sheet from the view that presents it) and asks for the keyboard once the sheet is up.
+private struct NameTyper: View {
+    @Bindable var gym: Gym
+    var onSubmit: () -> Void
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        // Tapping the hint brings the keyboard back if it was put away.
+        Text("Type your box's name — it goes on the flag. Up to \(GymSetup.maxNameLength) letters.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
+            .onTapGesture { focused = true }
+            .background(alignment: .topLeading) { field }
+    }
+
+    private var field: some View {
+        TextField("", text: Binding(get: { gym.name }, set: { gym.name = GymSetup.normalizedName($0) }))
+            .textInputAutocapitalization(.characters)
+            .autocorrectionDisabled()
+            .keyboardType(.asciiCapable)
+            .focused($focused)
+            .submitLabel(.continue)
+            .onSubmit { if !gym.name.isEmpty { onSubmit() } }
+            .frame(width: 2, height: 2)
+            .opacity(0.02)
+            .accessibilityLabel("Box name")
+            .task {
+                try? await Task.sleep(for: .milliseconds(500))           // after the sheet's slide-up
+                focused = true
+            }
     }
 }

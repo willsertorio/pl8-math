@@ -37,8 +37,8 @@ enum Planner {
     }
 
     static func record(for lift: String, in records: [PersonalRecord]) -> PersonalRecord? {
-        let name = LiftNames.canonical(lift)
-        return records.first { $0.lift == name }
+        let key = LiftNames.key(LiftNames.canonical(lift))
+        return records.first { LiftNames.key($0.lift) == key }
     }
 
     // MARK: - What the room's boards say (M6)

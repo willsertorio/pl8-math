@@ -31,8 +31,7 @@ struct PlateCalculatorView: View {
 
     /// The saved PR for a lift, matching names the same way the parser does.
     private func record(for lift: String) -> PersonalRecord? {
-        let name = LiftNames.canonical(lift)
-        return records.first { $0.lift == name }
+        Planner.record(for: lift, in: records)
     }
 
     /// The saved workout picked in the Workout picker, if it is one.
