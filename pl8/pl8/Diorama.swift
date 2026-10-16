@@ -159,14 +159,27 @@ enum PictureArt {
             g.setFillColor(dark.cgColor)
             g.fill(CGRect(origin: .zero, size: size))
             guard !name.isEmpty else { return }
-            let probe = NSAttributedString(string: name, attributes: [.font: flagFont(300)]).size()
-            let points = 300 * min(size.width * 0.66 / max(1, probe.width), size.height * 0.6 / max(1, probe.height * 0.75))
-            text(name, font: flagFont(points), colour: light, at: CGPoint(x: size.width / 2, y: size.height / 2), in: g)
+            // Sized and centred on the letters' own outlines, like the prototype's measureText, so digits
+            // (no descenders) sit in the middle rather than on a line box that leaves room below them.
+            let probe = glyphBounds(name, font: flagFont(300))
+            let points = 300 * min(size.width * 0.66 / max(1, probe.width), size.height * 0.6 / max(1, probe.height))
+            let font = flagFont(points)
+            let glyphs = glyphBounds(name, font: font)
+            let attributed = NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: light])
+            // `draw(at:)` takes the line's top-left; the baseline sits `ascender` below it.
+            let baseline = size.height / 2 + glyphs.height / 2 + glyphs.minY
+            attributed.draw(at: CGPoint(x: size.width / 2 - glyphs.midX, y: baseline - font.ascender))
         }
     }
 
     /// Playfair Display Black (SIL Open Font License, Fonts/PlayfairDisplay-OFL.txt), loaded from the app on first
     /// use; the system's heaviest serif if it's missing.
+    /// The letters' outline box, from the baseline (y up, as Core Text measures it).
+    static func glyphBounds(_ string: String, font: UIFont) -> CGRect {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: [.font: font]))
+        return CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+    }
+
     static func flagFont(_ size: CGFloat) -> UIFont {
         _ = registerPlayfair
         if let playfair = UIFont(name: "PlayfairDisplayRoman-Black", size: size) { return playfair }
