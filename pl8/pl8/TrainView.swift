@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import PlateKit
 
 /// Train tab (SPEC 2.4): today's whiteboard, or "Add today's workout".
 struct TrainView: View {
