@@ -355,7 +355,7 @@ final class TitleStage {
             let item = field.plates[i]
             let scale = item.radius / (TitleStage.halfHeight * 2 * 0.9) / (Float(plate.diameter) / 2)
             let width = 2.5 * item.z / (scale * TitleStage.halfHeight * 2 * 0.9)
-            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17, width: width), tone: .flat(Look.ink), inked: false, casts: false))
+            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17, width: width, justTheRim: true), tone: .flat(Look.ink), inked: false, casts: false))
             let entity = Entity()
             for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
                 entity.addChild(child)

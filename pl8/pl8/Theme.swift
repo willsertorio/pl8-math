@@ -46,14 +46,14 @@ enum Fonts {
 
 // MARK: - The rough edge
 
-/// A rectangle whose edges wobble like the prototype's rough filter (feTurbulence fractal noise at 0.039 per point,
-/// two octaves, displacing the outline by up to ±2.25 pt). The same shape for the same size, every time.
+/// A rectangle whose edges wobble a little like the prototype's rough filter (feTurbulence noise at 0.039 per point
+/// displacing the outline): as subtle as on Will's phone — about a point either way. The same shape for the same size.
 struct RoughRectangle: Shape {
-    var amplitude: CGFloat = 2.25
+    var amplitude: CGFloat = 1.2
     var seed: UInt32 = 1
 
     func path(in rect: CGRect) -> Path {
-        let step: CGFloat = 3
+        let step: CGFloat = 4
         var points: [CGPoint] = []
         func edge(from a: CGPoint, to b: CGPoint) {
             let length = hypot(b.x - a.x, b.y - a.y), count = max(1, Int(length / step))
@@ -79,7 +79,7 @@ struct RoughRectangle: Shape {
     /// Two octaves of smooth value noise, 0…1.
     static func noise(_ x: CGFloat, _ y: CGFloat, _ seed: UInt32) -> CGFloat {
         let f: CGFloat = 0.039
-        return (value(x * f, y * f, seed) * 2 + value(x * f * 2, y * f * 2, seed &+ 7)) / 3
+        return (value(x * f, y * f, seed) * 3 + value(x * f * 2, y * f * 2, seed &+ 7)) / 4
     }
 
     private static func value(_ x: CGFloat, _ y: CGFloat, _ seed: UInt32) -> CGFloat {
@@ -107,7 +107,7 @@ private struct Press: ViewModifier {
     }
 }
 
-/// The prototype's bigButton: solid black, 40 pt, square with a rough edge, Space Grotesk 700 18 pt in white.
+/// The prototype's bigButton: solid black, 40 pt, square, Space Grotesk 700 18 pt in white.
 struct BlackButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Label(configuration: configuration)
@@ -124,7 +124,7 @@ struct BlackButtonStyle: ButtonStyle {
                 .foregroundStyle(Theme.paper)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)
-                .background(RoughRectangle().fill(Theme.ink))
+                .background(Rectangle().fill(Theme.ink))
                 .opacity(isEnabled ? 1 : 0.35)
                 .contentShape(Rectangle())
                 .modifier(Press(isPressed: configuration.isPressed))
@@ -132,7 +132,7 @@ struct BlackButtonStyle: ButtonStyle {
     }
 }
 
-/// The prototype's secondary button (Edit, Cancel): the soft grey, rough edged, black text.
+/// The prototype's secondary button (Edit, Cancel): the soft grey, black text.
 struct SoftButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -140,7 +140,7 @@ struct SoftButtonStyle: ButtonStyle {
             .foregroundStyle(Theme.ink)
             .frame(maxWidth: .infinity)
             .frame(height: 40)
-            .background(RoughRectangle().fill(Theme.soft))
+            .background(Rectangle().fill(Theme.soft))
             .contentShape(Rectangle())
             .modifier(Press(isPressed: configuration.isPressed))
     }
