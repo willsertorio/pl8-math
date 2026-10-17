@@ -76,11 +76,11 @@ While reading: a spinning plate loader. Then the whiteboard in the room shows th
 Before Start, the app asks for anything it's missing (see 3.6): a PR it doesn't have ("What's your Snatch PR?", saved to PRs) and any % it couldn't read ("What % for Back Squat?").
 
 ### 2.3 A session
-**4–6 · The session page.** One page you scroll; two buttons pinned at the top, **Plate kit** and **Sets**, jump between its two parts. The room is a strip across the top third and follows the page: while the kit is at the top it shows the kit floor, where the session's plates dropped (heaviest first) when the session opened; while a set is at the top it shows the rack, its bar carrying that set's plates, which slide off and on between sets. Plates on the bar are missing from the floor.
-- **Plate kit** first: one chip per plate size, e.g. **2 × 45 LB**, plus the bar, which you tick off as you collect them. (3D: camera to the kit floor; the plates drop with a little physics and dust.)
-- **Sets** below, every set of the session in order, grouped by block (`WARM-UP · SNATCH`, `SNATCH`). Each set shows **"Set 3 of 6" and "1 rep"** as the biggest text (learned at the box), the load in the PR's unit and the % (`145 lb · 75–80%`), the change from the set before (*"Take off 5, then add 10 each side"*, *"Add 15 + 5 each side"* for the first), the bar diagram and the plates each side. (3D: on the rack the plates slide off and on to match.)
-- After the last set: *"Take off … each side, then put the bar back"*, then a big **End session** button.
-Nothing to tick off per set and no "How much did you lift?" (Will's first real class, 2026-10-16).
+**4–6 · The session page.** The room takes 80 % of the screen; below it, one card at a time, swiped up for the next (Will, 2026-10-17). No title or tab bar: just Back. Two buttons over the room, **Plate kit** and **Sets**, jump between the parts.
+- **Plate kit** card: one row of chips, e.g. **2 × 45 LB**, plus the bar, to tick off. The room shows the kit floor from close: the plates drop onto it with real physics (from 7–9.5 m, slightly tilted and spinning, the prototype's friction and bounce), heaviest first.
+- **Set** cards, text only: `WARM-UP · SNATCH`, **"Set 3 of 6" and "1 rep"** biggest, the load in the PR's unit and the %, and the change from the set before. The room shows one sleeve of the bar close up, carrying that set's plates, which slide off and on between sets; plates on the bar are missing from the floor.
+- Last card: *"Take off … each side, then put the bar back"* and **End session**.
+Nothing to tick off per set and no "How much did you lift?" (Will's first real class, 2026-10-16). No grey explanation text anywhere in the app.
 
 **7 · Session over.** After **End session**: the bell rings (three strikes) and a "scale" weighs the session's heaviest set (its plates and bar, total, label *Heaviest set*). Tap → kit is put away, camera to overview, tab bar appears. The session is saved to history.
 

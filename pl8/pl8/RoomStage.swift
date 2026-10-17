@@ -123,8 +123,21 @@ final class SetupProps {
 
     func attach(to world: Entity) {
         for group in [flag, rack, shelf, prBoard, board, kitFloor, barPlates] { world.addChild(group) }
+        // Physics for the kit drop, in the room's own space (the room moves for the camera): gravity, and the
+        // floor as a solid slab with the prototype's rubber (friction 0.55, a little bounce).
+        var simulation = PhysicsSimulationComponent()
+        simulation.gravity = [0, -9.81, 0]
+        world.components.set(simulation)
+        let room = RoomLayout.room
+        let floor = Entity()
+        floor.position = [room.centre.x, -0.5, room.centre.z]
+        floor.components.set(CollisionComponent(shapes: [.generateBox(size: [room.width + 4, 1, room.depth + 4])]))
+        floor.components.set(PhysicsBodyComponent(massProperties: .default, material: Self.rubber, mode: .static))
+        world.addChild(floor)
         attached = true
     }
+
+    static let rubber = PhysicsMaterialResource.generate(staticFriction: 0.55, dynamicFriction: 0.55, restitution: 0.15)
 
     func sync(name: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double, boards: Boards, animate: Bool) {
         guard attached else { return }
@@ -231,11 +244,11 @@ final class SetupProps {
                 kitFloor.addChild(holder)
                 return (placed.plate.size, holder)
             }
-            // Heaviest first, a beat apart, from a few metres up.
+            // Heaviest first, 0.16 s apart, dropped from 7–9.5 m with real physics, like the prototype.
             if animate {
                 let order = placed.indices.sorted { placed[$0].plate.size > placed[$1].plate.size }
                 for (n, index) in order.enumerated() {
-                    drop(plates[index], to: placed[index].centre, after: 0.4 + Double(n) * 0.12, from: 6 + Float(n % 3))
+                    physicsDrop(plates[index], placed[index], holder: kitItems[index].entity, after: 0.7 + Double(n) * 0.16)
                 }
             }
         }
@@ -298,6 +311,49 @@ final class SetupProps {
             }
         }
         barSide = perSide
+    }
+
+    /// The prototype's kit drop (spawnKitPlate): a solid disc of the plate's mass, slightly tilted and spinning,
+    /// let go 7–9.5 m above its spot; it lands, bounces a little and settles. Its shadow is drawn where it ends up.
+    private func physicsDrop(_ entity: Entity, _ placed: SessionScene.PlacedPlate, holder: Entity, after delay: Double) {
+        let radius = Float(placed.plate.diameter) / 2, thickness = Float(placed.plate.thickness)
+        var rim: [SIMD3<Float>] = []
+        for i in 0..<24 {
+            let angle = Float(i) / 24 * 2 * .pi
+            for y in [-thickness / 2, thickness / 2] { rim.append([radius * cos(angle), y, radius * sin(angle)]) }
+        }
+        entity.findEntity(named: "shadow")?.removeFromParent()
+        entity.components.set(CollisionComponent(shapes: [ShapeResource.generateConvex(from: rim)]))
+        entity.position = placed.centre + [0, Float.random(in: 7...9.5), 0]
+        entity.orientation = simd_quatf(angle: .random(in: -0.11...0.11), axis: [1, 0, 0])
+            * simd_quatf(angle: .random(in: 0...(2 * .pi)), axis: [0, 1, 0])
+            * simd_quatf(angle: .random(in: -0.11...0.11), axis: [0, 0, 1])
+        entity.isEnabled = false
+        let kilos = placed.plate.unit == .lb ? placed.plate.size * 0.4536 : placed.plate.size
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            entity.components.set(PhysicsBodyComponent(massProperties: .init(mass: Float(kilos)), material: Self.rubber, mode: .dynamic))
+            entity.components.set(PhysicsMotionComponent(linearVelocity: [0, -2, 0],
+                                                         angularVelocity: [.random(in: -0.3...0.3), .random(in: -0.6...0.6), .random(in: -0.3...0.3)]))
+            entity.isEnabled = true
+            // Once it has settled, its shadow where it lies.
+            try? await Task.sleep(for: .seconds(4))
+            let pose = entity.transform.matrix
+            let parts = SessionScene.parts(placed).map { part -> PropPart in
+                let moved = part.mesh.positions.map { p -> SIMD3<Float> in
+                    let q = pose * SIMD4(p.x, p.y, p.z, 1)
+                    return SIMD3(q.x, q.y, q.z)
+                }
+                return PropPart(mesh: LowPolyMesh(positions: moved, indices: part.mesh.indices), tone: part.tone,
+                                inked: part.inked, casts: part.casts)
+            }
+            let shadow = Entity()
+            for child in Diorama.entities(for: SceneBake.bake(parts, placement: .init(position: .zero, rotationDegrees: 0),
+                                                               wall: nil, content: .shadowsOnly)) {
+                shadow.addChild(child)
+            }
+            holder.addChild(shadow)
+        }
     }
 
     private func drop(_ entity: Entity, to target: SIMD3<Float>, after delay: Double, from height: Float) {

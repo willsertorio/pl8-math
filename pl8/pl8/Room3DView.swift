@@ -72,6 +72,8 @@ enum RoomScene {
         case .board: "Whiteboard"
         case .kit: "Kit floor"
         case .setv: "Rack"
+        case .kitFloor: "Kit (session)"
+        case .sleeve: "Sleeve (session)"
         }
     }
 

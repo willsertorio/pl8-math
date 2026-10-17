@@ -27,7 +27,7 @@ struct HistoryView: View {
                                         .font(.headline)
                                     Text(summary(session))
                                         .font(.subheadline)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Theme.ink)
                                 }
                             }
                             .listRowBackground(Theme.paper)

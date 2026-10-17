@@ -42,9 +42,6 @@ struct AddWorkoutSheet: View {
                             OptionRow(title: "Upload screenshots", systemImage: "photo.on.rectangle")
                         }
                         .buttonStyle(.plain)
-                        Text("Pick several if the workout doesn't fit on one screen.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
 
                     NavigationLink {

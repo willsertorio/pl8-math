@@ -62,8 +62,6 @@ struct TrainView: View {
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Today").font(Theme.heading)
-                            Text("No workout yet. Scan the whiteboard, upload a screenshot, or type it in.")
-                                .foregroundStyle(.secondary)
                             Button("Add today's workout") { sheet = .add }
                                 .buttonStyle(.bigBlack)
                         }

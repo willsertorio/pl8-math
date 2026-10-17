@@ -15,7 +15,15 @@ struct SessionView: View {
     @State private var collected: Set<Double> = []
     @State private var barCollected = false
     /// The row at the top of the scroll.
-    @State private var topRow: String? = "kit"
+    @State private var topRow: String?
+
+    /// - Parameter startOnFirstSet: open on the first set instead of the kit (the CI's screenshots).
+    init(session: Session, startOnFirstSet: Bool = false, onFinish: @escaping () -> Void) {
+        self.session = session
+        self.onFinish = onFinish
+        let first = session.orderedLogs.first.map { "s-\($0.order)" }
+        _topRow = State(initialValue: startOnFirstSet ? first : "kit")
+    }
     @State private var jumps = 0
     @State private var endCount = 0
 
@@ -28,8 +36,10 @@ struct SessionView: View {
                 sessionPage
             }
         }
-        .navigationTitle(session.gymName)
+        // Just Back on top: no title, no tab bar while you train.
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .sensoryFeedback(.success, trigger: endCount)
         .onAppear {
             // The clock starts when the session opens (SPEC 3.8).
@@ -42,64 +52,69 @@ struct SessionView: View {
 
     // MARK: - The page
 
-    /// One thing on the page; its id is what the room follows while it's at the top of the scroll.
+    /// One card on the page; the room shows what the card in view is about.
     private struct PageRow: Identifiable {
-        enum Kind { case kit, setsTitle, header(String), set(SetLog, number: Int, of: Int, previous: [Double]), strip, end }
+        enum Kind { case kit, set(SetLog, label: String, number: Int, of: Int, previous: [Double]), end }
         let id: String
         let kind: Kind
-        /// The plates on the bar while this row is at the top.
+        /// The plates on the bar while this card is in view.
         let perSide: [Double]
     }
 
     private func rows(_ logs: [SetLog]) -> [PageRow] {
         var rows = [PageRow(id: "kit", kind: .kit, perSide: [])]
-        rows.append(PageRow(id: "sets", kind: .setsTitle, perSide: logs.first?.perSide ?? []))
         for group in groups(logs) {
             let first = group[0]
             let name = session.liftName(for: first.blockIndex).uppercased()
-            rows.append(PageRow(id: "h-\(first.order)", kind: .header(first.isWarmUp ? "WARM-UP · \(name)" : name), perSide: first.perSide))
             for (index, log) in group.enumerated() {
-                rows.append(PageRow(id: "s-\(log.order)", kind: .set(log, number: index + 1, of: group.count, previous: previous(log, in: logs)),
+                rows.append(PageRow(id: "s-\(log.order)",
+                                    kind: .set(log, label: first.isWarmUp ? "WARM-UP · \(name)" : name, number: index + 1,
+                                               of: group.count, previous: previous(log, in: logs)),
                                     perSide: log.perSide))
             }
         }
-        rows.append(PageRow(id: "strip", kind: .strip, perSide: []))
         rows.append(PageRow(id: "end", kind: .end, perSide: []))
         return rows
     }
 
+    /// The room on 80 % of the screen, following the card in view: the kit on the floor, or the sleeve with that
+    /// set's plates. Below, one card at a time; swipe up for the next.
     private var sessionPage: some View {
         let logs = session.orderedLogs
         let rows = rows(logs)
         let top = rows.first { $0.id == (topRow ?? "kit") } ?? rows[0]
         let onKit = top.id == "kit"
+        let firstSet = rows.dropFirst().first?.id ?? "end"
         return VStack(spacing: 0) {
-            // The room follows the page: the kit floor while the kit is in view, the loaded bar for a set.
-            RoomStage(station: onKit ? .kit : .setv, gymName: session.gymName, unit: session.gymUnit,
+            RoomStage(station: onKit ? .kitFloor : .sleeve, gymName: session.gymName, unit: session.gymUnit,
                       plateSizes: session.plateSizes, barWeight: session.barWeight,
                       session: SessionProps(kit: Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) }),
                                             unit: session.gymUnit, barWeight: session.barWeight, perSide: top.perSide))
-                .containerRelativeFrame(.vertical) { length, _ in length * 0.35 }
-
-            HStack(spacing: 8) {
-                Chip(isOn: onKit, action: { jump(to: "kit") }) { Text("Plate kit") }.fixedSize()
-                Chip(isOn: !onKit, action: { jump(to: "sets") }) { Text("Sets") }.fixedSize()
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .sensoryFeedback(.selection, trigger: jumps)
+                .overlay(alignment: .topLeading) {
+                    HStack(spacing: 8) {
+                        Chip(isOn: onKit, action: { jump(to: "kit") }) { Text("Plate kit") }.fixedSize()
+                        Chip(isOn: !onKit, action: { jump(to: firstSet) }) { Text("Sets") }.fixedSize()
+                    }
+                    .padding(12)
+                    .sensoryFeedback(.selection, trigger: jumps)
+                }
+                .containerRelativeFrame(.vertical) { length, _ in length * 0.8 }
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+                LazyVStack(spacing: 0) {
                     ForEach(rows) { row in
-                        rowView(row, logs: logs).id(row.id)
+                        rowView(row, logs: logs)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .containerRelativeFrame(.vertical)
+                            .id(row.id)
                     }
                 }
                 .scrollTargetLayout()
-                .padding(16)
             }
-            .scrollPosition(id: $topRow, anchor: .top)
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $topRow)
+            .scrollIndicators(.hidden)
         }
     }
 
@@ -107,14 +122,9 @@ struct SessionView: View {
     private func rowView(_ row: PageRow, logs: [SetLog]) -> some View {
         switch row.kind {
         case .kit: kitCard(logs: logs)
-        case .setsTitle: Text("Sets").font(Theme.heading).padding(.top, 8)
-        case .header(let label): Text(label).sectionLabel()
-        case .set(let log, let number, let count, let previous): setCard(log, number: number, of: count, previous: previous)
-        case .strip: stripCard(logs: logs)
-        case .end:
-            Button("End session") { endSession() }
-                .buttonStyle(.bigBlack)
-                .padding(.top, 8)
+        case .set(let log, let label, let number, let count, let previous):
+            setCard(log, label: label, number: number, of: count, previous: previous)
+        case .end: endCard(logs: logs)
         }
     }
 
@@ -125,32 +135,36 @@ struct SessionView: View {
 
     // MARK: - Plate kit (SPEC 2.3 step 4)
 
+    /// The kit as one row of chips to tick off as you collect them.
     private func kitCard(logs: [SetLog]) -> some View {
         let kit = Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) })
         let unit = session.gymUnit
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Plate kit").font(Theme.heading)
-            Text("Take these from the rack. Tap each one as you collect it.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
-                Chip(isOn: barCollected, action: { barCollected.toggle() }) {
-                    Text("BAR \(WeightUnit.trimmed(kit.bar)) \(unit.rawValue.uppercased())")
-                }
-                ForEach(kit.plates, id: \.size) { item in
-                    let isOn = collected.contains(item.size)
-                    Chip(isOn: isOn, action: { toggle(item.size) }) {
-                        HStack(spacing: 6) {
-                            if let plate = Plate.find(item.size, unit) {
-                                PlateDot(plate: plate, outline: isOn ? Theme.paper : Theme.ink)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Plate kit").sectionLabel()
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Chip(isOn: barCollected, action: { barCollected.toggle() }) {
+                        Text("BAR \(WeightUnit.trimmed(kit.bar)) \(unit.rawValue.uppercased())")
+                    }
+                    .fixedSize()
+                    ForEach(kit.plates, id: \.size) { item in
+                        let isOn = collected.contains(item.size)
+                        Chip(isOn: isOn, action: { toggle(item.size) }) {
+                            HStack(spacing: 6) {
+                                if let plate = Plate.find(item.size, unit) {
+                                    PlateDot(plate: plate, outline: isOn ? Theme.paper : Theme.ink)
+                                }
+                                Text("\(item.count) × \(WeightUnit.trimmed(item.size)) \(unit.rawValue.uppercased())")
                             }
-                            Text("\(item.count) × \(WeightUnit.trimmed(item.size)) \(unit.rawValue.uppercased())")
                         }
+                        .fixedSize()
                     }
                 }
+                .padding(2)
             }
             .sensoryFeedback(.impact(weight: .light), trigger: collected)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .drawer()
     }
 
@@ -178,48 +192,41 @@ struct SessionView: View {
         return all[index - 1].perSide
     }
 
-    private func setCard(_ log: SetLog, number: Int, of count: Int, previous: [Double]) -> some View {
+    /// Text only: the bar in the room shows the plates.
+    private func setCard(_ log: SetLog, label: String, number: Int, of count: Int, previous: [Double]) -> some View {
         let change = SetChange(from: previous, to: log.perSide)
         let total = session.gymUnit.display(log.plannedTotal, in: session.prUnit(for: log.blockIndex))
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(label).sectionLabel()
             HStack(alignment: .firstTextBaseline) {
                 Text("\(log.isWarmUp ? "Round" : "Set") \(number) of \(count)")
                 Spacer()
                 Text("\(log.reps) \(log.reps == 1 ? "rep" : "reps")")
             }
-            .font(.system(size: 28, weight: .bold))
+            .font(.system(size: 26, weight: .bold))
             .minimumScaleFactor(0.6)
             .lineLimit(1)
-
-            Text("\(total) · \(log.pctText)")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            Text(change.text).font(.headline)
-
-            BarDiagram(perSide: log.perSide, unit: session.gymUnit)
-                .frame(height: 90)
-
-            Text(platesText(log.perSide)).font(.subheadline)
+            Text("\(total) · \(log.pctText)").font(.headline)
+            Text(change.text).font(.subheadline.weight(.semibold)).lineLimit(2)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .drawer()
     }
 
-    /// After the last set: everything comes off.
-    private func stripCard(logs: [SetLog]) -> some View {
+    /// After the last set: everything comes off, then End session.
+    private func endCard(logs: [SetLog]) -> some View {
         let last = logs.last?.perSide ?? []
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Done lifting").sectionLabel()
             Text(last.isEmpty ? "Put the bar back" : SetChange(from: last, to: []).text + ", then put the bar back")
                 .font(.headline)
+                .lineLimit(2)
+            Button("End session") { endSession() }
+                .buttonStyle(.bigBlack)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .drawer()
     }
 
-    private func platesText(_ perSide: [Double]) -> String {
-        if perSide.isEmpty { return "Empty bar" }
-        return perSide.map(WeightUnit.trimmed).joined(separator: " + ") + " \(session.gymUnit.rawValue) each side"
-    }
 
     /// Saves the session to history with its planned loads (SPEC 3.8).
     private func endSession() {
@@ -240,7 +247,7 @@ struct SessionView: View {
                     Text("Session done").font(Theme.heading)
                     if let duration = session.duration {
                         Text("\(Duration.seconds(duration).formatted(.time(pattern: .hourMinute))) in the box")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink)
                     }
                 }
                 .drawer()
@@ -260,7 +267,7 @@ struct SessionView: View {
                              : heaviest.perSide.map(WeightUnit.trimmed).joined(separator: " + ")
                                 + " \(session.gymUnit.rawValue) each side + \(WeightUnit.trimmed(session.barWeight)) \(session.gymUnit.rawValue) bar")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink)
                     }
                     .drawer()
                 }

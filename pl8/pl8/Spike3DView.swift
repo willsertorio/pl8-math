@@ -85,7 +85,6 @@ struct Spike3DView: View {
             }
             .disabled(outline != .sketch)
 
-            Text("Drag the bar to turn it.").font(.footnote).foregroundStyle(.secondary)
         }
         .drawer()
         .padding(16)

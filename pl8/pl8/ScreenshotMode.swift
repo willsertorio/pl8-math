@@ -6,7 +6,7 @@ import PlateKit
 /// For the automatic checks (.github/workflows/ci.yml): launched with `-pl8Shot <screen>`, the app fills an
 /// in-memory store with demo data and opens that one screen, so the Simulator can take its picture.
 /// Screens: `room-<station>` (overview, corner, nameFlag, flag, bar, pr, board, kit, setv), `firstrun-name`,
-/// `firstrun-plates`, `session`.
+/// `firstrun-plates`, `session` (the kit), `session-sets` (the first set).
 enum ScreenshotMode {
     static let shot: String? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -31,8 +31,8 @@ struct ScreenshotHost: View {
                 FirstRunView(startAt: .name) {}
             } else if shot == "firstrun-plates" {
                 FirstRunView(startAt: .plates) {}
-            } else if shot == "session", let session {
-                NavigationStack { SessionView(session: session) {} }
+            } else if shot.hasPrefix("session"), let session {
+                NavigationStack { SessionView(session: session, startOnFirstSet: shot == "session-sets") {} }
             } else {
                 Text("Unknown screen: \(shot)")
             }
@@ -64,7 +64,7 @@ struct ScreenshotHost: View {
         let workout = Workout(sourceText: text, blocks: blocks)
         context.insert(workout)
         try? context.save()
-        if shot == "session" {
+        if shot.hasPrefix("session") {
             let records = (try? context.fetch(FetchDescriptor<PersonalRecord>())) ?? []
             let plan = Planner.plan(blocks: blocks, gym: gym, records: records)
             session = Session.start(workout: workout, plan: plan, prLifts: Planner.prLifts(blocks: blocks), gym: gym, in: context)

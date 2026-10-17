@@ -100,9 +100,10 @@ struct FirstRunView: View {
 
             case .name:
                 // No field on screen: the keyboard types straight onto the flag in the room.
-                question("Where are you training now?")
                 if let gym {
-                    NameTyper(gym: gym) { step = .unit }
+                    NameTyper(gym: gym, question: "Where are you training now?") { step = .unit }
+                } else {
+                    question("Where are you training now?")
                 }
                 Button("Continue") { step = .unit }
                     .buttonStyle(.bigBlack)
@@ -148,9 +149,6 @@ struct FirstRunView: View {
 
             case .prList:
                 question("Your PRs")
-                Text("Tap a lift to enter its PR. You can change them any time in the PRs tab.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
                 PRList(editing: $editingPR)
                 Button("Continue") { onFinish() }
                     .buttonStyle(.bigBlack)
@@ -202,17 +200,18 @@ private struct UnitList: View {
 }
 
 /// The gym's name, typed with no field on screen: it shows on the flag. The field keeps its own focus (focus
-/// doesn't carry into a sheet from the view that presents it) and asks for the keyboard once the sheet is up.
+/// doesn't carry into a sheet from the view that presents it). It asks for the keyboard at once, and again as the
+/// sheet settles in case it wasn't ready; tapping the question brings the keyboard back.
 private struct NameTyper: View {
     @Bindable var gym: Gym
+    let question: String
     var onSubmit: () -> Void
     @FocusState private var focused: Bool
 
     var body: some View {
-        // Tapping the hint brings the keyboard back if it was put away.
-        Text("Type your box's name — it goes on the flag. Up to \(GymSetup.maxNameLength) letters.")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+        Text(question)
+            .font(Theme.heading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { focused = true }
             .background(alignment: .topLeading) { field }
@@ -229,9 +228,12 @@ private struct NameTyper: View {
             .frame(width: 2, height: 2)
             .opacity(0.02)
             .accessibilityLabel("Box name")
+            .onAppear { focused = true }
             .task {
-                try? await Task.sleep(for: .milliseconds(500))           // after the sheet's slide-up
-                focused = true
+                for delay in [150, 400] {
+                    try? await Task.sleep(for: .milliseconds(delay))
+                    if !focused { focused = true }
+                }
             }
     }
 }

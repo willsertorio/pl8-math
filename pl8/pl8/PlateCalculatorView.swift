@@ -197,7 +197,7 @@ struct PlateCalculatorView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(blockTitle(block)).font(.headline)
                     if let note = block.note {
-                        Text(note).font(.footnote).foregroundStyle(.secondary)
+                        Text(note).font(.footnote).foregroundStyle(Theme.ink)
                     }
                     if block.pctMissing {
                         HStack {
@@ -215,7 +215,7 @@ struct PlateCalculatorView: View {
                     } else {
                         Text(block.sets.compactMap { $0.target?.text }.joined(separator: ", "))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink)
                     }
                 }
                 .padding(.vertical, 2)
@@ -395,7 +395,7 @@ struct SetRow: View {
             }
             Text("\(detail) · \(plates)")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.ink)
             Text(change).font(.footnote)
             if let warning {
                 Text(warning).font(.footnote).foregroundStyle(.orange)

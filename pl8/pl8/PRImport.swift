@@ -36,7 +36,7 @@ struct PRScreenshotPicker<Label: View>: View {
                 }
             }
             if let message {
-                Text(message).font(.footnote).foregroundStyle(.secondary)
+                Text(message).font(.footnote.weight(.semibold))
             }
             if let readText {
                 DisclosureGroup("Show the text it read") {
@@ -106,7 +106,7 @@ struct PRScreenshotPicker<Label: View>: View {
         }
         try? context.save()
         waitingForUnit = []
-        message = "Saved \(entries.count) PR\(entries.count == 1 ? "" : "s")."
+        message = nil
         savedCount += 1
         onDone(entries.count)
     }

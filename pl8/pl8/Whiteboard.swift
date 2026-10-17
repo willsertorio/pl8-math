@@ -10,7 +10,7 @@ struct Whiteboard: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(Theme.heading)
             if blocks.isEmpty {
-                Text("No strength work.").foregroundStyle(.secondary)
+                Text("No strength work.").foregroundStyle(Theme.ink)
             }
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 VStack(alignment: .leading, spacing: 3) {
@@ -24,10 +24,10 @@ struct Whiteboard: View {
                     } else {
                         Text("\(sets(block)) · \(percents(block))")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink)
                     }
                     if let note = block.note {
-                        Text(note).font(.footnote).foregroundStyle(.secondary)
+                        Text(note).font(.footnote).foregroundStyle(Theme.ink)
                     }
                 }
             }

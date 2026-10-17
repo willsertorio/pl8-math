@@ -51,3 +51,21 @@ struct SessionSceneTests {
         #expect(shadow.allSatisfy { piece in piece.mesh.positions.allSatisfy { $0.y < 0.01 } })
     }
 }
+
+@Suite("Session camera shots (Will, 2026-10-17: room on 80% of the screen, closer)")
+struct SessionShotTests {
+    @Test func kitFloorShotLooksAtTheKitFromCloser() throws {
+        let shot = try #require(RoomLayout.shots[.kitFloor])
+        let kit = RoomLayout.objects[.kitPlates]!.position
+        #expect(SIMD2(shot.target.x - kit.x, shot.target.z - kit.z).length < 0.01)
+        #expect((shot.position - shot.target).length < (RoomLayout.shots[.kit]!.position - RoomLayout.shots[.kit]!.target).length)
+    }
+
+    @Test func sleeveShotFramesOneSideOfTheBar() throws {
+        let shot = try #require(RoomLayout.shots[.sleeve])
+        let bar = RoomLayout.barOnRack
+        #expect(shot.target.x > bar.x + 0.7 && shot.target.x < bar.x + 1.1)       // the right sleeve
+        #expect(abs(shot.target.z - bar.z) < 0.01)
+        #expect((shot.position - shot.target).length < 2)                           // close up
+    }
+}

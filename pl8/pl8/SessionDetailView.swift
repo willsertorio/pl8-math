@@ -41,16 +41,16 @@ struct SessionDetailView: View {
                                 if log.reportedTotal != nil, log.reportedTotal != log.plannedTotal {
                                     Text("planned \(WeightUnit.trimmed(log.plannedTotal))")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Theme.ink)
                                 }
                                 Spacer()
-                                Text(log.pctText).foregroundStyle(.secondary)
+                                Text(log.pctText).foregroundStyle(Theme.ink)
                             }
                             Text(log.perSide.isEmpty
                                  ? "Empty bar"
                                  : log.perSide.map(WeightUnit.trimmed).joined(separator: " + ") + " each side")
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.ink)
                         }
                     }
                 }

@@ -88,6 +88,9 @@ public enum RoomLayout {
     /// Camera shots (SPEC 2.1 stations).
     public enum Station: String, CaseIterable, Sendable {
         case overview, corner, nameFlag, flag, bar, pr, board, kit, setv
+        /// During a session, with the room on most of the screen: the kit's plates from closer, and one sleeve of the
+        /// bar on the rack, close enough to see each plate.
+        case kitFloor, sleeve
     }
 
     public struct Shot: Equatable, Sendable {
@@ -127,6 +130,17 @@ public enum RoomLayout {
         // Three-quarter view from the bar's end, close enough to see the sleeve.
         let bar = barOnRack
         shots[.bar] = Shot(target: SIMD3(bar.x + 0.55, 1.22, bar.z), position: SIMD3(bar.x + 2.25, 1.9, bar.z + 2.35), fieldOfView: 50)
+        // The kit from the same side as the kit shot, 4.2 m away and 55° up, aimed at the plates.
+        let kitSpot = objects[.kitPlates]!.position, kitShot = shots[.kit]!
+        let away = SIMD2(kitShot.target.x - kitShot.position.x, kitShot.target.z - kitShot.position.z)
+        let unit = away / (away.x * away.x + away.y * away.y).squareRoot()
+        let reach: Float = 4.2, up: Float = 55 * Float.pi / 180
+        let flat = reach * Float(sinApprox(Double(Float.pi / 2 - up))), height = reach * Float(sinApprox(Double(up)))
+        let kitTarget = SIMD3<Float>(kitSpot.x, 0.1, kitSpot.z)
+        shots[.kitFloor] = Shot(target: kitTarget, position: kitTarget + SIMD3(-unit.x * flat, height, -unit.y * flat), fieldOfView: 50)
+        // The right sleeve, from in front and to the right.
+        let sleeve = SIMD3<Float>(bar.x + 0.9, bar.y - 0.06, bar.z)
+        shots[.sleeve] = Shot(target: sleeve, position: sleeve + SIMD3(0.75, 0.35, 1.35), fieldOfView: 50)
         return shots
     }()
 }

@@ -124,7 +124,6 @@ struct GymNameField: View {
             .textFieldStyle(OutlineFieldStyle())
             .textInputAutocapitalization(.characters)
             .autocorrectionDisabled()
-            Text("Up to \(GymSetup.maxNameLength) letters.").font(.footnote).foregroundStyle(.secondary)
         }
     }
 }

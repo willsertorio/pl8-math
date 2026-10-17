@@ -33,9 +33,8 @@ struct ReadyToLiftSheet: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("What % for \(block.letter) · \(block.name)?").font(.headline)
                             if let rpe = block.rpe, let suggested = block.suggestedTarget {
-                                Text("The board says RPE \(WeightUnit.trimmed(rpe))/10, so \(suggested.text) of your \(block.prLift) PR is suggested. Change it if it feels off.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                Text("RPE \(WeightUnit.trimmed(rpe))/10 → \(suggested.text)")
+                                    .font(.subheadline.weight(.semibold))
                             }
                             HStack(spacing: 8) {
                                 TextField("83-85, 80 or 80+", text: percentBinding(index, block: block))
@@ -168,7 +167,7 @@ struct EditWorkoutView: View {
                     Section("\(block.letter) · \(block.name)") {
                         Text("\(block.sets.count) × \(block.sets.first?.reps ?? 0) · " +
                              (block.pctMissing ? "% missing" : block.sets.compactMap { $0.target?.text }.joined(separator: ", ")))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.ink)
                         HStack {
                             TextField("New %: 75-78, 80 or 80+", text: Binding(
                                 get: { percents[index] ?? "" },
