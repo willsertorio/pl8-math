@@ -31,7 +31,11 @@ struct SessionView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             if session.endedAt != nil {
-                finishedView
+                if let heaviest = session.heaviestLog {
+                    SessionOverView(perSide: heaviest.perSide, unit: session.gymUnit, barWeight: session.barWeight) { onFinish() }
+                } else {
+                    finishedView
+                }
             } else {
                 sessionPage
             }
@@ -99,6 +103,15 @@ struct SessionView: View {
                     .sensoryFeedback(.selection, trigger: jumps)
                 }
                 .containerRelativeFrame(.vertical) { length, _ in length * 0.8 }
+                // Swipe up or down anywhere on the room for the next or the card before, like on the cards.
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 24).onEnded { value in
+                    let dy = value.translation.height
+                    guard abs(dy) > 40, abs(dy) > abs(value.translation.width),
+                          let index = rows.firstIndex(where: { $0.id == top.id }) else { return }
+                    let next = min(rows.count - 1, max(0, index + (dy < 0 ? 1 : -1)))
+                    if next != index { jump(to: rows[next].id) }
+                })
 
             ScrollView {
                 LazyVStack(spacing: 0) {

@@ -46,52 +46,56 @@ struct TrainView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if let today {
-                        Whiteboard(blocks: today.blocks, title: "Today")
-                        if let session = unfinishedSession(of: today) {
-                            Button("Resume session") { activeSession = session }
-                                .buttonStyle(.bigBlack)
-                        } else {
-                            Button("Start training") { sheet = .ready(today) }
-                                .buttonStyle(.bigBlack)
-                        }
-                        Button("Add a different workout") { sheet = .add }
-                            .buttonStyle(.black)
-                    } else {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Today").font(Theme.heading)
-                            Button("Add today's workout") { sheet = .add }
-                                .buttonStyle(.bigBlack)
-                        }
-                        .drawer()
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        NavigationLink("Test screen") { PlateCalculatorView() }
-                        NavigationLink("3D test (M5)") { Spike3DView() }
-                        NavigationLink("3D room (M6)") { Room3DView() }
-                        Button("Replay the first run") { confirmReplay = true }
-                            .confirmationDialog("Replay the first run?", isPresented: $confirmReplay, titleVisibility: .visible) {
-                                Button("Erase everything and replay", role: .destructive) {
-                                    // A clean start: no gym, PRs, workouts or history left from before.
-                                    DataCleanup.eraseEverything(in: context)
-                                    didSeedDefaults = false
-                                    hasFinishedFirstRun = false
-                                }
-                            } message: {
-                                Text("Your gym, PRs, workouts and history are deleted.")
+            VStack(spacing: 0) {
+                RoomHeader(station: .board)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        if let today {
+                            Whiteboard(blocks: today.blocks, title: "Today")
+                            if let session = unfinishedSession(of: today) {
+                                Button("Resume session") { activeSession = session }
+                                    .buttonStyle(.bigBlack)
+                            } else {
+                                Button("Start training") { sheet = .ready(today) }
+                                    .buttonStyle(.bigBlack)
                             }
+                            Button("Add a different workout") { sheet = .add }
+                                .buttonStyle(.black)
+                        } else {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Today").font(Theme.heading)
+                                Button("Add today's workout") { sheet = .add }
+                                    .buttonStyle(.bigBlack)
+                            }
+                            .drawer()
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            NavigationLink("Test screen") { PlateCalculatorView() }
+                            NavigationLink("3D test (M5)") { Spike3DView() }
+                            NavigationLink("3D room (M6)") { Room3DView() }
+                            Button("Replay the first run") { confirmReplay = true }
+                                .confirmationDialog("Replay the first run?", isPresented: $confirmReplay, titleVisibility: .visible) {
+                                    Button("Erase everything and replay", role: .destructive) {
+                                        // A clean start: no gym, PRs, workouts or history left from before.
+                                        DataCleanup.eraseEverything(in: context)
+                                        didSeedDefaults = false
+                                        hasFinishedFirstRun = false
+                                    }
+                                } message: {
+                                    Text("Your gym, PRs, workouts and history are deleted.")
+                                }
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .tint(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .tint(Theme.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
                 }
-                .padding(16)
             }
             .background(Theme.background)
             .navigationTitle("Train")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $activeSession) { session in
                 SessionView(session: session) { activeSession = nil }
             }

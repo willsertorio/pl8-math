@@ -6,7 +6,8 @@ import PlateKit
 /// For the automatic checks (.github/workflows/ci.yml): launched with `-pl8Shot <screen>`, the app fills an
 /// in-memory store with demo data and opens that one screen, so the Simulator can take its picture.
 /// Screens: `room-<station>` (overview, corner, nameFlag, flag, bar, pr, board, kit, setv), `firstrun-name`,
-/// `firstrun-plates`, `session` (the kit), `session-sets` (the first set).
+/// `firstrun-plates`, `session` (the kit), `session-sets` (the first set), `opening-title`, `opening-box` (the closed
+/// box), `session-over` (the scale), `tab-<train|prs|gym|history>`.
 enum ScreenshotMode {
     static let shot: String? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -27,6 +28,14 @@ struct ScreenshotHost: View {
                 Theme.background.ignoresSafeArea()
             } else if shot.hasPrefix("room-"), let station = RoomLayout.Station(rawValue: String(shot.dropFirst(5))) {
                 NavigationStack { Room3DView(station: station) }
+            } else if shot == "opening-title" {
+                FirstRunView(startAt: .opening) {}
+            } else if shot == "opening-box" {
+                FirstRunView(startAt: .opening, openingAt: .closed) {}
+            } else if shot.hasPrefix("tab-"), let tab = HomeTabs.Tab(rawValue: String(shot.dropFirst(4))) {
+                HomeTabs(selection: tab)
+            } else if shot == "session-over" {
+                SessionOverView(perSide: [25, 20, 2.5], unit: .kg, barWeight: 20) {}
             } else if shot == "firstrun-name" {
                 FirstRunView(startAt: .name) {}
             } else if shot == "firstrun-plates" {

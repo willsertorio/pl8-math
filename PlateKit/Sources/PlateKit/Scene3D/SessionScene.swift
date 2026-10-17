@@ -9,6 +9,13 @@ public enum SessionScene {
         public let axis: LowPolyMesh.Axis
         /// How far it's turned round its hole (where its printing ends up), radians.
         public let turn: Float
+
+        public init(plate: Plate, centre: SIMD3<Float>, axis: LowPolyMesh.Axis, turn: Float) {
+            self.plate = plate
+            self.centre = centre
+            self.axis = axis
+            self.turn = turn
+        }
     }
 
     /// The kit on the floor, as the prototype lays it out: one group per plate size, lightest first, side by side

@@ -9,40 +9,41 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if sessions.isEmpty {
-                    ContentUnavailableView(
-                        "No sessions yet",
-                        systemImage: "clock",
-                        description: Text("Finished sessions show up here.")
-                    )
-                } else {
-                    List {
-                        ForEach(sessions) { session in
-                            NavigationLink {
-                                SessionDetailView(session: session)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.headline)
-                                    Text(summary(session))
-                                        .font(.subheadline)
-                                        .foregroundStyle(Theme.ink)
+            VStack(spacing: 0) {
+                RoomHeader(station: .overview)
+                Group {
+                    if sessions.isEmpty {
+                        ContentUnavailableView("No sessions yet", systemImage: "clock")
+                    } else {
+                        List {
+                            ForEach(sessions) { session in
+                                NavigationLink {
+                                    SessionDetailView(session: session)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(session.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                            .font(.headline)
+                                        Text(summary(session))
+                                            .font(.subheadline)
+                                            .foregroundStyle(Theme.ink)
+                                    }
                                 }
+                                .listRowBackground(Theme.paper)
                             }
-                            .listRowBackground(Theme.paper)
+                            .onDelete { offsets in
+                                for index in offsets { context.delete(sessions[index]) }
+                                try? context.save()
+                            }
                         }
-                        .onDelete { offsets in
-                            for index in offsets { context.delete(sessions[index]) }
-                            try? context.save()
-                        }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                 }
+                .frame(maxHeight: .infinity)
             }
             .background(Theme.background)
             .navigationTitle("History")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 

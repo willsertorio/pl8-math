@@ -8,16 +8,20 @@ struct PRsView: View {
 
     var body: some View {
         NavigationStack {
-            PRList(editing: $editing)
-                .background(Theme.background)
-                .navigationTitle("PRs")
-                .toolbar {
-                    Button {
-                        editing = PRTarget(lift: nil, record: nil)
-                    } label: {
-                        Label("Add PR", systemImage: "plus")
-                    }
+            VStack(spacing: 0) {
+                RoomHeader(station: .pr)
+                PRList(editing: $editing)
+            }
+            .background(Theme.background)
+            .navigationTitle("PRs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                Button {
+                    editing = PRTarget(lift: nil, record: nil)
+                } label: {
+                    Label("Add PR", systemImage: "plus")
                 }
+            }
         }
     }
 }

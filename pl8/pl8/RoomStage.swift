@@ -6,6 +6,7 @@ import PlateKit
 /// The 3D box as a stage behind the app's screens (SPEC 2.1): it flies to `station`, and the props the gym
 /// setup changes follow the gym live — the flag shows the name, the shelf the unit's pegs with the gym's piles
 /// popping on and off, the rack the gym's bar (SPEC 2.2). With `interactive`, drag to go round and pinch to zoom.
+/// With `opening`, it plays the first run's opening (SPEC 2.2 step 0).
 struct RoomStage: View {
     var station: RoomLayout.Station
     var gymName: String
@@ -16,8 +17,11 @@ struct RoomStage: View {
     /// During a session: the kit on the floor and the set's plates on the bar.
     var session: SessionProps?
     var interactive = false
+    var opening: OpeningPhase?
 
     @State private var orbit: Orbit
+    /// The closed box's own move during the opening (pop, turn, float), round the room's centre.
+    @State private var box = matrix_identity_float4x4
     @State private var dragStart: Orbit?
     @State private var pinchStart: Orbit?
     @State private var flight: Task<Void, Never>?
@@ -25,7 +29,8 @@ struct RoomStage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(station: RoomLayout.Station, gymName: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double,
-         boards: Boards = Boards(), session: SessionProps? = nil, interactive: Bool = false) {
+         boards: Boards = Boards(), session: SessionProps? = nil, interactive: Bool = false, opening: OpeningPhase? = nil) {
+        self.opening = opening
         self.boards = boards
         self.session = session
         self.station = station
@@ -39,28 +44,76 @@ struct RoomStage: View {
 
     var body: some View {
         RealityView { content in
-            // The rest of the room is baked once, off the main thread; the setup's props are built here.
-            let except = SetupProps.objects
-            let pieces = await Task.detached(priority: .userInitiated) {
-                SceneBake.pieces(plates: [], gymName: "", except: except)
-            }.value
-            let entities = RoomScene.entities(pieces: pieces)
+            // The rest of the room is baked once for the whole app, off the main thread; the setup's props are built here.
+            let entities = await RoomTemplate.entities()
             for entity in entities { content.add(entity) }
             if let world = entities.first(where: { $0.name == RoomScene.worldName }) {
                 props.attach(to: world)
                 props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, boards: boards, animate: false)
                 props.syncSession(session, animate: !reduceMotion)
+                props.syncOpening(opening)
             }
-            RoomScene.show(orbit, in: content.entities)
+            RoomScene.show(orbit, box: box, in: content.entities)
         } update: { content in
             props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, boards: boards, animate: !reduceMotion)
             props.syncSession(session, animate: !reduceMotion)
-            RoomScene.show(orbit, in: content.entities)
+            props.syncOpening(opening)
+            RoomScene.show(orbit, box: box, in: content.entities)
         }
         .background(Theme.background)
         .gesture(gestures, including: interactive ? .all : .subviews)
         .onChange(of: station) { _, item in fly(to: item) }
         .onDisappear { flight?.cancel() }
+        .task(id: opening) { await play(opening) }
+    }
+
+    // MARK: - Opening (SPEC 2.2 step 0, prototype runOnb)
+
+    /// Plays one part of the opening: the closed box popping in and floating, the box opening, or the furniture
+    /// arriving. The camera's flights come from `station` as usual.
+    private func play(_ phase: OpeningPhase?) async {
+        props.syncOpening(phase)
+        let centre = RoomLayout.room.centre
+        func pose(scale: Float, spin: Float, lift: Float) -> simd_float4x4 {
+            Transform(scale: SIMD3(repeating: scale), rotation: simd_quatf(angle: spin, axis: [0, 1, 0]),
+                      translation: centre + [0, lift, 0]).matrix * Transform(translation: -centre).matrix
+        }
+        let start = ContinuousClock.now
+        func elapsed() -> Float { Float((ContinuousClock.now - start) / .seconds(1)) }
+        switch phase {
+        case .title:
+            box = pose(scale: 0.0001, spin: props.spin, lift: 0.55)
+        case .closed:
+            // It pops in and turns slowly in the sky, floating, until the tap.
+            while !Task.isCancelled {
+                let t = elapsed()
+                props.spin = 0.45 + t * 0.1
+                box = pose(scale: reduceMotion ? 1 : Opening.popScale(at: t), spin: props.spin, lift: 0.55 + Opening.bob(at: t))
+                try? await Task.sleep(for: .milliseconds(8))
+            }
+        case .opening:
+            // It turns back to face us the short way while the lid floats off and the walls glide down.
+            let s0 = props.spin, s1 = (s0 / (2 * .pi)).rounded() * 2 * .pi
+            while !Task.isCancelled {
+                let t = reduceMotion ? Opening.duration : elapsed()
+                let p = Opening.pose(at: t)
+                props.poseBox(p)
+                props.spin = s0 + (s1 - s0) * p.turn
+                box = pose(scale: 1, spin: props.spin, lift: p.lift + Opening.bob(at: t) * p.settle)
+                if t >= Opening.duration { break }
+                try? await Task.sleep(for: .milliseconds(8))
+            }
+        case .furnishing:
+            box = matrix_identity_float4x4
+            while !Task.isCancelled {
+                let t = reduceMotion ? Opening.furnishTime : elapsed()
+                props.furnish(at: t)
+                if t >= Opening.furnishTime { break }
+                try? await Task.sleep(for: .milliseconds(8))
+            }
+        case .done, nil:
+            box = matrix_identity_float4x4
+        }
     }
 
     private var gestures: some Gesture {
@@ -90,7 +143,8 @@ struct RoomStage: View {
             orbit = destination
             return
         }
-        let path = Flight(from: orbit, to: destination, duration: Flight.duration(to: item))
+        // The opening drifts in to the overview a little slower, like the prototype (2.1 s).
+        let path = Flight(from: orbit, to: destination, duration: opening == .opening ? 2.1 : Flight.duration(to: item))
         flight = Task { @MainActor in
             let start = ContinuousClock.now
             while !Task.isCancelled {
@@ -108,9 +162,16 @@ struct RoomStage: View {
 /// what's written on the PR board and the whiteboard.
 @MainActor
 final class SetupProps {
-    nonisolated static let objects: Set<RoomLayout.Object> = [.flag, .rack, .shelf, .prBoard, .board]
+    nonisolated static let objects: Set<RoomLayout.Object> = [.flag, .rack, .shelf, .prBoard, .board, .bench]
 
-    private let flag = Entity(), rack = Entity(), shelf = Entity(), prBoard = Entity(), board = Entity()
+    private let flag = Entity(), rack = Entity(), shelf = Entity(), prBoard = Entity(), board = Entity(), bench = Entity()
+    /// The closed box's sides and lid, while the opening plays.
+    private let closedBox = Entity()
+    private var slabs: [(side: Opening.Side, entity: Entity)] = []
+    private let lid = Entity()
+    /// The box's turn during the opening.
+    var spin: Float = 0.45
+    private var openingPhase: OpeningPhase?
     private var boards: Boards?
     private let kitFloor = Entity(), barPlates = Entity()
     private var kit: Kit?
@@ -122,7 +183,12 @@ final class SetupProps {
     private var attached = false
 
     func attach(to world: Entity) {
-        for group in [flag, rack, shelf, prBoard, board, kitFloor, barPlates] { world.addChild(group) }
+        for group in [flag, rack, shelf, prBoard, board, bench, kitFloor, barPlates, closedBox] { world.addChild(group) }
+        // The board and the bench sit round their spots, so the opening can roll and toss them in.
+        for (group, object) in [(board, RoomLayout.Object.board), (bench, .bench)] {
+            group.position = PropModels.placement(for: object).position
+        }
+        rebuild(bench, Self.bakedAround(.bench, PropModels.parts(for: .bench, plates: [])))
         // Physics for the kit drop, in the room's own space (the room moves for the camera): gravity, and the
         // floor as a solid slab with the prototype's rubber (friction 0.55, a little bounce).
         var simulation = PhysicsSimulationComponent()
@@ -146,8 +212,7 @@ final class SetupProps {
                                             placement: PropModels.placement(for: .prBoard), wall: nil))
         }
         if boards.workout != self.boards?.workout {
-            rebuild(board, SceneBake.bake(PropModels.parts(for: .board, plates: [], boards: boards),
-                                          placement: PropModels.placement(for: .board), wall: nil))
+            rebuild(board, Self.bakedAround(.board, PropModels.parts(for: .board, plates: [], boards: boards)))
         }
         self.boards = boards
         if name != self.name {
@@ -191,6 +256,72 @@ final class SetupProps {
             } else if !wanted.contains(plate.size), let pile = piles.removeValue(forKey: plate.size) {
                 if animate { pop(pile, in: false, delay: 0) } else { pile.removeFromParent() }
             }
+        }
+    }
+
+    /// A prop baked in its place in the room, then moved so its group can sit at the spot and turn round it.
+    private static func bakedAround(_ object: RoomLayout.Object, _ parts: [PropPart]) -> [BakedPiece] {
+        let placement = PropModels.placement(for: object)
+        return SceneBake.bake(parts, placement: placement, wall: nil).map { $0.translated(by: -placement.position) }
+    }
+
+    // MARK: - Opening (SPEC 2.2 step 0)
+
+    /// Before and while the box opens: its sides and lid are up, the board and the bench not in yet. Once the
+    /// furniture is in, everything is as usual.
+    func syncOpening(_ phase: OpeningPhase?) {
+        guard attached, phase != openingPhase else { return }
+        openingPhase = phase
+        let closed = phase == .title || phase == .closed || phase == .opening
+        if closed && slabs.isEmpty {
+            for slab in Opening.slabs() {
+                let entity = Entity()
+                entity.position = slab.position
+                for child in Diorama.entities(for: SceneBake.bake(slab.parts, placement: .init(position: .zero, rotationDegrees: 0), wall: nil)
+                    .map { $0.translated(by: -slab.position) }) {
+                    entity.addChild(child)
+                }
+                closedBox.addChild(entity)
+                slabs.append((slab.side, entity))
+            }
+            lid.position = RoomLayout.room.centre + [0, Opening.lidHeight, 0]
+            for child in Diorama.entities(for: SceneBake.bake(Opening.lid(), placement: .init(position: .zero, rotationDegrees: 0), wall: nil)) {
+                lid.addChild(child)
+            }
+            closedBox.addChild(lid)
+            poseBox(Opening.pose(at: 0))
+        }
+        if !closed {
+            for child in Array(closedBox.children) { child.removeFromParent() }
+            slabs = []
+        }
+        let furnished = phase == nil || phase == .done
+        board.isEnabled = furnished || phase == .furnishing
+        bench.isEnabled = board.isEnabled
+        if furnished { furnish(at: Opening.furnishTime) }
+        if phase == .furnishing { furnish(at: 0) }
+    }
+
+    /// The sides at their height and the lid where it has floated to.
+    func poseBox(_ pose: Opening.Pose) {
+        for slab in slabs {
+            let height = Opening.slabHeight(slab.side, walls: pose.walls)
+            slab.entity.scale = [1, max(0.0001, height / Opening.cubeHeight), 1]
+            slab.entity.isEnabled = height > 0.01
+        }
+        lid.position = RoomLayout.room.centre + [0, Opening.lidHeight + pose.lidUp, 0]
+        lid.orientation = simd_quatf(angle: pose.lidTilt, axis: [0, 0, 1])
+        lid.isEnabled = pose.lidUp < 30
+    }
+
+    /// The whiteboard rolling in and the bench landing, `time` seconds after the box opened.
+    func furnish(at time: Float) {
+        for (group, object, move) in [(board, RoomLayout.Object.board, Opening.board(at: time)), (bench, .bench, Opening.bench(at: time))] {
+            let placement = PropModels.placement(for: object)
+            group.isEnabled = move.visible
+            group.position = placement.position + move.offset
+            group.orientation = simd_quatf(angle: move.turn, axis: [0, 1, 0]) * simd_quatf(angle: move.wobble.x, axis: [1, 0, 0])
+                * simd_quatf(angle: move.wobble.y, axis: [0, 0, 1])
         }
     }
 
@@ -400,4 +531,42 @@ struct SessionProps: Equatable {
     var barWeight: Double
     /// The plates on the bar now (the set in view); empty for an empty bar.
     var perSide: [Double]
+}
+
+/// Where the first run's opening is (SPEC 2.2 step 0): the title over the sky, the closed box waiting for a tap,
+/// the box opening, the furniture coming in, then the gym setup.
+enum OpeningPhase: Equatable {
+    case title, closed, opening, furnishing, done
+}
+
+/// The static room, baked once for the whole app (it's the slow part) and copied for each stage: the copies share
+/// their meshes and textures.
+@MainActor
+enum RoomTemplate {
+    private static var world: Task<Entity, Never>?
+
+    /// Starts the bake early, e.g. at launch.
+    static func warmUp() { _ = template() }
+
+    private static func template() -> Task<Entity, Never> {
+        if let world { return world }
+        let task = Task { @MainActor in
+            let except = SetupProps.objects
+            let pieces = await Task.detached(priority: .userInitiated) {
+                SceneBake.pieces(plates: [], gymName: "", except: except)
+            }.value
+            return RoomScene.entities(pieces: pieces)[0]
+        }
+        world = task
+        return task
+    }
+
+    /// A fresh world and camera for one stage.
+    static func entities() async -> [Entity] {
+        let world = await template().value.clone(recursive: true)
+        let camera = PerspectiveCamera()
+        camera.name = RoomScene.cameraName
+        camera.camera.fieldOfViewInDegrees = 50
+        return [world, camera]
+    }
 }

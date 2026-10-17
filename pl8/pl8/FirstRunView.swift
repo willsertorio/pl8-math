@@ -16,9 +16,14 @@ struct FirstRunView: View {
     @Query private var records: [PersonalRecord]
     @State private var step: Step
 
-    init(startAt step: Step = .opening, onFinish: @escaping () -> Void) {
+    /// Where the opening is, while `step` is `.opening`.
+    @State private var opening: OpeningPhase
+
+    /// - Parameter openingAt: where the opening starts (the CI's screenshots of the closed box).
+    init(startAt step: Step = .opening, openingAt: OpeningPhase = .title, onFinish: @escaping () -> Void) {
         self.onFinish = onFinish
         _step = State(initialValue: step)
+        _opening = State(initialValue: step == .opening ? openingAt : .done)
     }
     /// The sheet's height, measured from its content, so the room gets the rest of the screen.
     @State private var sheetHeight: CGFloat = 320
@@ -39,7 +44,7 @@ struct FirstRunView: View {
     /// Where each question looks in the room (SPEC 2.1, 2.2).
     private var station: RoomLayout.Station {
         switch step {
-        case .opening: .overview
+        case .opening: opening == .title || opening == .closed ? .far : .overview
         case .name: .nameFlag
         case .unit, .plates: .corner
         case .bar: .bar
@@ -51,32 +56,27 @@ struct FirstRunView: View {
         ZStack(alignment: .top) {
             Theme.background.ignoresSafeArea()
 
-            if step == .opening {
-                VStack(spacing: 24) {
-                    Text("pl8(math)")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                    Text("Tap to start").font(.headline).foregroundStyle(Theme.ink)
-                }
-                .padding(.top, 60)
-                .padding(.horizontal, 16)
-            } else {
-                // The sheet is only as tall as its question; the room fills the rest, a little behind the sheet's
-                // rounded top.
-                GeometryReader { geometry in
-                    RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
-                              plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
-                              boards: Boards(prs: Planner.boardRows(records)))
-                        .frame(height: max(200, geometry.size.height - keyboardHeight - visibleSheet(of: geometry.size.height) + 24))
-                }
-                .ignoresSafeArea()
+            // The sheet is only as tall as its question; the room fills the rest, a little behind the sheet's
+            // rounded top. During the opening it has the whole screen.
+            GeometryReader { geometry in
+                RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
+                          plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
+                          boards: Boards(prs: Planner.boardRows(records)), opening: step == .opening ? opening : nil)
+                    .frame(height: step == .opening
+                           ? geometry.size.height
+                           : max(200, geometry.size.height - keyboardHeight - visibleSheet(of: geometry.size.height) + 24))
+            }
+            .ignoresSafeArea()
+
+            if step == .opening && opening == .title {
+                OpeningTitle()
+                    .transition(.opacity.animation(.easeOut(duration: 0.55)))
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture {
-            if step == .opening { step = .name }
-        }
+        .onTapGesture { tapDuringOpening() }
         .sensoryFeedback(.impact(weight: .light), trigger: step)
+        .sensoryFeedback(.impact(weight: .light), trigger: opening) { _, new in new == .closed || new == .opening }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
             guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
             withAnimation(.snappy) { keyboardHeight = max(0, UIScreen.main.bounds.height - frame.minY) }
@@ -166,6 +166,26 @@ struct FirstRunView: View {
         .animation(.snappy, value: step)
     }
 
+    /// Title → tap → the closed box → tap → it opens, the furniture comes in, and the setup starts (SPEC 2.2 step 0).
+    private func tapDuringOpening() {
+        guard step == .opening else { return }
+        switch opening {
+        case .title:
+            withAnimation { opening = .closed }
+        case .closed:
+            opening = .opening
+            Task {
+                try? await Task.sleep(for: .seconds(2.1))              // the box opens while the camera drifts in
+                opening = .furnishing
+                try? await Task.sleep(for: .seconds(Double(Opening.furnishTime)))
+                opening = .done
+                step = .name
+            }
+        case .opening, .furnishing, .done:
+            break
+        }
+    }
+
     private func question(_ text: String) -> some View {
         Text(text).font(Theme.heading)
     }
@@ -235,5 +255,60 @@ private struct NameTyper: View {
                     if !focused { focused = true }
                 }
             }
+    }
+}
+
+/// The opening's title (prototype AnimLayer 'open'): "pl8(math)" in cream over the orange, with plates drifting
+/// up behind it, slowly turning. Tap anywhere to go on.
+private struct OpeningTitle: View {
+    private struct Drifter {
+        let plate: Plate
+        let x: Double, speed: Double, phase: Double, spin: Double, size: Double
+    }
+
+    private let drifters: [Drifter] = {
+        var seed: UInt64 = 7
+        func random() -> Double {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            return Double(seed >> 33) / Double(1 << 31)
+        }
+        let plates = Plate.catalog(.kg)
+        return (0..<24).map { i in
+            Drifter(plate: plates[i % plates.count], x: random(), speed: 0.035 + random() * 0.04, phase: random(),
+                    spin: 0.3 + random() * 0.9, size: 0.6 + random() * 0.6)
+        }
+    }()
+
+    private let ink = Color(Diorama.uiColor(Look.boxDark)), cream = Color(Diorama.uiColor(Look.boxLight))
+
+    var body: some View {
+        ZStack {
+            Theme.background
+            TimelineView(.animation) { timeline in
+                Canvas { context, size in
+                    let t = timeline.date.timeIntervalSinceReferenceDate
+                    for d in drifters {
+                        let travel = (d.phase + t * d.speed).truncatingRemainder(dividingBy: 1)
+                        let diameter = size.width * 0.32 * d.plate.diameter / 0.45 * d.size
+                        let y = size.height + diameter - travel * (size.height + diameter * 2)
+                        let x = d.x * size.width + sin(t * 0.4 + d.phase * 6) * 18
+                        let squash = max(0.12, abs(cos(t * d.spin + d.phase * 6)))
+                        let rect = CGRect(x: x - diameter * squash / 2, y: y - diameter / 2, width: diameter * squash, height: diameter)
+                        context.fill(Path(ellipseIn: rect), with: .color(Color(hex: d.plate.colorHex)))
+                        context.stroke(Path(ellipseIn: rect), with: .color(ink), lineWidth: 2)
+                        let hub = rect.insetBy(dx: rect.width * 0.4, dy: rect.height * 0.4)
+                        context.fill(Path(ellipseIn: hub), with: .color(cream))
+                    }
+                }
+            }
+            Text("pl8(math)")
+                .font(.system(size: 54, weight: .black))
+                .tracking(4)
+                .foregroundStyle(cream)
+        }
+        .ignoresSafeArea()
+        .accessibilityElement()
+        .accessibilityLabel("pl8(math). Tap to start")
+        .accessibilityAddTraits(.isButton)
     }
 }

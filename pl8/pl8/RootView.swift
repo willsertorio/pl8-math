@@ -13,30 +13,17 @@ struct RootView: View {
     var body: some View {
         Group {
             if hasFinishedFirstRun {
-                tabs
+                HomeTabs()
             } else {
                 FirstRunView { hasFinishedFirstRun = true }
             }
         }
         .onChange(of: hasFinishedFirstRun) { seedIfNeeded() }
         .task {
+            RoomTemplate.warmUp()                     // the room's bake starts at launch, before the first stage needs it
             seedIfNeeded()
             DataCleanup.mergeDuplicatePRs(in: context)
         }
-    }
-
-    private var tabs: some View {
-        TabView {
-            TrainView()
-                .tabItem { Label("Train", systemImage: "figure.strengthtraining.traditional") }
-            PRsView()
-                .tabItem { Label("PRs", systemImage: "trophy") }
-            GymView()
-                .tabItem { Label("Gym", systemImage: "dumbbell") }
-            HistoryView()
-                .tabItem { Label("History", systemImage: "clock") }
-        }
-        .tint(Theme.ink)
     }
 
     /// One unnamed gym with every plate (named in the first run) and the default PR list with no values (SPEC Part 4).
@@ -51,5 +38,29 @@ struct RootView: View {
         }
         try? context.save()
         didSeedDefaults = true
+    }
+}
+
+/// The four tabs, each with the room on top looking at its station.
+struct HomeTabs: View {
+    enum Tab: String { case train, prs, gym, history }
+    @State var selection: Tab = .train
+
+    var body: some View {
+        TabView(selection: $selection) {
+            TrainView()
+                .tabItem { Label("Train", systemImage: "figure.strengthtraining.traditional") }
+                .tag(Tab.train)
+            PRsView()
+                .tabItem { Label("PRs", systemImage: "trophy") }
+                .tag(Tab.prs)
+            GymView()
+                .tabItem { Label("Gym", systemImage: "dumbbell") }
+                .tag(Tab.gym)
+            HistoryView()
+                .tabItem { Label("History", systemImage: "clock") }
+                .tag(Tab.history)
+        }
+        .tint(Theme.ink)
     }
 }

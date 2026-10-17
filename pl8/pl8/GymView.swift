@@ -12,40 +12,44 @@ struct GymView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Gyms").sectionLabel()
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(gyms) { gym in
-                                    Chip(isOn: gym.id == current?.id, action: { switchTo(gym) }) {
-                                        Text(gym.name.isEmpty ? "—" : gym.name)
+            VStack(spacing: 0) {
+                RoomHeader(station: .corner)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Gyms").sectionLabel()
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(gyms) { gym in
+                                        Chip(isOn: gym.id == current?.id, action: { switchTo(gym) }) {
+                                            Text(gym.name.isEmpty ? "—" : gym.name)
+                                        }
+                                        .fixedSize()
+                                    }
+                                    Chip(isOn: false, action: addGym) {
+                                        Label("Add gym", systemImage: "plus")
                                     }
                                     .fixedSize()
                                 }
-                                Chip(isOn: false, action: addGym) {
-                                    Label("Add gym", systemImage: "plus")
-                                }
-                                .fixedSize()
+                                .padding(2)
                             }
-                            .padding(2)
+                            if gyms.count > 1 {
+                                Button("Remove this gym", role: .destructive) { confirmRemove = true }
+                                    .font(.subheadline.weight(.semibold))
+                            }
                         }
-                        if gyms.count > 1 {
-                            Button("Remove this gym", role: .destructive) { confirmRemove = true }
-                                .font(.subheadline.weight(.semibold))
-                        }
-                    }
-                    .drawer()
+                        .drawer()
 
-                    if let current {
-                        GymSetupForm(gym: current)
+                        if let current {
+                            GymSetupForm(gym: current)
+                        }
                     }
+                    .padding(16)
                 }
-                .padding(16)
             }
             .background(Theme.background)
             .navigationTitle("Gym")
+            .navigationBarTitleDisplayMode(.inline)
             .sensoryFeedback(.selection, trigger: current?.id)
             .confirmationDialog("Remove \(current?.name ?? "this gym")?", isPresented: $confirmRemove, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) { removeCurrent() }
