@@ -119,7 +119,9 @@ public enum PropModels {
         case .flag: flag(&b, text: gymName)
         case .prBoard: prBoard(&b, prs: boards.prs)
         case .barHolder: barHolder(&b)
-        case .wallFan: wallFan(&b)
+        case .wallFan:
+            let fan = wallFanParts()
+            b.parts = fan.fixed + fan.head + fan.blades
         case .wallWindow: wallWindow(&b)
         case .kitPlates: break
         }
@@ -248,13 +250,25 @@ public enum PropModels {
             b.box([0.14, 0.24, 0.02], [x, 2.02, wallZ + 0.01], .dark)        // wall plate
         }
         b.cylinder(0.02, 1.33, .x, 12, [0, top - 0.06, z], .dark)            // pull-up bar
-        let bar = SIMD3<Float>(0, 1.265, z + 0.08)
+        b.parts += rackBar(barScale: barScale)
+    }
+
+    /// The barbell on the rack's J-hooks, in the rack's space.
+    private static func rackBar(barScale: SIMD2<Float>) -> [PropPart] {
+        let bar = SIMD3<Float>(0, 1.265, -0.85 + 0.08)
         var barbellParts = Builder()
         barbell(&barbellParts, at: .zero)
-        b.parts += barbellParts.parts.map { part in
+        return barbellParts.parts.map { part in
             PropPart(mesh: part.mesh.mapped { SIMD3(barX($0.x, length: barScale.x), $0.y * barScale.y, $0.z * barScale.y) + bar },
                      tone: part.tone, inked: part.inked, casts: part.casts)
         }
+    }
+
+    /// The rack apart from its bar, so the bar can go down to the floor for pulls (prototype barTick). Rack space.
+    public static func rackParts(barWeight: Double, unit: WeightUnit) -> (frame: [PropPart], bar: [PropPart]) {
+        let all = parts(for: .rack, plates: [], barWeight: barWeight, unit: unit)
+        let bar = rackBar(barScale: barScale(barWeight, unit: unit))
+        return (Array(all.dropLast(bar.count)), bar)
     }
 
     /// An Olympic bar along X, in the prototype's steels: smooth centre, knurled hand sections, collars,
@@ -440,7 +454,15 @@ public enum PropModels {
 
     /// A wall fan: bracket and arm, a head tilted down a little with its drum, blades, hub, guard rings and
     /// spokes, and the switch below with its cable wiggling up the wall. Still (the prototype's blades spin).
-    private static func wallFan(_ b: inout Builder) {
+    /// The wall fan's parts, in its own space: what stays put, the head that sweeps left and right round the swivel
+    /// (Y), and the blades that spin round the head's axis through the hub (prototype buildWallFanG: osc, spin).
+    public struct FanParts: Sendable {
+        public let fixed: [PropPart], head: [PropPart], blades: [PropPart]
+        public let swivel: SIMD3<Float>, hub: SIMD3<Float>, spinAxis: SIMD3<Float>
+    }
+
+    public static func wallFanParts() -> FanParts {
+        var b = Builder(), headParts = Builder(), bladeParts = Builder()
         let radius: Float = 0.27
         b.box([0.16, 0.22, 0.03], [0, 0, 0.015], .dark)                      // wall bracket
         b.box([0.05, 0.05, 0.2], [0, -0.02, 0.12], .dark)                    // arm
@@ -448,29 +470,32 @@ public enum PropModels {
         b.add(LowPolyMesh.cylinder(radius: 0.035, length: 0.07, sides: 10, axis: .y).translated(by: swivel + [0, -0.02, 0]), .dark)
         // The head, tilted down 0.28 rad around X, hung from the swivel.
         func head(_ mesh: LowPolyMesh) -> LowPolyMesh { mesh.rotatedX(0.28).translated(by: swivel) }
-        b.add(head(LowPolyMesh.cylinder(radius: 0.095, length: 0.16, sides: 16, axis: .z).translated(by: [0, 0, 0.1])), .light)   // motor
-        b.add(head(LowPolyMesh.cylinder(radius: radius, length: 0.1, sides: 28, axis: .z).translated(by: [0, 0, 0.27])), .light)  // drum
-        b.add(head(LowPolyMesh.cylinder(radius: radius - 0.025, length: 0.005, sides: 28, axis: .z).translated(by: [0, 0, 0.32])),
+        headParts.add(head(LowPolyMesh.cylinder(radius: 0.095, length: 0.16, sides: 16, axis: .z).translated(by: [0, 0, 0.1])), .light)   // motor
+        headParts.add(head(LowPolyMesh.cylinder(radius: radius, length: 0.1, sides: 28, axis: .z).translated(by: [0, 0, 0.27])), .light)  // drum
+        headParts.add(head(LowPolyMesh.cylinder(radius: radius - 0.025, length: 0.005, sides: 28, axis: .z).translated(by: [0, 0, 0.32])),
               .dark, ink: false)
         for i in 0..<3 {                                                                                     // blades
             let blade = LowPolyMesh.box(size: [0.09, 0.2, 0.006]).rotatedY(0.35).translated(by: [0, 0.12, 0])
                 .rotatedZ(Float(i) * 2 * Float.pi / 3).translated(by: [0, 0, 0.33])
-            b.add(head(blade), .light, ink: false)
+            bladeParts.add(head(blade), .light, ink: false)
         }
-        b.add(head(LowPolyMesh.cylinder(radius: 0.04, length: 0.02, sides: 12, axis: .z).translated(by: [0, 0, 0.334])), .light)
+        headParts.add(head(LowPolyMesh.cylinder(radius: 0.04, length: 0.02, sides: 12, axis: .z).translated(by: [0, 0, 0.334])), .light)
         for ring: Float in [0.09, 0.17, radius - 0.01] {                                                    // guard
-            b.add(head(LowPolyMesh.hoop(radius: ring, width: 0.01, segments: 32).translated(by: [0, 0, 0.335])), .dark,
+            headParts.add(head(LowPolyMesh.hoop(radius: ring, width: 0.01, segments: 32).translated(by: [0, 0, 0.335])), .dark,
                   ink: false, casts: false)
         }
         for i in 0..<4 {                                                                                     // spokes
             let spoke = LowPolyMesh.box(size: [0.006, 2 * radius - 0.02, 0.006]).rotatedZ(Float(i) * Float.pi / 4)
-            b.add(head(spoke.translated(by: [0, 0, 0.335])), .dark, ink: false)
+            headParts.add(head(spoke.translated(by: [0, 0, 0.335])), .dark, ink: false)
         }
         b.box([0.09, 0.13, 0.014], [0, -0.85, 0.008], .light)                                              // switch plate
         b.add(LowPolyMesh.box(size: [0.034, 0.06, 0.014]).rotatedX(-0.32).translated(by: [0, -0.85, 0.02]), .dark)   // rocker: on
         let cable: [SIMD3<Float>] = [[0, -0.78, 0.012], [0.025, -0.66, 0.012], [-0.012, -0.48, 0.012],
                                      [0.02, -0.3, 0.012], [0.004, -0.16, 0.014], [0, -0.11, 0.02]]
         b.add(LowPolyMesh.tube(through: cable, width: 0.012), .dark, ink: false)
+        let axis = LowPolyMesh(positions: [[0, 0, 1]], indices: []).rotatedX(0.28).positions[0]
+        return FanParts(fixed: b.parts, head: headParts.parts, blades: bladeParts.parts, swivel: swivel,
+                        hub: head(LowPolyMesh(positions: [[0, 0, 0.33]], indices: [])).positions[0], spinAxis: axis)
     }
 
     /// A window high on the wall: glass pane, sill, four panes' mullions and the top and bottom rails.

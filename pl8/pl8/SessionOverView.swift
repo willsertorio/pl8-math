@@ -208,9 +208,6 @@ final class ScaleStage {
 /// prototype's ringBell. It follows the silent switch, and each strike is felt too.
 @MainActor
 enum Bell {
-    private static let engine = AVAudioEngine()
-    private static let player = AVAudioPlayerNode()
-    private static var ready = false
 
     static func ring() {
         let strikes: [Double] = [0, 0.32, 0.64]
@@ -219,7 +216,7 @@ enum Bell {
         Task { @MainActor in
             // Worked out off the main thread (a few hundred thousand samples), then played with the strikes felt.
             let samples = await Task.detached(priority: .userInitiated, operation: { sound(strikes: strikes) }).value
-            if let buffer = buffer(samples) { play(buffer) }
+            Sounds.play(samples)
             var last = 0.0
             for delay in strikes {
                 try? await Task.sleep(for: .seconds(delay - last))
@@ -227,32 +224,6 @@ enum Bell {
                 haptic.impactOccurred(intensity: 1)
             }
         }
-    }
-
-    private static func play(_ buffer: AVAudioPCMBuffer) {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.ambient)          // quiet when the phone is on silent
-            try AVAudioSession.sharedInstance().setActive(true)
-            if !ready {
-                engine.attach(player)
-                engine.connect(player, to: engine.mainMixerNode, format: buffer.format)
-                ready = true
-            }
-            if !engine.isRunning { try engine.start() }
-            player.scheduleBuffer(buffer, at: nil)
-            player.play()
-        } catch {}
-    }
-
-    private static let rate = 44_100.0
-
-    private static func buffer(_ samples: [Float]) -> AVAudioPCMBuffer? {
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
-              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
-              let channel = buffer.floatChannelData?[0] else { return nil }
-        buffer.frameLength = buffer.frameCapacity
-        for (index, sample) in samples.enumerated() { channel[index] = sample }
-        return buffer
     }
 
     nonisolated private static func sound(strikes: [Double]) -> [Float] {
@@ -276,5 +247,59 @@ enum Bell {
             samples[frame] = Float(value * 0.22)
         }
         return samples
+    }
+}
+
+/// The app's few sounds, made like the prototype's Web Audio ones and played through one engine with a handful of
+/// voices so they can overlap. They follow the silent switch.
+@MainActor
+enum Sounds {
+    private static let engine = AVAudioEngine()
+    private static var voices: [AVAudioPlayerNode] = []
+    private static var nextVoice = 0
+    static let rate = 44_100.0
+
+    /// A plate seating on the sleeve (prototype clank): three short triangle tones, louder for heavier plates.
+    static func clank(_ weight: Float) {
+        let length = 0.12, level = 0.05 + 0.1 * min(1, Double(weight))
+        var samples = [Float](repeating: 0, count: Int(rate * length))
+        for (frequency, decay) in [(1650.0, 0.09), (2430, 0.06), (3900, 0.035)] {
+            let f = frequency * Double.random(in: 0.92...1.04)
+            for frame in samples.indices {
+                let t = Double(frame) / rate
+                guard t < decay else { break }
+                let envelope = t < 0.003 ? 0.0001 * pow(1 / 0.0001, t / 0.003) : pow(0.0001, (t - 0.003) / (decay - 0.003))
+                let phase = (t * f).truncatingRemainder(dividingBy: 1)
+                let triangle = 4 * abs(phase - 0.5) - 1
+                samples[frame] += Float(triangle * envelope * level)
+            }
+        }
+        play(samples)
+    }
+
+    static func play(_ samples: [Float]) {
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
+              let channel = buffer.floatChannelData?[0] else { return }
+        buffer.frameLength = buffer.frameCapacity
+        for (index, sample) in samples.enumerated() { channel[index] = sample }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient)          // quiet when the phone is on silent
+            try AVAudioSession.sharedInstance().setActive(true)
+            if voices.isEmpty {
+                for _ in 0..<4 {
+                    let voice = AVAudioPlayerNode()
+                    engine.attach(voice)
+                    engine.connect(voice, to: engine.mainMixerNode, format: format)
+                    voices.append(voice)
+                }
+            }
+            if !engine.isRunning { try engine.start() }
+            let voice = voices[nextVoice]
+            nextVoice = (nextVoice + 1) % voices.count
+            voice.stop()
+            voice.scheduleBuffer(buffer, at: nil)
+            voice.play()
+        } catch {}
     }
 }

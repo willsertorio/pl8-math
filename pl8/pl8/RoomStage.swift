@@ -162,7 +162,7 @@ struct RoomStage: View {
 /// what's written on the PR board and the whiteboard.
 @MainActor
 final class SetupProps {
-    nonisolated static let objects: Set<RoomLayout.Object> = [.flag, .rack, .shelf, .prBoard, .board, .bench]
+    nonisolated static let objects: Set<RoomLayout.Object> = [.flag, .rack, .shelf, .prBoard, .board, .bench, .wallFan]
 
     private let flag = Entity(), rack = Entity(), shelf = Entity(), prBoard = Entity(), board = Entity(), bench = Entity()
     /// The closed box's sides and lid, while the opening plays.
@@ -174,6 +174,22 @@ final class SetupProps {
     private var openingPhase: OpeningPhase?
     private var boards: Boards?
     private let kitFloor = Entity(), barPlates = Entity()
+    /// The rack's bar with its plates, so it can go down to the platform for pulls; its shadow apart.
+    private let barGroup = Entity(), barBody = Entity(), barShadow = Entity()
+    private var barOnFloor = false
+    /// The wall fan: the head sweeps round the swivel, the blades spin round the hub.
+    private let fan = Entity(), fanSwivel = Entity(), fanBlades = Entity()
+    private var fanAxis = SIMD3<Float>(0, 0, 1), fanPhase: Float = 0, bladeAngle: Float = 0
+    /// The flag stirs in the fan's wind; not while it unrolls.
+    private var flagStill: Float = 0
+    /// The room dims behind the bar while you look at a set (prototype renderDimmed).
+    private var dimGoal: Float = 0, dim: Float = 0
+    private var undimmed: [ObjectIdentifier: [any RealityKit.Material]] = [:]
+    private weak var world: Entity?
+    /// Plates sliding on or off the bar, moved frame by frame (prototype showSet and its onBar loop).
+    private var moving: [PlateMove] = []
+    private var clock: Float = 0
+    private var ticker: Task<Void, Never>?
     private var kit: Kit?
     private var kitItems: [(size: Double, entity: Entity)] = []
     private var onBar: [(size: Double, entity: Entity, k: Int)] = []
@@ -183,7 +199,10 @@ final class SetupProps {
     private var attached = false
 
     func attach(to world: Entity) {
-        for group in [flag, rack, shelf, prBoard, board, bench, kitFloor, barPlates, closedBox] { world.addChild(group) }
+        self.world = world
+        for group in [flag, rack, shelf, prBoard, board, bench, kitFloor, barGroup, fan, closedBox] { world.addChild(group) }
+        for part in [barBody, barShadow, barPlates] { barGroup.addChild(part) }
+        buildFan()
         // The board and the bench sit round their spots, so the opening can roll and toss them in.
         for (group, object) in [(board, RoomLayout.Object.board), (bench, .bench)] {
             group.position = PropModels.placement(for: object).position
@@ -201,6 +220,105 @@ final class SetupProps {
         floor.components.set(PhysicsBodyComponent(massProperties: .default, material: Self.rubber, mode: .static))
         world.addChild(floor)
         attached = true
+        startTicking()
+    }
+
+    // MARK: - What moves all the time (prototype propsTick)
+
+    private func startTicking() {
+        ticker = Task { @MainActor [weak self] in
+            var last = ContinuousClock.now
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(16))
+                guard let self else { return }
+                let now = ContinuousClock.now
+                self.tick(min(0.05, Float((now - last) / .seconds(1))))
+                last = now
+            }
+        }
+    }
+
+    private func tick(_ dt: Float) {
+        clock += dt
+        // The fan sweeps left and right and its blades spin (0.25 rad a frame at 60 fps).
+        fanPhase += dt
+        let sweep = sin(fanPhase / 1.8) * 0.5
+        fanSwivel.orientation = simd_quatf(angle: sweep, axis: [0, 1, 0])
+        bladeAngle -= 15 * dt
+        fanBlades.orientation = simd_quatf(angle: bladeAngle, axis: fanAxis)
+        // Its wind stirs the flag: the cloth swings out from the wall and flutters.
+        if clock > flagStill {
+            let wind = 0.22 + 0.16 * (sweep + 0.5)
+            let placement = PropModels.placement(for: .flag)
+            let along = placement.turn([1, 0, 0]), into = placement.turn([0, 0, 1])
+            let outward: Float = simd_dot(simd_cross(along, [0, -1, 0]), into) > 0 ? 1 : -1
+            let angle = outward * wind * (0.16 + 0.06 * sin(clock * 7.4) + 0.03 * sin(clock * 12.5 + 1))
+            flag.orientation = simd_quatf(angle: angle, axis: along)
+        }
+        // The room fades towards box light behind the bar while a set is in view, and back.
+        let next = dim + (dimGoal - dim) * (1 - exp(-dt * 3))
+        if abs(next - dim) > 0.004 || (dimGoal == 0 && dim > 0 && next < 0.01) {
+            dim = next < 0.01 && dimGoal == 0 ? 0 : next
+            applyDim(dim)
+        }
+        moving = moving.filter { step($0) }
+    }
+
+    /// The fan in three parts: what stays put (and the whole fan's shadow), the head round the swivel and the
+    /// blades round the hub. Each is baked where it rests, then moved so it turns round its own pivot.
+    private func buildFan() {
+        let placement = PropModels.placement(for: .wallFan), wall = RoomLayout.Object.wallFan.wall
+        let parts = PropModels.wallFanParts()
+        let swivel = placement.apply(parts.swivel), hub = placement.apply(parts.hub)
+        fanAxis = placement.turn(parts.spinAxis)
+        rebuild(fan, SceneBake.bake(parts.fixed, placement: placement, wall: wall, content: .withoutShadows)
+            + SceneBake.bake(parts.fixed + parts.head + parts.blades, placement: placement, wall: wall, content: .shadowsOnly))
+        fan.addChild(fanSwivel)
+        fanSwivel.position = swivel
+        for child in Diorama.entities(for: SceneBake.bake(parts.head, placement: placement, wall: wall, content: .withoutShadows)
+            .map { $0.translated(by: -swivel) }) {
+            fanSwivel.addChild(child)
+        }
+        fanSwivel.addChild(fanBlades)
+        fanBlades.position = hub - swivel
+        for child in Diorama.entities(for: SceneBake.bake(parts.blades, placement: placement, wall: wall, content: .withoutShadows)
+            .map { $0.translated(by: -hub) }) {
+            fanBlades.addChild(child)
+        }
+    }
+
+    /// Every colour in the room mixed `k` × 62 % towards box light (pictures fade), except the bar and its plates.
+    private func applyDim(_ k: Float) {
+        guard let world else { return }
+        let light = Look.boxLight
+        func visit(_ entity: Entity) {
+            if entity === barGroup { return }
+            if let model = entity as? ModelEntity, let current = model.model?.materials {
+                let id = ObjectIdentifier(model)
+                let original = undimmed[id] ?? current
+                if k <= 0 {
+                    model.model?.materials = original
+                    undimmed[id] = nil
+                } else {
+                    undimmed[id] = original
+                    model.model?.materials = original.map { material in
+                        guard var unlit = material as? UnlitMaterial else { return material }
+                        if unlit.color.texture != nil {
+                            unlit.blending = .transparent(opacity: .init(floatLiteral: 1 - 0.62 * k))
+                        } else {
+                            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                            unlit.color.tint.getRed(&r, green: &g, blue: &b, alpha: &a)
+                            let m = CGFloat(0.62 * k)
+                            unlit.color.tint = UIColor(red: r + (CGFloat(light.r) - r) * m, green: g + (CGFloat(light.g) - g) * m,
+                                                       blue: b + (CGFloat(light.b) - b) * m, alpha: a)
+                        }
+                        return unlit
+                    }
+                }
+            }
+            for child in entity.children { visit(child) }
+        }
+        visit(world)
     }
 
     static let rubber = PhysicsMaterialResource.generate(staticFriction: 0.55, dynamicFriction: 0.55, restitution: 0.15)
@@ -225,6 +343,8 @@ final class SetupProps {
                                                              placement: PropModels.placement(for: .flag), wall: nil)
                 .map { $0.translated(by: -rod) })
             if unrolls && animate {
+                flagStill = clock + 0.7
+                flag.orientation = simd_quatf()
                 flag.scale = [1, 0.01, 1]
                 _ = flag.move(to: Transform(scale: .one, rotation: flag.orientation, translation: rod), relativeTo: flag.parent,
                           duration: 0.6, timingFunction: .easeOut)
@@ -234,8 +354,10 @@ final class SetupProps {
         }
         if unit != self.unit || barWeight != self.barWeight {
             self.barWeight = barWeight
-            rebuild(rack, SceneBake.bake(PropModels.parts(for: .rack, plates: [], barWeight: barWeight, unit: unit),
-                                         placement: PropModels.placement(for: .rack), wall: nil))
+            let parts = PropModels.rackParts(barWeight: barWeight, unit: unit), placement = PropModels.placement(for: .rack)
+            rebuild(rack, SceneBake.bake(parts.frame, placement: placement, wall: nil))
+            rebuild(barBody, SceneBake.bake(parts.bar, placement: placement, wall: nil, content: .withoutShadows))
+            rebuild(barShadow, SceneBake.bake(parts.bar, placement: placement, wall: nil, content: .shadowsOnly))
         }
         var popIn = animate
         if unit != self.unit {
@@ -360,7 +482,9 @@ final class SetupProps {
         guard attached else { return }
         guard let session else {
             for child in Array(kitFloor.children) + Array(barPlates.children) { child.removeFromParent() }
-            kitItems = []; onBar = []; barSide = []; kit = nil
+            kitItems = []; onBar = []; barSide = []; kit = nil; moving = []
+            if barOnFloor { moveBar(down: false, animate: false) }
+            if dimGoal > 0 || dim > 0 { dimGoal = 0; dim = 0; applyDim(0) }
             return
         }
         if session.kit != kit {
@@ -384,6 +508,9 @@ final class SetupProps {
             }
         }
         if session.perSide != barSide { load(session.perSide, unit: session.unit, barWeight: session.barWeight, animate: animate) }
+        if session.onFloor != barOnFloor { moveBar(down: session.onFloor, animate: animate) }
+        dimGoal = session.dim ? 1 : 0
+        if !animate && dim != dimGoal { dim = dimGoal; applyDim(dim) }
         // What's on the bar isn't on the floor.
         var onBarCount: [Double: Int] = [:]
         for plate in onBar { onBarCount[plate.size, default: 0] += 1 }
@@ -413,35 +540,115 @@ final class SetupProps {
         return entity
     }
 
-    /// Changes the bar to `perSide`: the plates that differ come off from the outside in, then the new ones go on.
+    /// Changes the bar to `perSide` like the prototype's showSet: the plates that differ slide off the sleeve
+    /// end, outermost first, 0.13 s apart, and drop to the floor; then the new ones slide on, innermost first, and
+    /// seat with a clank.
     private func load(_ perSide: [Double], unit: WeightUnit, barWeight: Double, animate: Bool) {
         let kept = zip(barSide, perSide).prefix { $0 == $1 }.count
-        let sleeveEnd = RoomLayout.barOnRack.x
-        for plate in onBar where plate.k >= kept {
-            let entity = plate.entity
-            if animate {
-                let outward: Float = entity.position.x > sleeveEnd ? 1 : -1
-                slide(entity, to: SIMD3(sleeveEnd + outward * 1.5, entity.position.y, entity.position.z),
-                      after: Double(plate.k - kept) * 0.05, removing: true)
+        let centre = RoomLayout.barOnRack.x
+        let leaving = onBar.filter { $0.k >= kept }
+        for plate in leaving {
+            if animate, let found = Plate.find(plate.size, unit) {
+                plate.entity.findEntity(named: "shadow")?.isEnabled = false
+                let side: Float = plate.entity.position.x > centre ? 1 : -1
+                moving.append(PlateMove(entity: plate.entity, plate: found, side: side, off: true,
+                                        start: clock + Float(barSide.count - 1 - plate.k) * 0.13, x: plate.entity.position.x))
             } else {
-                entity.removeFromParent()
+                plate.entity.removeFromParent()
             }
         }
         onBar.removeAll { $0.k >= kept }
+        let goingOff = barSide.count - kept
+        let first = clock + (goingOff > 0 ? Float(goingOff) * 0.13 + 0.32 : 0.05)
         let placed = SessionScene.barPlates(perSide: perSide, unit: unit, barWeight: barWeight)
         for (index, plate) in placed.enumerated() where index / 2 >= kept {
             let entity = Self.plateEntity(plate)
             barPlates.addChild(entity)
             onBar.append((plate.plate.size, entity, index / 2))
             if animate {
-                let outward: Float = plate.centre.x > sleeveEnd ? 1 : -1
-                let target = plate.centre
-                entity.position = SIMD3(sleeveEnd + outward * 1.5, target.y, target.z)
+                let side: Float = plate.centre.x > centre ? 1 : -1
                 entity.findEntity(named: "shadow")?.isEnabled = false
-                slide(entity, to: target, after: 0.3 + Double(index / 2 - kept) * 0.2, removing: false)
+                entity.position.x = centre + side * 1.5
+                entity.isEnabled = false
+                moving.append(PlateMove(entity: entity, plate: plate.plate, side: side, off: false,
+                                        start: first + Float(index / 2 - kept) * 0.2 + (side > 0 ? 0.05 : 0), x: plate.centre.x))
+            } else if barOnFloor {
+                entity.findEntity(named: "shadow")?.isEnabled = false
             }
         }
         barSide = perSide
+    }
+
+    /// One frame of a plate's slide. Returns false once it's done.
+    private func step(_ move: PlateMove) -> Bool {
+        let centre = RoomLayout.barOnRack.x, t = clock - move.start, entity = move.entity
+        guard t >= 0 else { return true }
+        let radius = Float(move.plate.diameter) / 2
+        if move.off {
+            // Off the end of the sleeve (ease in), then a fall onto its face beside the rack, then it sinks away.
+            let end = centre + move.side * (1.25 + radius * 0.2)
+            if t < 0.32 {
+                let q = t / 0.32
+                entity.position.x = move.x + (end - move.x) * q * q
+                return true
+            }
+            let f = t - 0.32, barY = RoomLayout.barOnRack.y + barGroup.position.y
+            let y = max(radius * cos(min(1, f * 2.4) * 1.2), barY - 4.9 * f * f)
+            entity.position = SIMD3(end + move.side * f * 0.5, y - barGroup.position.y, entity.position.z)
+            entity.orientation = simd_quatf(angle: move.side * min(1, f * 2.4) * 1.2, axis: [0, 0, 1])
+            if move.landed == nil && f > 0.2 && y <= radius + 0.01 { move.landed = clock }
+            if let landed = move.landed {
+                let k = min(1, max(0, (clock - landed - 0.35) / 0.35))
+                entity.scale = SIMD3(repeating: max(0.001, 1 - k))
+                if k >= 1 { entity.removeFromParent(); return false }
+            }
+            return true
+        }
+        // On: from the sleeve end to its place (ease out), then it seats with a clank and a small shiver.
+        let q = t / 0.34
+        entity.isEnabled = true
+        if q < 1 {
+            let e = 1 - pow(1 - q, 3), start = centre + move.side * 1.5
+            entity.position.x = start + (move.x - start) * e
+            return true
+        }
+        if move.landed == nil {
+            move.landed = clock
+            let kilos = move.plate.unit == .lb ? move.plate.size * 0.4536 : move.plate.size
+            Sounds.clank(Float(kilos) / 25 + 0.15)
+        }
+        let since = clock - (move.landed ?? clock)
+        entity.position.x = move.x + move.side * 0.012 * exp(-since * 14) * sin(since * 40)
+        if since > 0.4 {
+            entity.position.x = move.x
+            entity.findEntity(named: "shadow")?.isEnabled = !barOnFloor
+            return false
+        }
+        return true
+    }
+
+    /// The bar goes down onto the platform for pulls, and back up onto the J-hooks (prototype barTick: 0.75 s,
+    /// cubic in and out). Its shadows only show on the rack.
+    private func moveBar(down: Bool, animate: Bool) {
+        barOnFloor = down
+        let target = Transform(translation: down ? SessionScene.floorOffset : .zero)
+        let shadows = [barShadow] + barPlates.children.compactMap { $0.findEntity(named: "shadow") }
+        for shadow in shadows { shadow.isEnabled = false }
+        guard animate else {
+            barGroup.transform = target
+            for shadow in shadows { shadow.isEnabled = !down }
+            return
+        }
+        _ = barGroup.move(to: target, relativeTo: barGroup.parent, duration: 0.75, timingFunction: .easeInOut)
+        if !down {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(0.75))
+                guard let self, !self.barOnFloor else { return }
+                for shadow in [self.barShadow] + self.barPlates.children.compactMap({ $0.findEntity(named: "shadow") }) {
+                    shadow.isEnabled = true
+                }
+            }
+        }
     }
 
     /// The prototype's kit drop (spawnKitPlate): a solid disc of the plate's mass, slightly tilted and spinning,
@@ -487,37 +694,6 @@ final class SetupProps {
         }
     }
 
-    private func drop(_ entity: Entity, to target: SIMD3<Float>, after delay: Double, from height: Float) {
-        entity.position = target + SIMD3(0, height, 0)
-        entity.isEnabled = false
-        entity.findEntity(named: "shadow")?.isEnabled = false
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(delay))
-            entity.isEnabled = true
-            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target), relativeTo: entity.parent,
-                            duration: 0.55, timingFunction: .easeIn)
-            try? await Task.sleep(for: .seconds(0.55))
-            entity.findEntity(named: "shadow")?.isEnabled = true
-            // A small bounce as it lands.
-            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target + [0, 0.05, 0]),
-                            relativeTo: entity.parent, duration: 0.1, timingFunction: .easeOut)
-            try? await Task.sleep(for: .seconds(0.1))
-            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target), relativeTo: entity.parent,
-                            duration: 0.1, timingFunction: .easeIn)
-        }
-    }
-
-    private func slide(_ entity: Entity, to target: SIMD3<Float>, after delay: Double, removing: Bool) {
-        Task { @MainActor in
-            entity.findEntity(named: "shadow")?.isEnabled = false
-            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
-            _ = entity.move(to: Transform(scale: .one, rotation: entity.orientation, translation: target), relativeTo: entity.parent,
-                            duration: 0.35, timingFunction: .easeInOut)
-            try? await Task.sleep(for: .seconds(0.35))
-            if removing { entity.removeFromParent() } else { entity.findEntity(named: "shadow")?.isEnabled = true }
-        }
-    }
-
     private func rebuild(_ group: Entity, _ pieces: [BakedPiece]) {
         for child in Array(group.children) { child.removeFromParent() }
         for child in Diorama.entities(for: pieces) { group.addChild(child) }
@@ -531,6 +707,32 @@ struct SessionProps: Equatable {
     var barWeight: Double
     /// The plates on the bar now (the set in view); empty for an empty bar.
     var perSide: [Double]
+    /// A pull: the bar is down on the platform.
+    var onFloor = false
+    /// A set is in view: the room dims behind the bar.
+    var dim = false
+}
+
+/// A plate sliding on or off the bar.
+final class PlateMove {
+    let entity: Entity
+    let plate: Plate
+    /// −1 left sleeve, 1 right.
+    let side: Float
+    let off: Bool
+    let start: Float
+    /// Where it sits on the bar (coming on) or sat (going off), along X.
+    let x: Float
+    var landed: Float?
+
+    init(entity: Entity, plate: Plate, side: Float, off: Bool, start: Float, x: Float) {
+        self.entity = entity
+        self.plate = plate
+        self.side = side
+        self.off = off
+        self.start = start
+        self.x = x
+    }
 }
 
 /// Where the first run's opening is (SPEC 2.2 step 0): the title over the sky, the closed box waiting for a tap,

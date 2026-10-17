@@ -1,5 +1,11 @@
 /// Lift names: case-insensitive, trimmed, with aliases (SPEC 3.6 rule 7).
 public enum LiftNames {
+    /// Pulls start with the bar on the floor (prototype liftOnFloor: dead, snatch or clean in the name).
+    public static func startsOnFloor(_ name: String) -> Bool {
+        let lower = name.lowercased()
+        return ["dead", "snatch", "clean"].contains { lower.contains($0) }
+    }
+
     /// The default PR list (SPEC Part 4).
     public static let defaultPRLifts = ["Back Squat", "Front Squat", "Deadlift", "Clean", "Snatch", "Bench Press"]
 

@@ -63,6 +63,14 @@ public enum RoomLayout {
             self.position = position
             self.rotationDegrees = rotationDegrees
         }
+
+        /// A point in the prop's space, in the room (as `LowPolyMesh.placed` moves a mesh).
+        public func apply(_ point: SIMD3<Float>) -> SIMD3<Float> { turn(point) + position }
+
+        /// A direction in the prop's space, turned into the room.
+        public func turn(_ direction: SIMD3<Float>) -> SIMD3<Float> {
+            LowPolyMesh(positions: [direction], indices: []).placed(Placement(position: .zero, rotationDegrees: rotationDegrees)).positions[0]
+        }
     }
 
     public static let objects: [Object: Placement] = [
@@ -93,6 +101,8 @@ public enum RoomLayout {
         case kitFloor, sleeve
         /// The opening: the closed box far off in the sky (prototype SHOTS.far).
         case far
+        /// The sleeve with the bar down on the platform, for pulls.
+        case sleeveFloor
     }
 
     public struct Shot: Equatable, Sendable {
@@ -143,6 +153,8 @@ public enum RoomLayout {
         // The right sleeve, from in front and to the right.
         let sleeve = SIMD3<Float>(bar.x + 0.9, bar.y - 0.06, bar.z)
         shots[.sleeve] = Shot(target: sleeve, position: sleeve + SIMD3(0.75, 0.35, 1.35), fieldOfView: 50)
+        let down = SessionScene.floorOffset
+        shots[.sleeveFloor] = Shot(target: sleeve + down, position: sleeve + SIMD3(0.75, 0.35, 1.35) + down, fieldOfView: 50)
         // The prototype's shot(T, dir, d): 52 m out along (0.6, 0.34, 0.7) from above the room.
         let farTarget = SIMD3<Float>(0, 4.2, 0), farDirection = SIMD3<Float>(0.6, 0.34, 0.7)
         shots[.far] = Shot(target: farTarget, position: farTarget + farDirection / farDirection.length * 52, fieldOfView: 50)

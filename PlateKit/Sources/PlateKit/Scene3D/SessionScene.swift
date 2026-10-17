@@ -1,6 +1,13 @@
 /// Where the session's plates are in the room (prototype buildKit and showSet): the kit laid out on the kit
 /// floor, and the current set's plates on the bar on the rack.
 public enum SessionScene {
+    /// For pulls the bar goes from the J-hooks down onto the platform, resting on its bumpers (prototype barTick:
+    /// forward to the platform's middle, down to a bumper's radius above its top).
+    public static let floorOffset: SIMD3<Float> = {
+        let bar = RoomLayout.barOnRack, platform = RoomLayout.objects[.platform]!.position
+        return SIMD3(0, 0.05 + 0.225 - bar.y, platform.z - bar.z)
+    }()
+
     public struct PlacedPlate: Hashable, Sendable {
         public let plate: Plate
         /// Its middle, in room space.

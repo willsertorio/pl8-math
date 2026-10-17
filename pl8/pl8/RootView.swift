@@ -9,13 +9,22 @@ struct RootView: View {
     /// Default data is created once, so deleting it doesn't bring it back.
     @AppStorage("didSeedDefaults") private var didSeedDefaults = false
     @AppStorage("hasFinishedFirstRun") private var hasFinishedFirstRun = false
+    @State private var openedThisLaunch = false
 
     var body: some View {
         Group {
             if hasFinishedFirstRun {
-                HomeTabs()
+                if openedThisLaunch {
+                    HomeTabs()
+                } else {
+                    // The opening plays on every launch for now (SPEC open decision 2).
+                    OpeningScreen { withAnimation(.easeInOut(duration: 0.4)) { openedThisLaunch = true } }
+                }
             } else {
-                FirstRunView { hasFinishedFirstRun = true }
+                FirstRunView {
+                    openedThisLaunch = true            // it just played the opening
+                    hasFinishedFirstRun = true
+                }
             }
         }
         .onChange(of: hasFinishedFirstRun) { seedIfNeeded() }

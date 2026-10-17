@@ -63,6 +63,8 @@ struct SessionView: View {
         let kind: Kind
         /// The plates on the bar while this card is in view.
         let perSide: [Double]
+        /// A pull: the bar is down on the platform.
+        var onFloor = false
     }
 
     private func rows(_ logs: [SetLog]) -> [PageRow] {
@@ -74,7 +76,8 @@ struct SessionView: View {
                 rows.append(PageRow(id: "s-\(log.order)",
                                     kind: .set(log, label: first.isWarmUp ? "WARM-UP · \(name)" : name, number: index + 1,
                                                of: group.count, previous: previous(log, in: logs)),
-                                    perSide: log.perSide))
+                                    perSide: log.perSide,
+                                    onFloor: LiftNames.startsOnFloor(session.liftName(for: first.blockIndex))))
             }
         }
         rows.append(PageRow(id: "end", kind: .end, perSide: []))
@@ -90,10 +93,11 @@ struct SessionView: View {
         let onKit = top.id == "kit"
         let firstSet = rows.dropFirst().first?.id ?? "end"
         return VStack(spacing: 0) {
-            RoomStage(station: onKit ? .kitFloor : .sleeve, gymName: session.gymName, unit: session.gymUnit,
+            RoomStage(station: onKit ? .kitFloor : top.onFloor ? .sleeveFloor : .sleeve, gymName: session.gymName, unit: session.gymUnit,
                       plateSizes: session.plateSizes, barWeight: session.barWeight,
                       session: SessionProps(kit: Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) }),
-                                            unit: session.gymUnit, barWeight: session.barWeight, perSide: top.perSide))
+                                            unit: session.gymUnit, barWeight: session.barWeight, perSide: top.perSide,
+                                            onFloor: top.onFloor, dim: !onKit))
                 .overlay(alignment: .topLeading) {
                     HStack(spacing: 8) {
                         Chip(isOn: onKit, action: { jump(to: "kit") }) { Text("Plate kit") }.fixedSize()

@@ -6,7 +6,7 @@ import PlateKit
 /// For the automatic checks (.github/workflows/ci.yml): launched with `-pl8Shot <screen>`, the app fills an
 /// in-memory store with demo data and opens that one screen, so the Simulator can take its picture.
 /// Screens: `room-<station>` (overview, corner, nameFlag, flag, bar, pr, board, kit, setv), `firstrun-name`,
-/// `firstrun-plates`, `session` (the kit), `session-sets` (the first set), `opening-title`, `opening-box` (the closed
+/// `firstrun-plates`, `session` (the kit), `session-sets` (the first set), `session-pull` (a deadlift set, bar on the floor), `opening-title`, `opening-box` (the closed
 /// box), `session-over` (the scale), `tab-<train|prs|gym|history>`.
 enum ScreenshotMode {
     static let shot: String? = {
@@ -41,7 +41,7 @@ struct ScreenshotHost: View {
             } else if shot == "firstrun-plates" {
                 FirstRunView(startAt: .plates) {}
             } else if shot.hasPrefix("session"), let session {
-                NavigationStack { SessionView(session: session, startOnFirstSet: shot == "session-sets") {} }
+                NavigationStack { SessionView(session: session, startOnFirstSet: shot != "session") {} }
             } else {
                 Text("Unknown screen: \(shot)")
             }
@@ -61,7 +61,11 @@ struct ScreenshotHost: View {
             context.insert(record)
             record.update(value: value, unit: .kg)
         }
-        let text = """
+        let text = shot == "session-pull" ? """
+        A. Deadlift
+        3 Deadlift @75% 1RM Deadlift
+        3 Deadlift @80% 1RM Deadlift
+        """ : """
         A. Back Squat
         3 Back Squat @75-78% 1RM Back Squat
         3 Back Squat @75-78% 1RM Back Squat

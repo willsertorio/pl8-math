@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 import UIKit
+import RealityKit
 import PlateKit
 
 /// First run (SPEC 2.2): opening → gym setup, one question per sheet → PRs.
@@ -258,52 +259,67 @@ private struct NameTyper: View {
     }
 }
 
-/// The opening's title (prototype AnimLayer 'open'): "pl8(math)" in cream over the orange, with plates drifting
-/// up behind it, slowly turning, in the prototype's two tones (bumpers brown, change plates cream, brown outline).
-/// Tap anywhere to go on.
-private struct OpeningTitle: View {
-    private struct Drifter {
-        let plate: Plate
-        let x: Double, speed: Double, phase: Double, spin: Double, size: Double
+/// The opening on later launches (SPEC open decision 2: every launch for now): the same title, closed box and
+/// opening as the first run, then home.
+struct OpeningScreen: View {
+    var onDone: () -> Void
+
+    @Query private var gyms: [Gym]
+    @Query private var records: [PersonalRecord]
+    @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
+    @State private var opening: OpeningPhase = .title
+
+    private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+
+    var body: some View {
+        let today = workouts.first { Calendar.current.isDateInToday($0.date) }
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            RoomStage(station: opening == .title || opening == .closed ? .far : .overview, gymName: gym?.name ?? "",
+                      unit: gym?.unit ?? .kg, plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
+                      boards: Boards(prs: Planner.boardRows(records), workout: Planner.boardLines(for: today, gym: gym, records: records)),
+                      opening: opening)
+                .ignoresSafeArea()
+            if opening == .title {
+                OpeningTitle()
+                    .transition(.opacity.animation(.easeOut(duration: 0.55)))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            switch opening {
+            case .title:
+                withAnimation { opening = .closed }
+            case .closed:
+                opening = .opening
+                Task {
+                    try? await Task.sleep(for: .seconds(2.1))
+                    opening = .furnishing
+                    try? await Task.sleep(for: .seconds(Double(Opening.furnishTime)))
+                    onDone()
+                }
+            case .opening, .furnishing, .done:
+                break
+            }
+        }
+        .sensoryFeedback(.impact(weight: .light), trigger: opening) { _, new in new == .closed || new == .opening }
     }
+}
 
-    private let drifters: [Drifter] = {
-        var seed: UInt64 = 7
-        func random() -> Double {
-            seed = seed &* 6364136223846793005 &+ 1442695040888963407
-            return Double(seed >> 33) / Double(1 << 31)
-        }
-        let plates = Plate.catalog(.kg)
-        return (0..<16).map { i in
-            Drifter(plate: plates[i % plates.count], x: random(), speed: 0.018 + random() * 0.022, phase: random(),
-                    spin: 0.25 + random() * 0.6, size: 0.7 + random() * 0.6)
-        }
-    }()
-
-    private let ink = Color(Diorama.uiColor(Look.boxDark)), cream = Color(Diorama.uiColor(Look.boxLight))
+/// The opening's title (prototype AnimLayer 'open'): "pl8(math)" in cream over the orange, with real plates in the
+/// prototype's two tones and rough outline drifting up on both sides, slowly tumbling. Tap anywhere to go on.
+private struct OpeningTitle: View {
+    @State private var stage = TitleStage()
+    private let cream = Color(Diorama.uiColor(Look.boxLight))
 
     var body: some View {
         ZStack {
             Theme.background
-            TimelineView(.animation) { timeline in
-                Canvas { context, size in
-                    let t = timeline.date.timeIntervalSinceReferenceDate
-                    for d in drifters {
-                        let travel = (d.phase + t * d.speed).truncatingRemainder(dividingBy: 1)
-                        let diameter = size.width * 0.32 * d.plate.diameter / 0.45 * d.size
-                        let y = size.height + diameter - travel * (size.height + diameter * 2)
-                        let x = d.x * size.width + sin(t * 0.4 + d.phase * 6) * 18
-                        let squash = max(0.12, abs(cos(t * d.spin + d.phase * 6)))
-                        let rect = CGRect(x: x - diameter * squash / 2, y: y - diameter / 2, width: diameter * squash, height: diameter)
-                        let bumper = d.plate.kind == .bumper
-                        context.fill(Path(ellipseIn: rect), with: .color(bumper ? ink : cream))
-                        context.stroke(Path(ellipseIn: rect), with: .color(ink), lineWidth: 2.5)
-                        let ring = rect.insetBy(dx: rect.width * 0.3, dy: rect.height * 0.3)
-                        context.stroke(Path(ellipseIn: ring), with: .color(bumper ? cream : ink), lineWidth: 1.5)
-                        let hub = rect.insetBy(dx: rect.width * 0.42, dy: rect.height * 0.42)
-                        context.fill(Path(ellipseIn: hub), with: .color(bumper ? cream : ink))
-                    }
+            GeometryReader { geometry in
+                RealityView { content in
+                    for entity in stage.build(aspect: Float(geometry.size.width / max(1, geometry.size.height))) { content.add(entity) }
                 }
+                .task { await stage.run() }
             }
             Text("pl8(math)")
                 .font(.system(size: 39, weight: .heavy))
@@ -314,5 +330,69 @@ private struct OpeningTitle: View {
         .accessibilityElement()
         .accessibilityLabel("pl8(math). Tap to start")
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// The title's plates in 3D: PlateKit's `TitleField` moves them, this places them in front of a camera with the
+/// prototype's lens (focal length 0.9 × the screen height).
+@MainActor
+final class TitleStage {
+    private var field = TitleField(count: 24, seed: UInt32.random(in: 1...99_999))
+    private var plates: [(entity: Entity, scale: Float)] = []
+    private var aspect: Float = 390.0 / 844.0
+    private var built = false
+
+    func build(aspect: Float) -> [Entity] {
+        self.aspect = aspect
+        let root = Entity()
+        if let sky = try? ModelEntity(mesh: Diorama.meshResource(LowPolyMesh.box(size: [200, 200, 200]).insideOut()),
+                                      materials: [Diorama.flat(Diorama.background)]) {
+            root.addChild(sky)
+        }
+        let catalog = Plate.catalog(.kg), still = RoomLayout.Placement(position: .zero, rotationDegrees: 0)
+        plates = field.plates.indices.map { i in
+            let plate = catalog[i % catalog.count]
+            var parts = SessionScene.parts(.init(plate: plate, centre: .zero, axis: .x, turn: 0))
+            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17), tone: .flat(Look.ink), inked: false, casts: false))
+            let entity = Entity()
+            for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
+                entity.addChild(child)
+            }
+            root.addChild(entity)
+            // Its radius on screen at depth 1 over the focal length, in metres at 1 m, against its real radius.
+            return (entity, field.plates[i].radius / (TitleStage.halfHeight * 2 * 0.9) / (Float(plate.diameter) / 2))
+        }
+        place()
+        let camera = PerspectiveCamera()
+        camera.camera.fieldOfViewInDegrees = 2 * atan(0.5 / 0.9) * 180 / .pi
+        built = true
+        return [root, camera]
+    }
+
+    static let halfHeight: Float = 422
+
+    func run() async {
+        var last = ContinuousClock.now
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(16))
+            let now = ContinuousClock.now
+            if built {
+                field.step(min(0.05, Float((now - last) / .seconds(1))))
+                place()
+            }
+            last = now
+        }
+    }
+
+    /// Each plate at its spot: across and up by its screen position times its depth, turned by its tumble.
+    private func place() {
+        for (i, item) in field.plates.enumerated() where i < plates.count {
+            let k = item.z / 0.9 * 0.5
+            let entity = plates[i].entity
+            entity.position = SIMD3(item.u * aspect * k, -item.v * k, -item.z)
+            entity.orientation = simd_quatf(angle: item.rotation.x, axis: [1, 0, 0]) * simd_quatf(angle: item.rotation.y, axis: [0, 1, 0])
+                * simd_quatf(angle: item.rotation.z, axis: [0, 0, 1])
+            entity.scale = SIMD3(repeating: plates[i].scale)
+        }
     }
 }
