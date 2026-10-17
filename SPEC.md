@@ -82,10 +82,10 @@ Before Start, the app asks for anything it's missing (see 3.6): a PR it doesn't 
 - Last card: *"Take off … each side, then put the bar back"* and **End session**.
 Nothing to tick off per set and no "How much did you lift?" (Will's first real class, 2026-10-16). No grey explanation text anywhere in the app.
 
-**7 · Session over.** After **End session**: the bell rings (three strikes, heard and felt) and a "scale" weighs the session's heaviest set, like the prototype's 'done' scene: its plates fall onto a platform scale one by one, heaviest first, then the bar lands across them; the scale's screen counts up to the total; label *Heaviest set*; then *"You lifted a lion."* word by word — the animal nearest the total in kg on a log scale (the prototype's list, house cat to blue whale). Tap → back to Train, tab bar appears. The session is saved to history.
+**7 · Session over.** After **End session**: the bell rings (three strikes, heard and felt) and a "scale" weighs the session's heaviest set, like the prototype's 'done' scene and in its two tones (everything posterized to box dark or box light): its plates fall onto a platform scale one by one, heaviest first, then the bar lands across them; the scale's screen counts up to the total; label *Heaviest set*; then *"You lifted a lion."* word by word — the animal nearest the total in kg on a log scale (the prototype's list, house cat to blue whale). Tap → back to Train, tab bar appears. The session is saved to history.
 
 ### 2.4 Home (after first run)
-Tab bar: **Train** · **PRs** · **Gym** · **History**. Each tab has the room on its top 40 %, live and draggable, looking at its station: Train → whiteboard, PRs → PR board, Gym → plate shelf, History → overview.
+Tab bar: **Train** · **PRs** · **Gym** · **History**. Each tab has the room on its top 40 %, live and draggable, looking at its station: Train → whiteboard, PRs → PR board, Gym → plate shelf, History → the flag wall (the whole overview is too small in a 40 % strip).
 - **Train** → whiteboard + "Add today's workout" (step 3). If today's workout exists, offer to resume it.
 - **PRs** → PR list (add, edit, delete, swipe to delete).
 - **Gym** → gym sheet: gyms as chips (tap to switch, **+ Add gym**, remove current), name, units (segmented), plates (chips), bar (chips). The room updates live.

@@ -23,13 +23,26 @@ enum Diorama {
 
     /// One model per baked piece. Each is named after the walls it shows with ("walls:back,right"), so
     /// `showWalls(from:in:)` can cut away the walls between the camera and the room.
-    static func entities(for pieces: [BakedPiece]) -> [Entity] {
+    /// With `duotone`, every colour and picture is posterized to box dark or box light (`Look.duotone`), like the
+    /// prototype's animation scenes.
+    private static var duotoneTextures: [BakedPiece.Paint: TextureResource] = [:]
+
+    static func entities(for pieces: [BakedPiece], duotone: Bool = false) -> [Entity] {
         var textures: [Picture: TextureResource] = [:]
         return pieces.compactMap { piece in
             let material: UnlitMaterial
             switch piece.paint {
             case .colour(let colour):
-                material = flat(uiColor(colour))
+                material = flat(uiColor(duotone ? Look.duotone(colour) : colour))
+            case .picture(let picture, let tint) where duotone:
+                // Its own two-tone print for this much light, made once.
+                if duotoneTextures[piece.paint] == nil, let image = PictureArt.duotone(PictureArt.image(picture), tint: tint).cgImage {
+                    duotoneTextures[piece.paint] = try? TextureResource(image: image, options: .init(semantic: .color))
+                }
+                guard let texture = duotoneTextures[piece.paint] else { return nil }
+                var m = UnlitMaterial(applyPostProcessToneMap: false)
+                m.color = .init(tint: .white, texture: .init(texture))
+                material = m
             case .picture(let picture, let tint):
                 if textures[picture] == nil, let image = PictureArt.image(picture).cgImage {
                     textures[picture] = try? TextureResource(image: image, options: .init(semantic: .color))
@@ -251,6 +264,25 @@ enum PictureArt {
     }()
 
     // MARK: - Drawing helpers
+
+    /// A picture as lit by `tint`, posterized to box dark and box light pixel by pixel.
+    static func duotone(_ image: UIImage, tint: RGB) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let width = cg.width, height = cg.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let space = CGColorSpaceCreateDeviceRGB(), info = CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: space, bitmapInfo: info) else { return image }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let dark = Look.boxDark, light = Look.boxLight
+        for i in stride(from: 0, to: pixels.count, by: 4) {
+            let colour = RGB(Float(pixels[i]) / 255 * tint.r, Float(pixels[i + 1]) / 255 * tint.g, Float(pixels[i + 2]) / 255 * tint.b)
+            let out = Look.duotone(colour) == light ? light : dark
+            pixels[i] = UInt8(out.r * 255); pixels[i + 1] = UInt8(out.g * 255); pixels[i + 2] = UInt8(out.b * 255); pixels[i + 3] = 255
+        }
+        guard let result = context.makeImage() else { return image }
+        return UIImage(cgImage: result)
+    }
 
     private static func draw(_ size: CGSize, _ body: (CGContext) -> Void) -> UIImage {
         let format = UIGraphicsImageRendererFormat()

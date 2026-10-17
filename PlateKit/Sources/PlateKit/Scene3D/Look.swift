@@ -80,6 +80,12 @@ public enum Look {
     /// The ink lines (the prototype's LineBasicMaterial and sketch line), unlit.
     public static let ink = boxDark
 
+    /// The prototype's animation scenes (the title and the session-over scale) are two-tone: everything posterized
+    /// to box dark or box light by its brightness.
+    public static func duotone(_ colour: RGB) -> RGB {
+        0.299 * colour.r + 0.587 * colour.g + 0.114 * colour.b > 0.5 ? boxLight : boxDark
+    }
+
     public static let ambient: Float = 2.7
     public static let sunIntensity: Float = 1.5
     /// How finely the sun's angle is stepped: each step is one flat colour.

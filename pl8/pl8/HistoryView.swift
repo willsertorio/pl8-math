@@ -10,7 +10,7 @@ struct HistoryView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                RoomHeader(station: .overview)
+                RoomHeader(station: .flag)
                 Group {
                     if sessions.isEmpty {
                         ContentUnavailableView("No sessions yet", systemImage: "clock")

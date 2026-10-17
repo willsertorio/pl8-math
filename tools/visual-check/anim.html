@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{"three":"/tools/visual-check/node_modules/three/build/three.module.js","three/addons/":"/tools/visual-check/node_modules/three/examples/jsm/"}}</script>
+<script>class DCLogic { constructor(p){ this.props = p || {}; } setState(s){ Object.assign(this.state, s); } }</script>
+<script src="/reference/prototype-app-logic.js"></script>
+<style>html,body{margin:0;background:#FF6200}#stage{width:390px;height:844px;position:relative}</style>
+</head><body><div id="stage"></div>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+window.PlateKit = { THREE, RoomEnvironment };
+try {
+  const scene = new URLSearchParams(location.search).get('s');
+  const L = new AnimLayer(document.getElementById('stage'), scene, scene === 'done' ? { bar: 20, unit: 'kg', total: 115 } : {});
+  window.L = L; window.ready = 'ok';
+} catch (e) { window.ready = 'ERR ' + e.message + '\n' + e.stack; }
+</script></body></html>

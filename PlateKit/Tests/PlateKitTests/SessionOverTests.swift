@@ -91,3 +91,15 @@ struct OpeningTests {
         #expect((far.position - far.target).length > 50)
     }
 }
+
+@Suite("The animation scenes' two-tone look (prototype AnimLayer: posterize 2, duotone)")
+struct DuotoneTests {
+    @Test func everyColourBecomesBrownOrCream() {
+        #expect(Look.duotone(Look.boxLight) == Look.boxLight)
+        #expect(Look.duotone(Look.boxDark) == Look.boxDark)
+        #expect(Look.duotone(RGB(hex: "#D3262E")) == Look.boxDark)        // red 25: dark, its print light
+        #expect(Look.duotone(RGB(hex: "#1E5BC6")) == Look.boxDark)
+        #expect(Look.duotone(RGB(hex: "#F2F2EE")) == Look.boxLight)       // white change plate
+        #expect(Look.duotone(RGB(hex: "#CDD2D8")) == Look.boxLight)       // the bar's steel
+    }
+}

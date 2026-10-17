@@ -95,10 +95,10 @@ final class ScaleStage {
             world.addChild(sky)
         }
         let parts = ScaleScene.parts()
-        for child in Diorama.entities(for: SceneBake.bake(parts.base, placement: still, wall: nil, content: .withoutShadows)) {
+        for child in Diorama.entities(for: SceneBake.bake(parts.base, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
             world.addChild(child)
         }
-        for child in Diorama.entities(for: SceneBake.bake(parts.platform, placement: still, wall: nil, content: .withoutShadows)) {
+        for child in Diorama.entities(for: SceneBake.bake(parts.platform, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
             platform.addChild(child)
         }
         world.addChild(platform)
@@ -116,7 +116,7 @@ final class ScaleStage {
             let parts = drop.plate.map { SessionScene.parts(.init(plate: $0, centre: .zero, axis: .y, turn: drop.turn)) }
                 ?? PropModels.barbellParts()
             let entity = Entity()
-            for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows)) {
+            for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
                 entity.addChild(child)
             }
             entity.isEnabled = false

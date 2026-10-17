@@ -259,7 +259,8 @@ private struct NameTyper: View {
 }
 
 /// The opening's title (prototype AnimLayer 'open'): "pl8(math)" in cream over the orange, with plates drifting
-/// up behind it, slowly turning. Tap anywhere to go on.
+/// up behind it, slowly turning, in the prototype's two tones (bumpers brown, change plates cream, brown outline).
+/// Tap anywhere to go on.
 private struct OpeningTitle: View {
     private struct Drifter {
         let plate: Plate
@@ -273,9 +274,9 @@ private struct OpeningTitle: View {
             return Double(seed >> 33) / Double(1 << 31)
         }
         let plates = Plate.catalog(.kg)
-        return (0..<24).map { i in
-            Drifter(plate: plates[i % plates.count], x: random(), speed: 0.035 + random() * 0.04, phase: random(),
-                    spin: 0.3 + random() * 0.9, size: 0.6 + random() * 0.6)
+        return (0..<16).map { i in
+            Drifter(plate: plates[i % plates.count], x: random(), speed: 0.018 + random() * 0.022, phase: random(),
+                    spin: 0.25 + random() * 0.6, size: 0.7 + random() * 0.6)
         }
     }()
 
@@ -294,16 +295,19 @@ private struct OpeningTitle: View {
                         let x = d.x * size.width + sin(t * 0.4 + d.phase * 6) * 18
                         let squash = max(0.12, abs(cos(t * d.spin + d.phase * 6)))
                         let rect = CGRect(x: x - diameter * squash / 2, y: y - diameter / 2, width: diameter * squash, height: diameter)
-                        context.fill(Path(ellipseIn: rect), with: .color(Color(hex: d.plate.colorHex)))
-                        context.stroke(Path(ellipseIn: rect), with: .color(ink), lineWidth: 2)
-                        let hub = rect.insetBy(dx: rect.width * 0.4, dy: rect.height * 0.4)
-                        context.fill(Path(ellipseIn: hub), with: .color(cream))
+                        let bumper = d.plate.kind == .bumper
+                        context.fill(Path(ellipseIn: rect), with: .color(bumper ? ink : cream))
+                        context.stroke(Path(ellipseIn: rect), with: .color(ink), lineWidth: 2.5)
+                        let ring = rect.insetBy(dx: rect.width * 0.3, dy: rect.height * 0.3)
+                        context.stroke(Path(ellipseIn: ring), with: .color(bumper ? cream : ink), lineWidth: 1.5)
+                        let hub = rect.insetBy(dx: rect.width * 0.42, dy: rect.height * 0.42)
+                        context.fill(Path(ellipseIn: hub), with: .color(bumper ? cream : ink))
                     }
                 }
             }
             Text("pl8(math)")
-                .font(.system(size: 54, weight: .black))
-                .tracking(4)
+                .font(.system(size: 39, weight: .heavy))
+                .tracking(4.3)
                 .foregroundStyle(cream)
         }
         .ignoresSafeArea()
