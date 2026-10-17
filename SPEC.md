@@ -59,7 +59,7 @@ Stations (camera shot names from `scene-layout-and-look.json`):
 | Rack | `setv` | Bar on the rack, loaded for the current set |
 
 ### 2.2 First run
-**0 · Opening.** Title "pl8(math)" → tap → a closed box pops in → tap → the box opens and the room unfolds (walls drop, furniture lands). Light haptic on each tap.
+**0 · Opening.** Title "pl8(math)" in cream over the orange, plates drifting up behind it → tap → a closed box pops in far off in the sky, turning slowly and floating → tap → the box opens like the prototype's runOnb (it turns to face you, the lid floats up and away, the walls glide down — the ones facing the overview all the way — and the camera drifts in to the overview), then the whiteboard rolls in and the bench is tossed in, and the setup starts. Light haptic on each tap.
 
 **1 · Gym setup** — one question per sheet, each answer visibly builds the room:
 1. *"Where are you training now?"* Name, up to 8 characters, uppercase. As you type, the flag on the back wall unrolls with the name.
@@ -76,16 +76,16 @@ While reading: a spinning plate loader. Then the whiteboard in the room shows th
 Before Start, the app asks for anything it's missing (see 3.6): a PR it doesn't have ("What's your Snatch PR?", saved to PRs) and any % it couldn't read ("What % for Back Squat?").
 
 ### 2.3 A session
-**4–6 · The session page.** The room takes 80 % of the screen; below it, one card at a time, swiped up for the next (Will, 2026-10-17). No title or tab bar: just Back. Two buttons over the room, **Plate kit** and **Sets**, jump between the parts.
+**4–6 · The session page.** The room takes 80 % of the screen; below it, one card at a time, swiped up for the next — on the card or anywhere on the room (Will, 2026-10-17). No title or tab bar: just Back. Two buttons over the room, **Plate kit** and **Sets**, jump between the parts.
 - **Plate kit** card: one row of chips, e.g. **2 × 45 LB**, plus the bar, to tick off. The room shows the kit floor from close: the plates drop onto it with real physics (from 7–9.5 m, slightly tilted and spinning, the prototype's friction and bounce), heaviest first.
-- **Set** cards, text only: `WARM-UP · SNATCH`, **"Set 3 of 6" and "1 rep"** biggest, the load in the PR's unit and the %, and the change from the set before. The room shows one sleeve of the bar close up, carrying that set's plates, which slide off and on between sets; plates on the bar are missing from the floor.
+- **Set** cards, text only: `WARM-UP · SNATCH`, **"Set 3 of 6" and "1 rep"** biggest, the load in the PR's unit and the %, and the change from the set before. The room shows one sleeve of the bar close up, carrying that set's plates, which slide off and on between sets; plates on the bar are missing from the floor. Plates start just outside the collar on every bar: a lighter bar has shorter sleeves, not a shorter shaft, so plates never reach the J-hooks.
 - Last card: *"Take off … each side, then put the bar back"* and **End session**.
 Nothing to tick off per set and no "How much did you lift?" (Will's first real class, 2026-10-16). No grey explanation text anywhere in the app.
 
-**7 · Session over.** After **End session**: the bell rings (three strikes) and a "scale" weighs the session's heaviest set (its plates and bar, total, label *Heaviest set*). Tap → kit is put away, camera to overview, tab bar appears. The session is saved to history.
+**7 · Session over.** After **End session**: the bell rings (three strikes, heard and felt) and a "scale" weighs the session's heaviest set, like the prototype's 'done' scene: its plates fall onto a platform scale one by one, heaviest first, then the bar lands across them; the scale's screen counts up to the total; label *Heaviest set*; then *"You lifted a lion."* word by word — the animal nearest the total in kg on a log scale (the prototype's list, house cat to blue whale). Tap → back to Train, tab bar appears. The session is saved to history.
 
 ### 2.4 Home (after first run)
-Tab bar: **Train** · **PRs** · **Gym**.
+Tab bar: **Train** · **PRs** · **Gym** · **History**. Each tab has the room on its top 40 %, live and draggable, looking at its station: Train → whiteboard, PRs → PR board, Gym → plate shelf, History → overview.
 - **Train** → whiteboard + "Add today's workout" (step 3). If today's workout exists, offer to resume it.
 - **PRs** → PR list (add, edit, delete, swipe to delete).
 - **Gym** → gym sheet: gyms as chips (tap to switch, **+ Add gym**, remove current), name, units (segmented), plates (chips), bar (chips). The room updates live.
