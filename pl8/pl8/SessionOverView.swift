@@ -215,9 +215,8 @@ enum Bell {
         haptic.prepare()
         Task { @MainActor in
             // Worked out off the main thread (a few hundred thousand samples), then played with the strikes felt.
-            if let buffer = await Task.detached(priority: .userInitiated, operation: { sound(strikes: strikes) }).value {
-                play(buffer)
-            }
+            let samples = await Task.detached(priority: .userInitiated, operation: { sound(strikes: strikes) }).value
+            if let buffer = buffer(samples) { play(buffer) }
             var last = 0.0
             for delay in strikes {
                 try? await Task.sleep(for: .seconds(delay - last))
@@ -242,14 +241,22 @@ enum Bell {
         } catch {}
     }
 
-    nonisolated private static func sound(strikes: [Double]) -> AVAudioPCMBuffer? {
-        let rate = 44_100.0, length = 3.4
+    private static let rate = 44_100.0
+
+    private static func buffer(_ samples: [Float]) -> AVAudioPCMBuffer? {
         guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
-              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(rate * length)),
-              let samples = buffer.floatChannelData?[0] else { return nil }
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
+              let channel = buffer.floatChannelData?[0] else { return nil }
         buffer.frameLength = buffer.frameCapacity
+        for (index, sample) in samples.enumerated() { channel[index] = sample }
+        return buffer
+    }
+
+    nonisolated private static func sound(strikes: [Double]) -> [Float] {
+        let rate = 44_100.0, length = 3.4
+        var samples = [Float](repeating: 0, count: Int(rate * length))
         let partials: [(ratio: Double, level: Double, decay: Double)] = [(1, 1, 2.6), (2.76, 0.45, 1.6), (5.4, 0.22, 0.9), (8.9, 0.1, 0.5)]
-        for frame in 0..<Int(buffer.frameLength) {
+        for frame in samples.indices {
             let t = Double(frame) / rate
             var value = 0.0
             for (k, start) in strikes.enumerated() where t >= start {
@@ -265,6 +272,6 @@ enum Bell {
             }
             samples[frame] = Float(value * 0.22)
         }
-        return buffer
+        return samples
     }
 }
