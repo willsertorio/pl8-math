@@ -19,6 +19,7 @@ struct SessionView: View {
     @State private var forward = true
     @State private var jumps = 0
     @State private var endCount = 0
+    @State private var grabFlag = GrabFlag()
 
     /// - Parameter startOnFirstSet: open on the first set instead of the kit (the CI's screenshots).
     init(session: Session, startOnFirstSet: Bool = false, onFinish: @escaping () -> Void) {
@@ -90,7 +91,8 @@ struct SessionView: View {
                       plateSizes: session.plateSizes, barWeight: session.barWeight,
                       session: SessionProps(kit: Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) }),
                                             unit: session.gymUnit, barWeight: session.barWeight, perSide: top.perSide,
-                                            onFloor: top.onFloor, dim: !onKit))
+                                            onFloor: top.onFloor, dim: !onKit),
+                      grabFlag: grabFlag)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -114,9 +116,10 @@ struct SessionView: View {
                     .padding(.bottom, 2)
             }
         }
-        // Swipe up or down anywhere for the next card or the one before.
+        // Swipe up or down anywhere for the next card or the one before (unless the drag picked up a plate).
         .contentShape(Rectangle())
-        .gesture(DragGesture(minimumDistance: 24).onEnded { value in
+        .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { value in
+            if grabFlag.used { return }
             let dy = value.translation.height
             guard abs(dy) > 40, abs(dy) > abs(value.translation.width),
                   let index = rows.firstIndex(where: { $0.id == top.id }) else { return }

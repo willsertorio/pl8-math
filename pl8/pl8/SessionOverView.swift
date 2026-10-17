@@ -82,6 +82,9 @@ final class ScaleStage {
     private var unit: WeightUnit = .kg
     private var barWeight: Double = 0
     private var built = false
+    /// The camera's kick on each landing (the prototype's dShake 0.3), and the room's resting pose.
+    private var root: Entity?
+    private var rest = Transform()
     var onLanding: () -> Void = {}
 
     func build(perSide: [Double], unit: WeightUnit, barWeight: Double) -> [Entity] {
@@ -133,6 +136,8 @@ final class ScaleStage {
         let eye = ScaleScene.cameraTarget + SIMD3(flat * sin(ScaleScene.cameraYaw), distance * sin(ScaleScene.cameraElevation),
                                                   flat * cos(ScaleScene.cameraYaw))
         world.transform = Diorama.worldTransform(target: ScaleScene.cameraTarget, position: eye)
+        root = world
+        rest = world.transform
         let camera = PerspectiveCamera()
         camera.camera.fieldOfViewInDegrees = 2 * atan(ScaleScene.viewHeight / 2 / distance) * 180 / .pi
         built = true
@@ -142,7 +147,7 @@ final class ScaleStage {
     /// Drops everything in turn; the platform dips on a spring at each landing. Returns once the last one lands.
     func play(instantly: Bool) async {
         while !built && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(16)) }
-        var dip: Float = 0, dipSpeed: Float = 0, read: Double = 0
+        var dip: Float = 0, dipSpeed: Float = 0, read: Double = 0, shake: Float = 0
         var landed = Array(repeating: false, count: drops.count)
         let start = ContinuousClock.now
         var last = start
@@ -162,6 +167,8 @@ final class ScaleStage {
                 if elapsed >= ScaleScene.fallTime && !landed[index] {
                     landed[index] = true
                     dipSpeed -= ScaleScene.kick(drop)
+                    let kilos = drop.plate.map { Float($0.unit == .lb ? $0.size * 0.4536 : $0.size) }
+                    shake = max(shake, 0.3 * (kilos.map { $0 / 25 + 0.3 } ?? 1.4))
                     read += drop.plate?.size ?? barWeight
                     show(read)
                     onLanding()
@@ -171,6 +178,14 @@ final class ScaleStage {
                 entity.orientation = simd_quatf(angle: drop.tilt.x * tilt, axis: [1, 0, 0])
                     * simd_quatf(angle: drop.turn + drop.spin * fall, axis: [0, 1, 0])
                     * simd_quatf(angle: drop.tilt.y * tilt, axis: [0, 0, 1])
+            }
+            // The kick: the camera jumps at random by up to 5 % of the view, dying away fast.
+            shake *= exp(-dt * 10)
+            if let root {
+                var pose = rest
+                let reach = shake * 0.05 * ScaleScene.viewHeight
+                pose.translation += SIMD3<Float>(Float.random(in: -0.5...0.5), Float.random(in: -0.5...0.5), 0) * reach
+                root.transform = pose
             }
             if landed.allSatisfy({ $0 }) && t > (drops.last?.at ?? 0) + ScaleScene.fallTime + 1 { break }
             if landed.allSatisfy({ $0 }) && instantly { break }

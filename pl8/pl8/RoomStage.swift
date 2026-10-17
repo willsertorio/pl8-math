@@ -20,6 +20,11 @@ struct RoomStage: View {
     var opening: OpeningPhase?
     /// Home: the room floats a little in space (prototype floatTick).
     var floating = false
+    /// Set when a drag picked up a kit plate, so the session's swipe leaves it alone.
+    var grabFlag: GrabFlag?
+    @State private var viewSize: CGSize = .zero
+    @State private var grabbing = false
+    @State private var grabStarted = false
 
     @State private var orbit: Orbit
     /// The closed box's own move during the opening (pop, turn, float), round the room's centre.
@@ -32,9 +37,10 @@ struct RoomStage: View {
 
     init(station: RoomLayout.Station, gymName: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double,
          boards: Boards = Boards(), session: SessionProps? = nil, interactive: Bool = false, opening: OpeningPhase? = nil,
-         floating: Bool = false) {
+         floating: Bool = false, grabFlag: GrabFlag? = nil) {
         self.opening = opening
         self.floating = floating
+        self.grabFlag = grabFlag
         self.boards = boards
         self.session = session
         self.station = station
@@ -66,6 +72,9 @@ struct RoomStage: View {
         }
         .background(Theme.background)
         .gesture(gestures, including: interactive ? .all : .subviews)
+        // In the kit view, the plates on the floor can be picked up and thrown.
+        .simultaneousGesture(grabGesture, including: session != nil && station == .kitFloor ? .all : .subviews)
+        .onGeometryChange(for: CGSize.self, of: { $0.size }) { viewSize = $0 }
         .onChange(of: station) { _, item in fly(to: item) }
         .onDisappear { flight?.cancel() }
         .task(id: opening) { await play(opening) }
@@ -136,6 +145,39 @@ struct RoomStage: View {
         case .done, nil:
             box = matrix_identity_float4x4
         }
+    }
+
+    private var grabGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if !grabStarted {
+                    grabStarted = true
+                    grabbing = props.beginGrab(direction: ray(through: value.startLocation))
+                    if grabbing { grabFlag?.used = true }
+                }
+                if grabbing { props.moveGrab(direction: ray(through: value.location)) }
+            }
+            .onEnded { _ in
+                if grabbing {
+                    props.endGrab()
+                    // The session's swipe ends at the same moment; it sees the flag, then it's cleared.
+                    let flag = grabFlag
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(150))
+                        flag?.used = false
+                    }
+                }
+                grabbing = false
+                grabStarted = false
+            }
+    }
+
+    /// The ray from the camera (at the origin, looking down −Z, with the orbit's vertical field of view) through a
+    /// point on the view.
+    private func ray(through point: CGPoint) -> SIMD3<Float> {
+        let width = Float(max(1, viewSize.width)), height = Float(max(1, viewSize.height))
+        let t = tan(orbit.fieldOfView * .pi / 360)
+        return SIMD3((2 * Float(point.x) / width - 1) * t * width / height, (1 - 2 * Float(point.y) / height) * t, -1)
     }
 
     private var gestures: some Gesture {
@@ -214,6 +256,19 @@ final class SetupProps {
     private var ticker: Task<Void, Never>?
     private var kit: Kit?
     private var kitItems: [(size: Double, entity: Entity)] = []
+    /// The kit's plates once they're real bodies, to grab and throw (prototype bindTaps / kitHit).
+    private var kitBodies: [ObjectIdentifier: KitBody] = [:]
+    private var grab: Grab?
+    private var subscriptions: [EventSubscription] = []
+    /// The camera's kick on impacts (prototype shakeKick), and the room's pose before the kick was added.
+    private var shake: Float = 0
+    private var shakeBase: Transform?
+    private var shakeWritten: simd_float4x4?
+    /// Dust puffs where things land (prototype emitDust).
+    private let dustGroup = Entity()
+    private var dust: [DustBit] = []
+    private var dustTemplate: Entity?
+    private var benchLanded = true
     private var onBar: [(size: Double, entity: Entity, k: Int)] = []
     private var barSide: [Double] = []
     private var piles: [Double: Entity] = [:]
@@ -236,11 +291,26 @@ final class SetupProps {
         simulation.gravity = [0, -9.81, 0]
         world.components.set(simulation)
         let room = RoomLayout.room
-        let floor = Entity()
-        floor.position = [room.centre.x, -0.5, room.centre.z]
-        floor.components.set(CollisionComponent(shapes: [.generateBox(size: [room.width + 4, 1, room.depth + 4])]))
-        floor.components.set(PhysicsBodyComponent(massProperties: .default, material: Self.rubber, mode: .static))
-        world.addChild(floor)
+        func solid(_ name: String, size: SIMD3<Float>, at position: SIMD3<Float>) {
+            let body = Entity()
+            body.name = name
+            body.position = position
+            body.components.set(CollisionComponent(shapes: [.generateBox(size: size)]))
+            body.components.set(PhysicsBodyComponent(massProperties: .default, material: Self.rubber, mode: .static))
+            world.addChild(body)
+        }
+        solid("floor", size: [room.width + 4, 1, room.depth + 4], at: [room.centre.x, -0.5, room.centre.z])
+        // Like the prototype's kit world: the raised platform, the walls round the room (so a thrown plate stays in)
+        // and the rack's uprights (it bounces off them).
+        let platform = RoomLayout.objects[.platform]!.position
+        solid("platform", size: [2.44, 0.05, 2.44], at: [platform.x, 0.025, platform.z])
+        solid("wall", size: [room.width + 1, 6, 0.5], at: [room.centre.x, 3, room.minZ - 0.25])
+        solid("wall", size: [room.width + 1, 6, 0.5], at: [room.centre.x, 3, room.maxZ + 0.25])
+        solid("wall", size: [0.5, 6, room.depth + 1], at: [room.minX - 0.25, 3, room.centre.z])
+        solid("wall", size: [0.5, 6, room.depth + 1], at: [room.maxX + 0.25, 3, room.centre.z])
+        let rack = PropModels.placement(for: .rack)
+        for x: Float in [-0.62, 0.62] { solid("upright", size: [0.09, 2.35, 0.09], at: rack.apply([x, 1.175, -0.85])) }
+        world.addChild(dustGroup)
         attached = true
         startTicking()
     }
@@ -284,6 +354,182 @@ final class SetupProps {
             applyDim(dim)
         }
         moving = moving.filter { step($0) }
+        holdGrab()
+        updateDust(dt)
+        updateShake(dt)
+    }
+
+    // MARK: - Impacts: the camera's kick and dust (prototype shakeKick, emitDust, updateDust)
+
+    /// A kick of the camera, e.g. 0.16 for a 25 kg plate landing hard.
+    func kick(_ amount: Float) { shake = max(shake, amount) }
+
+    /// The kick dies away fast (×e^−9 a second); it moves the camera at random by up to 1.2 % of how far it is
+    /// from what it looks at.
+    private func updateShake(_ dt: Float) {
+        guard let world else { return }
+        shake *= exp(-dt * 9)
+        // The stage moves the room for the camera; anything it wrote since our last kick is the new resting pose.
+        if shakeWritten == nil || world.transform.matrix != shakeWritten! { shakeBase = world.transform }
+        guard var pose = shakeBase else { return }
+        if shake < 0.0005 {
+            if shakeWritten != nil { world.transform = pose; shakeWritten = nil }
+            return
+        }
+        let target = pose.matrix * SIMD4(RoomLayout.room.centre, 1)
+        let reach = shake * simd_length(SIMD3(target.x, target.y, target.z)) * 0.012
+        pose.translation += SIMD3<Float>(Float.random(in: -0.5...0.5), Float.random(in: -0.5...0.5), Float.random(in: -0.5...0.5)) * reach
+        world.transform = pose
+        shakeWritten = world.transform.matrix
+    }
+
+    /// A puff where something lands: a few pale chunks pop up in a ring, drift out and up, and shrink away.
+    func emitDust(x: Float, z: Float, count: Float, speed: Float, ring: Float, size: Float = 1) {
+        let raw = count * 0.45 * 0.05
+        let n = min(120, Int(raw) + (Float.random(in: 0..<1) < raw.truncatingRemainder(dividingBy: 1) ? 1 : 0))
+        guard n > 0 else { return }
+        if dustTemplate == nil {
+            let template = Entity()
+            let chunk = PropPart(mesh: LowPolyMesh.box(size: [1.5, 1.5, 1.5]), tone: .paint(RGB(hex: "#E9E2D6")), inked: false, casts: false)
+            for child in Diorama.entities(for: SceneBake.bake([chunk], placement: .init(position: .zero, rotationDegrees: 0), wall: nil,
+                                                               content: .withoutShadows)) {
+                template.addChild(child)
+            }
+            dustTemplate = template
+        }
+        for _ in 0..<n {
+            let angle = Float.random(in: 0...(2 * .pi)), radius = ring * .random(in: 0.8...1.1)
+            let spread = speed * 0.05 * .random(in: 0.3...1.1)
+            let bit = DustBit(entity: dustTemplate!.clone(recursive: true),
+                              position: [x + cos(angle) * radius, .random(in: 0.04...0.08), z + sin(angle) * radius],
+                              velocity: [cos(angle) * spread, .random(in: 0.2...0.8) * speed * 0.5 * 0.94, sin(angle) * spread],
+                              rotation: [.random(in: 0...6.28), .random(in: 0...6.28), .random(in: 0...6.28)],
+                              spin: [.random(in: -0.8...0.8), .random(in: -0.8...0.8), .random(in: -0.8...0.8)],
+                              lifetime: .random(in: 0.9...1.7) * 0.24,
+                              size: (.random(in: 0.05...0.11) + speed * 0.012) * 0.2 * size)
+            dustGroup.addChild(bit.entity)
+            dust.append(bit)
+        }
+    }
+
+    private func updateDust(_ dt: Float) {
+        guard !dust.isEmpty else { return }
+        let drag = exp(-3 * dt)
+        dust = dust.filter { bit in
+            bit.age += dt
+            guard bit.age < bit.lifetime else { bit.entity.removeFromParent(); return false }
+            bit.velocity.x *= drag; bit.velocity.z *= drag
+            bit.velocity.y = bit.velocity.y * drag + 0.18 * 0.94 * dt
+            bit.position += bit.velocity * dt
+            bit.rotation += bit.spin * dt
+            bit.position.y = max(bit.position.y, bit.size * 0.6)
+            let t = bit.age / bit.lifetime
+            let pop = t < 0.22 ? 1 - pow(1 - t / 0.22, 3) : 1
+            let shrink = t > 0.45 ? max(0, 1 - (t - 0.45) / 0.55) : 1
+            let scale = bit.size * (0.35 + pop + 0.7 * t) * shrink
+            bit.entity.transform = Transform(scale: SIMD3(repeating: scale),
+                                             rotation: simd_quatf(angle: bit.rotation.x, axis: [1, 0, 0]) * simd_quatf(angle: bit.rotation.y, axis: [0, 1, 0])
+                                                * simd_quatf(angle: bit.rotation.z, axis: [0, 0, 1]),
+                                             translation: bit.position)
+            return true
+        }
+    }
+
+    // MARK: - Grabbing the kit's plates (prototype bindTaps: kitHit, aim, the drag spring)
+
+    /// Picks up the kit plate under the finger: `direction` is the ray from the camera through it (the camera sits at
+    /// the origin, looking down −Z). It lifts 32 cm and follows the finger on that height. Returns false if no plate.
+    func beginGrab(direction: SIMD3<Float>) -> Bool {
+        guard let world, let scene = world.scene else { return false }
+        let hits = scene.raycast(origin: .zero, direction: simd_normalize(direction), length: 100, query: .nearest, mask: .all, relativeTo: nil)
+        guard let hit = hits.first, let body = kitBodies[ObjectIdentifier(hit.entity)] else { return false }
+        let point = world.convert(position: hit.position, from: nil)
+        let position = body.entity.position(relativeTo: world)
+        body.holder.findEntity(named: "settled")?.removeFromParent()
+        let height = max(point.y, 0.03) + 0.32
+        grab = Grab(body: body, offset: point - position, height: height, target: [point.x, height, point.z])
+        return true
+    }
+
+    /// The finger moved: where its ray meets the grab height, kept 35 cm inside the walls.
+    func moveGrab(direction: SIMD3<Float>) {
+        guard let world, var held = grab else { return }
+        let origin = world.convert(position: .zero, from: nil), ray = world.convert(direction: simd_normalize(direction), from: nil)
+        guard abs(ray.y) > 0.0001 else { return }
+        let t = (held.height - origin.y) / ray.y
+        guard t > 0, t < 30 else { return }
+        let point = origin + ray * t, room = RoomLayout.room
+        held.target = [min(room.maxX - 0.35, max(room.minX + 0.35, point.x)), held.height, min(room.maxZ - 0.35, max(room.minZ + 0.35, point.z))]
+        grab = held
+    }
+
+    /// Let go: it keeps the speed it had, so a quick flick throws it. Its shadow comes back where it settles.
+    func endGrab() {
+        guard let held = grab else { return }
+        grab = nil
+        settle(held.body)
+    }
+
+    /// While held: the grabbed point is pulled to the finger (a stiff, well-damped spring, as velocity), and its
+    /// spin dies down.
+    private func holdGrab() {
+        guard let world, let held = grab else { return }
+        let entity = held.body.entity
+        let point = entity.position(relativeTo: world) + held.offset
+        var velocity = (held.target - point) * 12
+        if simd_length(velocity) > 8 { velocity = simd_normalize(velocity) * 8 }
+        var motion = entity.components[PhysicsMotionComponent.self] ?? PhysicsMotionComponent()
+        motion.linearVelocity = velocity
+        motion.angularVelocity *= 0.85
+        entity.components.set(motion)
+    }
+
+    /// Once a kit plate has come to rest (or after 6 s), its shadow is drawn where it lies.
+    private func settle(_ body: KitBody) {
+        Task { @MainActor [weak self] in
+            var calm = 0
+            for _ in 0..<24 {
+                try? await Task.sleep(for: .seconds(0.25))
+                guard let self else { return }
+                if self.grab?.body.entity === body.entity { return }
+                let motion = body.entity.components[PhysicsMotionComponent.self]
+                let still = simd_length(motion?.linearVelocity ?? .zero) < 0.03 && simd_length(motion?.angularVelocity ?? .zero) < 0.05
+                calm = still ? calm + 1 : 0
+                if calm >= 2 { break }
+            }
+            guard let self, self.grab?.body.entity !== body.entity, let world = self.world else { return }
+            body.holder.findEntity(named: "settled")?.removeFromParent()
+            let pose = body.entity.transformMatrix(relativeTo: world)
+            let parts = SessionScene.parts(body.placed).map { part -> PropPart in
+                let moved = part.mesh.positions.map { p -> SIMD3<Float> in
+                    let q = pose * SIMD4(p.x, p.y, p.z, 1)
+                    return SIMD3(q.x, q.y, q.z)
+                }
+                return PropPart(mesh: LowPolyMesh(positions: moved, indices: part.mesh.indices), tone: part.tone,
+                                inked: part.inked, casts: part.casts)
+            }
+            let shadow = Entity()
+            shadow.name = "settled"
+            for child in Diorama.entities(for: SceneBake.bake(parts, placement: .init(position: .zero, rotationDegrees: 0),
+                                                               wall: nil, content: .shadowsOnly)) {
+                shadow.addChild(child)
+            }
+            body.holder.addChild(shadow)
+        }
+    }
+
+    /// A kit plate hit the floor or the platform (prototype kitImpact): the camera kicks and dust puffs, more for
+    /// heavier plates and harder hits.
+    private func impact(_ event: CollisionEvents.Began, body: KitBody) {
+        let other = event.entityA === body.entity ? event.entityB : event.entityA
+        guard other.name == "floor" || other.name == "platform", let world else { return }
+        let mass = Float(body.placed.plate.unit == .lb ? body.placed.plate.size * 0.4536 : body.placed.plate.size)
+        let speed = event.impulse / max(0.5, mass)
+        guard speed >= 1.2 else { return }
+        let f = mass / 25, hit = min(1, speed / 12)
+        kick(0.16 * f * (0.35 + 0.65 * hit))
+        let k = f * (0.45 + 0.55 * hit), at = world.convert(position: event.position, from: nil)
+        emitDust(x: at.x, z: at.z, count: 6 * f + 110 * k, speed: 0.4 * f + 2.8 * k, ring: Float(body.placed.plate.diameter) / 2, size: 0.2 + 1.25 * f)
     }
 
     /// The fan in three parts: what stays put (and the whole fan's shadow), the head round the swivel and the
@@ -467,6 +713,14 @@ final class SetupProps {
             group.orientation = simd_quatf(angle: move.turn, axis: [0, 1, 0]) * simd_quatf(angle: move.wobble.x, axis: [1, 0, 0])
                 * simd_quatf(angle: move.wobble.y, axis: [0, 0, 1])
         }
+        // The bench lands with a thump: a kick and a puff of dust.
+        if time < 1.1 { benchLanded = false }
+        if time >= 1.1 && time < Opening.furnishTime && !benchLanded {
+            benchLanded = true
+            let spot = PropModels.placement(for: .bench).position
+            kick(0.12)
+            emitDust(x: spot.x, z: spot.z, count: 26, speed: 1.1, ring: 0.4, size: 0.5)
+        }
     }
 
     /// A pile baked in place (with its shadow), then moved so it sits around its peg and scales from there.
@@ -504,13 +758,14 @@ final class SetupProps {
         guard attached else { return }
         guard let session else {
             for child in Array(kitFloor.children) + Array(barPlates.children) { child.removeFromParent() }
-            kitItems = []; onBar = []; barSide = []; kit = nil; moving = []
+            kitItems = []; onBar = []; barSide = []; kit = nil; moving = []; kitBodies = [:]; grab = nil; subscriptions = []
             if barOnFloor { moveBar(down: false, animate: false) }
             if dimGoal > 0 || dim > 0 { dimGoal = 0; dim = 0; applyDim(0) }
             return
         }
         if session.kit != kit {
             kit = session.kit
+            kitBodies = [:]; grab = nil; subscriptions = []
             for child in Array(kitFloor.children) { child.removeFromParent() }
             let placed = SessionScene.kitFloor(session.kit, unit: session.unit)
             // Each plate sits in a holder: the holder hides it while it's on the bar, the plate itself drops.
@@ -618,7 +873,13 @@ final class SetupProps {
             let y = max(radius * cos(min(1, f * 2.4) * 1.2), barY - 4.9 * f * f)
             entity.position = SIMD3(end + move.side * f * 0.5, y - barGroup.position.y, entity.position.z)
             entity.orientation = simd_quatf(angle: move.side * min(1, f * 2.4) * 1.2, axis: [0, 0, 1])
-            if move.landed == nil && f > 0.2 && y <= radius + 0.01 { move.landed = clock }
+            if move.landed == nil && f > 0.2 && y <= radius + 0.01 {
+                move.landed = clock
+                let ff = Float(move.plate.unit == .lb ? move.plate.size * 0.4536 : move.plate.size) / 25
+                emitDust(x: entity.position.x, z: entity.position.z + barGroup.position.z, count: 6 + 60 * ff, speed: 0.4 + 2 * ff,
+                         ring: radius, size: 0.2 + ff)
+                kick(0.04 * ff)
+            }
             if let landed = move.landed {
                 let k = min(1, max(0, (clock - landed - 0.35) / 0.35))
                 entity.scale = SIMD3(repeating: max(0.001, 1 - k))
@@ -638,6 +899,7 @@ final class SetupProps {
             move.landed = clock
             let kilos = move.plate.unit == .lb ? move.plate.size * 0.4536 : move.plate.size
             Sounds.clank(Float(kilos) / 25 + 0.15)
+            kick(0.02 + 0.05 * Float(kilos) / 25)
         }
         let since = clock - (move.landed ?? clock)
         entity.position.x = move.x + move.side * 0.012 * exp(-since * 14) * sin(since * 40)
@@ -662,7 +924,16 @@ final class SetupProps {
             return
         }
         _ = barGroup.move(to: target, relativeTo: barGroup.parent, duration: 0.75, timingFunction: .easeInOut)
-        if !down {
+        if down {
+            // It lands on the platform with a thump.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(0.75))
+                guard let self, self.barOnFloor else { return }
+                let bar = RoomLayout.barOnRack + SessionScene.floorOffset
+                self.kick(0.08)
+                self.emitDust(x: bar.x, z: bar.z, count: 30, speed: 1.4, ring: 0.3, size: 0.6)
+            }
+        } else {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(0.75))
                 guard let self, !self.barOnFloor else { return }
@@ -690,29 +961,23 @@ final class SetupProps {
             * simd_quatf(angle: .random(in: -0.11...0.11), axis: [0, 0, 1])
         entity.isEnabled = false
         let kilos = placed.plate.unit == .lb ? placed.plate.size * 0.4536 : placed.plate.size
-        Task { @MainActor in
+        let body = KitBody(entity: entity, placed: placed, holder: holder)
+        Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             entity.components.set(PhysicsBodyComponent(massProperties: .init(mass: Float(kilos)), material: Self.rubber, mode: .dynamic))
             entity.components.set(PhysicsMotionComponent(linearVelocity: [0, -2, 0],
                                                          angularVelocity: [.random(in: -0.3...0.3), .random(in: -0.6...0.6), .random(in: -0.3...0.3)]))
             entity.isEnabled = true
-            // Once it has settled, its shadow where it lies.
-            try? await Task.sleep(for: .seconds(4))
-            let pose = entity.transform.matrix
-            let parts = SessionScene.parts(placed).map { part -> PropPart in
-                let moved = part.mesh.positions.map { p -> SIMD3<Float> in
-                    let q = pose * SIMD4(p.x, p.y, p.z, 1)
-                    return SIMD3(q.x, q.y, q.z)
-                }
-                return PropPart(mesh: LowPolyMesh(positions: moved, indices: part.mesh.indices), tone: part.tone,
-                                inked: part.inked, casts: part.casts)
+            guard let self else { return }
+            // Now a body: it can be grabbed and thrown, it kicks the camera and puffs dust when it lands, and its
+            // shadow is drawn where it settles.
+            self.kitBodies[ObjectIdentifier(entity)] = body
+            if let scene = entity.scene {
+                self.subscriptions.append(scene.subscribe(to: CollisionEvents.Began.self, on: entity) { [weak self] event in
+                    self?.impact(event, body: body)
+                })
             }
-            let shadow = Entity()
-            for child in Diorama.entities(for: SceneBake.bake(parts, placement: .init(position: .zero, rotationDegrees: 0),
-                                                               wall: nil, content: .shadowsOnly)) {
-                shadow.addChild(child)
-            }
-            holder.addChild(shadow)
+            self.settle(body)
         }
     }
 
@@ -793,4 +1058,44 @@ enum RoomTemplate {
         camera.camera.fieldOfViewInDegrees = 50
         return [world, camera]
     }
+}
+
+/// A kit plate that's a real body, with where it was laid out and the holder that hides it while it's on the bar.
+struct KitBody {
+    let entity: Entity
+    let placed: SessionScene.PlacedPlate
+    let holder: Entity
+}
+
+/// A plate in the hand: the grabbed point's offset from its middle, the height it's carried at, where the finger is.
+struct Grab {
+    let body: KitBody
+    let offset: SIMD3<Float>
+    let height: Float
+    var target: SIMD3<Float>
+}
+
+/// One chunk of a dust puff.
+final class DustBit {
+    let entity: Entity
+    var position: SIMD3<Float>, velocity: SIMD3<Float>, rotation: SIMD3<Float>
+    let spin: SIMD3<Float>
+    let lifetime: Float, size: Float
+    var age: Float = 0
+
+    init(entity: Entity, position: SIMD3<Float>, velocity: SIMD3<Float>, rotation: SIMD3<Float>, spin: SIMD3<Float>,
+         lifetime: Float, size: Float) {
+        self.entity = entity
+        self.position = position
+        self.velocity = velocity
+        self.rotation = rotation
+        self.spin = spin
+        self.lifetime = lifetime
+        self.size = size
+    }
+}
+
+/// Shared between the stage and the session page: a drag picked up a plate (so it isn't a swipe to the next card).
+final class GrabFlag {
+    var used = false
 }
