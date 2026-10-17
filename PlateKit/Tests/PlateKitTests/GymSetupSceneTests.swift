@@ -40,6 +40,9 @@ struct GymSetupSceneTests {
             return (xs.max() ?? 0) - (xs.min() ?? 0)
         }
         #expect(abs(barLength(technique) - barLength(full) * 0.8) < 0.001)
+        // Only the sleeves get shorter: the collars stay where the full bar's are, outside the J-hooks.
+        #expect(PropModels.barX(0.67, length: 0.8) == 0.67)
+        #expect(abs(PropModels.barX(1.1, length: 0.914) - 1.1 * 0.914) < 0.0001)
     }
 
     @Test func bakingAGroupGivesItsOwnPiecesAndShadows() {

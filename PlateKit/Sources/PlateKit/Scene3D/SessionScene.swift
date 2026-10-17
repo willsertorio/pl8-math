@@ -58,15 +58,15 @@ public enum SessionScene {
     }
 
     /// The set's plates on both sleeves of the bar on the rack, innermost first, from just outside the collar
-    /// (0.695 m from the middle on the full bar), 2 mm apart.
+    /// (the same on every bar, clear of the J-hooks), 2 mm apart.
     public static func barPlates(perSide: [Double], unit: WeightUnit, barWeight: Double) -> [PlacedPlate] {
-        let bar = RoomLayout.barOnRack, length = PropModels.barScale(barWeight, unit: unit).x
+        let bar = RoomLayout.barOnRack
         var placed: [PlacedPlate] = []
         var along: Float = 0
         for (k, size) in perSide.enumerated() {
             guard let plate = Plate.find(size, unit) else { continue }
             let t = Float(plate.thickness)
-            let x = 0.695 * length + along + t / 2
+            let x = PropModels.collarEnd + 0.004 + along + t / 2
             along += t + 0.002
             for side: Float in [-1, 1] {
                 placed.append(PlacedPlate(plate: plate, centre: bar + SIMD3(side * x, 0, 0), axis: .x, turn: turn(plate, k * 2 + (side > 0 ? 1 : 0))))

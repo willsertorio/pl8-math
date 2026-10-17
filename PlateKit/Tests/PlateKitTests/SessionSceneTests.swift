@@ -29,17 +29,24 @@ struct SessionSceneTests {
         let bar = RoomLayout.barOnRack
         let right = placed.filter { $0.centre.x > bar.x }.sorted { $0.centre.x < $1.centre.x }
         #expect(right.map(\.plate.size) == [25, 15])                                    // heaviest inside
-        #expect(abs(right[0].centre.x - bar.x - (0.695 + 0.028)) < 0.001)               // the 25's middle
+        #expect(abs(right[0].centre.x - bar.x - (0.701 + 0.028)) < 0.001)               // the 25's middle
         #expect(placed.allSatisfy { $0.axis == .x && abs($0.centre.y - bar.y) < 0.001 })
         let left = placed.filter { $0.centre.x < bar.x }
         #expect(left.count == 2)
     }
 
-    @Test func aLighterBarHasShorterSleeves() {
-        let full = SessionScene.barPlates(perSide: [5], unit: .kg, barWeight: 20)
-        let technique = SessionScene.barPlates(perSide: [5], unit: .kg, barWeight: 10)
+    @Test func platesSitClearOfTheRackOnEveryBar() {
+        // Will's 2026-10-17 session: on the 35 lb bar the plates went into the J-hooks. The uprights and hooks
+        // reach 0.67 m from the middle of the bar, the collar's ring 0.697 m.
         let bar = RoomLayout.barOnRack.x
-        #expect(technique.map { abs($0.centre.x - bar) }.max()! < full.map { abs($0.centre.x - bar) }.max()!)
+        for unit in [WeightUnit.kg, .lb] {
+            for weight in Bar.weights(unit) {
+                let sizes = Plate.catalog(unit).map(\.size).sorted(by: >).prefix(2)
+                let placed = SessionScene.barPlates(perSide: Array(sizes), unit: unit, barWeight: weight)
+                let inner = placed.map { abs($0.centre.x - bar) - Float($0.plate.thickness) / 2 }.min()!
+                #expect(inner > PropModels.collarEnd, "\(weight) \(unit)")
+            }
+        }
     }
 
     @Test func shadowsCanBeBakedApart() {

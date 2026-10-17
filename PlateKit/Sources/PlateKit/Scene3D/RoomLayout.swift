@@ -91,6 +91,8 @@ public enum RoomLayout {
         /// During a session, with the room on most of the screen: the kit's plates from closer, and one sleeve of the
         /// bar on the rack, close enough to see each plate.
         case kitFloor, sleeve
+        /// The opening: the closed box far off in the sky (prototype SHOTS.far).
+        case far
     }
 
     public struct Shot: Equatable, Sendable {
@@ -141,6 +143,9 @@ public enum RoomLayout {
         // The right sleeve, from in front and to the right.
         let sleeve = SIMD3<Float>(bar.x + 0.9, bar.y - 0.06, bar.z)
         shots[.sleeve] = Shot(target: sleeve, position: sleeve + SIMD3(0.75, 0.35, 1.35), fieldOfView: 50)
+        // The prototype's shot(T, dir, d): 52 m out along (0.6, 0.34, 0.7) from above the room.
+        let farTarget = SIMD3<Float>(0, 4.2, 0), farDirection = SIMD3<Float>(0.6, 0.34, 0.7)
+        shots[.far] = Shot(target: farTarget, position: farTarget + farDirection / farDirection.length * 52, fieldOfView: 50)
         return shots
     }()
 }

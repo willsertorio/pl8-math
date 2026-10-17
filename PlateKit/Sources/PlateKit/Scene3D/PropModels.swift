@@ -208,10 +208,25 @@ public enum PropModels {
 
     /// Wall-mounted rack: two uprights, J-hooks, arms back to the wall, a pull-up bar, and the barbell on the hooks.
     /// How much shorter (x) and thinner (y) the gym's bar is than the full Olympic bar: the prototype's
-    /// setBarModel, by the bar's place in the unit's list (20/15/10 kg, 45/35/15 lb).
+    /// setBarModel, by the bar's place in the unit's list (20/15/10 kg, 45/35/15 lb). Only the sleeves get
+    /// shorter (see `barX`): the shaft between the collars stays the full bar's, so the plates clear the rack.
     public static func barScale(_ weight: Double, unit: WeightUnit) -> SIMD2<Float> {
         let index = max(0, Bar.weights(unit).firstIndex(of: weight) ?? 0)
         return [SIMD2<Float>(1, 1), SIMD2(0.914, 0.88), SIMD2(0.8, 0.8)][min(index, 2)]
+    }
+
+    /// Where a lighter bar's sleeve ends (the collar's outer ring, measured from the middle of the bar).
+    public static let collarEnd: Float = 0.697
+    /// The full bar's half length, end cap included.
+    static let barHalfLength: Float = 1.1
+
+    /// A point on the full bar moved onto a bar `length` times as long: inside the collars nothing moves, the
+    /// sleeves shrink so the whole bar is `length` times as long, like real bars (a 15 kg bar has shorter
+    /// sleeves, not a shorter grip).
+    public static func barX(_ x: Float, length: Float) -> Float {
+        guard abs(x) > collarEnd else { return x }
+        let sleeve = (barHalfLength * length - collarEnd) / (barHalfLength - collarEnd)
+        return (x < 0 ? -1 : 1) * (collarEnd + (abs(x) - collarEnd) * sleeve)
     }
 
     private static func rack(_ b: inout Builder, barScale: SIMD2<Float> = [1, 1]) {
@@ -237,13 +252,20 @@ public enum PropModels {
         var barbellParts = Builder()
         barbell(&barbellParts, at: .zero)
         b.parts += barbellParts.parts.map { part in
-            PropPart(mesh: part.mesh.mapped { SIMD3($0.x * barScale.x, $0.y * barScale.y, $0.z * barScale.y) + bar },
+            PropPart(mesh: part.mesh.mapped { SIMD3(barX($0.x, length: barScale.x), $0.y * barScale.y, $0.z * barScale.y) + bar },
                      tone: part.tone, inked: part.inked, casts: part.casts)
         }
     }
 
     /// An Olympic bar along X, in the prototype's steels: smooth centre, knurled hand sections, collars,
     /// sleeves and end caps.
+    /// The full Olympic bar on its own, around its middle (the session-over scale).
+    public static func barbellParts() -> [PropPart] {
+        var b = Builder()
+        barbell(&b, at: .zero)
+        return b.parts
+    }
+
     private static func barbell(_ b: inout Builder, at centre: SIMD3<Float>) {
         let smooth = PropPart.Tone.metal(RGB(hex: "#CDD2D8")), knurl = PropPart.Tone.metal(RGB(hex: "#D3D8DD"))
         let sleeve = PropPart.Tone.metal(RGB(hex: "#EEF1F4")), collar = PropPart.Tone.metal(RGB(hex: "#A9B0B8"))
