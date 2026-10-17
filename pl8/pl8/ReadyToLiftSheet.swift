@@ -3,13 +3,15 @@ import SwiftData
 import SwiftUI
 import PlateKit
 
-/// "Ready to lift?" (SPEC 2.2 step 3): the whiteboard, any missing PR or %, then Start · Edit · Cancel.
-struct ReadyToLiftSheet: View {
+/// "Ready to lift?" (SPEC 2.2 step 3), like the prototype's wodReady: the plan is on the whiteboard in the room;
+/// anything missing is asked first (a PR, a %), then Start training · Edit · Cancel. With a session already under
+/// way: Back to the set.
+struct ReadyToLift: View {
     let workout: Workout
     var onStart: (Workout) -> Void
+    var onResume: (Session) -> Void = { _ in }
 
     @Environment(\.modelContext) private var context
-    @Environment(\.dismiss) private var dismiss
     @Query private var records: [PersonalRecord]
     @State private var prValues: [String: Double] = [:]
     @State private var prUnits: [String: WeightUnit] = [:]
@@ -23,73 +25,67 @@ struct ReadyToLiftSheet: View {
         let missingPRs = Planner.missingPRs(blocks: blocks, records: records)
         let missingPercents = blocks.indices.filter { blocks[$0].pctMissing }
         let isReady = !blocks.isEmpty && missingPRs.isEmpty && missingPercents.isEmpty
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Whiteboard(blocks: blocks)
-
-                    ForEach(missingPercents, id: \.self) { index in
-                        let block = blocks[index]
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("What % for \(block.letter) · \(block.name)?").font(.headline)
-                            if let rpe = block.rpe, let suggested = block.suggestedTarget {
-                                Text("RPE \(WeightUnit.trimmed(rpe))/10 → \(suggested.text)")
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                            HStack(spacing: 8) {
-                                TextField("83-85, 80 or 80+", text: percentBinding(index, block: block))
-                                    .textFieldStyle(OutlineFieldStyle())
-                                    .keyboardType(.numbersAndPunctuation)
-                                Button("OK") { answerPercent(index, block: block) }
-                                    .buttonStyle(.black)
-                                    .frame(width: 64)
-                                    .disabled(Target(parsing: answer(index, block: block)) == nil)
-                            }
-                        }
-                        .drawer()
+        let unfinished = workout.sessions.first { $0.endedAt == nil }
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(missingPercents, id: \.self) { index in
+                let block = blocks[index]
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("What % for \(block.letter) · \(block.name)?").font(Theme.display(17))
+                    if let rpe = block.rpe, let suggested = block.suggestedTarget {
+                        Text("RPE \(WeightUnit.trimmed(rpe))/10 → \(suggested.text)").font(Theme.text(15))
                     }
-
-                    ForEach(missingPRs, id: \.self) { lift in
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("What's your \(lift) PR?").font(.headline)
-                            HStack(spacing: 8) {
-                                TextField("PR", value: prBinding(lift), format: .number)
-                                    .textFieldStyle(OutlineFieldStyle())
-                                    .keyboardType(.decimalPad)
-                                Picker("Unit", selection: unitBinding(lift)) {
-                                    Text("kg").tag(WeightUnit.kg)
-                                    Text("lb").tag(WeightUnit.lb)
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 100)
-                            }
-                            Button("Save PR") { savePR(lift) }
-                                .buttonStyle(.black)
-                                .disabled((prValues[lift] ?? 0) <= 0)
-                        }
-                        .drawer()
+                    HStack(spacing: 8) {
+                        TextField("83-85, 80 or 80+", text: percentBinding(index, block: block))
+                            .textFieldStyle(OutlineFieldStyle(size: 20))
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.soft))
+                            .keyboardType(.numbersAndPunctuation)
+                        Button("OK") { answerPercent(index, block: block) }
+                            .buttonStyle(.black)
+                            .frame(width: 64)
+                            .disabled(Target(parsing: answer(index, block: block)) == nil)
                     }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Ready to lift?").font(Theme.heading)
-                        Button("Start training") { onStart(workout) }
-                            .buttonStyle(.bigBlack)
-                            .disabled(!isReady)
-                        HStack(spacing: 8) {
-                            Button("Edit") { showEdit = true }
-                                .buttonStyle(.black)
-                            Button("Cancel") { confirmCancel = true }
-                                .buttonStyle(.black)
-                        }
-                    }
-                    .drawer()
                 }
-                .padding(16)
+                .padding(.bottom, 12)
             }
-            .background(Theme.background)
-            .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Today")
-            .navigationBarTitleDisplayMode(.inline)
+
+            ForEach(missingPRs, id: \.self) { lift in
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("What's your \(lift) PR?").font(Theme.display(17))
+                    HStack(spacing: 8) {
+                        TextField("PR", value: prBinding(lift), format: .number)
+                            .textFieldStyle(OutlineFieldStyle(size: 20))
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.soft))
+                            .keyboardType(.decimalPad)
+                        Segmented(options: [(WeightUnit.kg, "kg"), (.lb, "lb")], selection: unitBinding(lift))
+                            .frame(width: 100)
+                    }
+                    Button("Save PR") { savePR(lift) }
+                        .buttonStyle(.black)
+                        .disabled((prValues[lift] ?? 0) <= 0)
+                }
+                .padding(.bottom, 12)
+            }
+
+            Text("Ready to lift?")
+                .font(Theme.heading)
+                .tracking(-0.25)
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
+                .padding(.bottom, 6)
+            if let unfinished {
+                Button("Back to the set") { onResume(unfinished) }
+                    .buttonStyle(.black)
+            } else {
+                Button("Start training") { onStart(workout) }
+                    .buttonStyle(.black)
+                    .disabled(!isReady)
+            }
+            HStack(spacing: 10) {
+                Button("Edit") { showEdit = true }
+                    .buttonStyle(.soft)
+                Button("Cancel") { confirmCancel = true }
+                    .buttonStyle(.soft)
+            }
         }
         .sheet(isPresented: $showEdit) {
             EditWorkoutView(workout: workout)
@@ -98,7 +94,6 @@ struct ReadyToLiftSheet: View {
             Button("Discard", role: .destructive) {
                 context.delete(workout)
                 try? context.save()
-                dismiss()
             }
         }
         .sensoryFeedback(.warning, trigger: warned)

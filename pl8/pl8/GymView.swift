@@ -2,58 +2,60 @@ import SwiftData
 import SwiftUI
 import PlateKit
 
-/// Gym tab: gyms as chips (switch, add, remove), then the current gym's name, units, plates and bar (SPEC 2.4).
-struct GymView: View {
+/// The Gym drawer, like the prototype's showGymHome: your gyms as chips (tap to switch, + Add gym, remove the
+/// current one), then its name, units, plates and bar. The room follows as you change them (SPEC 2.4).
+struct GymDrawerContent: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Gym.name) private var gyms: [Gym]
+    @AppStorage("hasFinishedFirstRun") private var hasFinishedFirstRun = true
+    @AppStorage("didSeedDefaults") private var didSeedDefaults = true
     @State private var confirmRemove = false
+    @State private var confirmReplay = false
 
     private var current: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                RoomHeader(station: .corner)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Gyms").sectionLabel()
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(gyms) { gym in
-                                        Chip(isOn: gym.id == current?.id, action: { switchTo(gym) }) {
-                                            Text(gym.name.isEmpty ? "—" : gym.name)
-                                        }
-                                        .fixedSize()
-                                    }
-                                    Chip(isOn: false, action: addGym) {
-                                        Label("Add gym", systemImage: "plus")
-                                    }
-                                    .fixedSize()
-                                }
-                                .padding(2)
-                            }
-                            if gyms.count > 1 {
-                                Button("Remove this gym", role: .destructive) { confirmRemove = true }
-                                    .font(.subheadline.weight(.semibold))
-                            }
-                        }
-                        .drawer()
-
-                        if let current {
-                            GymSetupForm(gym: current)
-                        }
+        VStack(alignment: .leading, spacing: 0) {
+            GymLabel(text: "Gyms")
+            Flow {
+                ForEach(gyms) { gym in
+                    Chip(isOn: gym.id == current?.id, action: { switchTo(gym) }) {
+                        Text(gym.name.isEmpty ? "New gym" : gym.name)
                     }
-                    .padding(16)
                 }
+                Chip(isOn: false, action: addGym) { Text("+ Add gym") }
             }
-            .background(Theme.background)
-            .navigationTitle("Gym")
-            .navigationBarTitleDisplayMode(.inline)
-            .sensoryFeedback(.selection, trigger: current?.id)
-            .confirmationDialog("Remove \(current?.name ?? "this gym")?", isPresented: $confirmRemove, titleVisibility: .visible) {
-                Button("Remove", role: .destructive) { removeCurrent() }
+            if gyms.count > 1 {
+                Button("Remove \(current?.name.isEmpty == false ? current!.name : "this gym")") { confirmRemove = true }
+                    .font(Theme.display(15))
+                    .foregroundStyle(Color(hex: "#D70015"))
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 10)
             }
+            if let current {
+                GymSetupForm(gym: current)
+            }
+            Button("Replay the first run") { confirmReplay = true }
+                .font(Theme.display(15))
+                .foregroundStyle(Color(hex: "#D70015"))
+                .padding(.vertical, 6)
+                .padding(.horizontal, 4)
+                .padding(.top, 24)
+        }
+        .sensoryFeedback(.selection, trigger: current?.id)
+        .confirmationDialog("Remove \(current?.name ?? "this gym")?", isPresented: $confirmRemove, titleVisibility: .visible) {
+            Button("Remove", role: .destructive) { removeCurrent() }
+        }
+        .confirmationDialog("Replay the first run?", isPresented: $confirmReplay, titleVisibility: .visible) {
+            Button("Erase everything and replay", role: .destructive) {
+                // A clean start: no gym, PRs, workouts or history left from before.
+                DataCleanup.eraseEverything(in: context)
+                didSeedDefaults = false
+                hasFinishedFirstRun = false
+            }
+        } message: {
+            Text("Your gym, PRs, workouts and history are deleted.")
         }
     }
 
@@ -63,7 +65,7 @@ struct GymView: View {
     }
 
     private func addGym() {
-        let gym = Gym(name: "GYM \(gyms.count + 1)", unit: current?.unit ?? .lb)
+        let gym = Gym(name: "", unit: current?.unit ?? .lb)
         context.insert(gym)
         switchTo(gym)
     }
@@ -77,73 +79,66 @@ struct GymView: View {
     }
 }
 
+/// The Gym drawer's small headings: 15 pt bold, 18 pt of air above (prototype label()).
+struct GymLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(Theme.display(15))
+            .padding(.horizontal, 4)
+            .padding(.top, 18)
+            .padding(.bottom, 8)
+    }
+}
+
 /// Name, units, plates and bar of one gym; changes save as you make them.
 struct GymSetupForm: View {
     @Bindable var gym: Gym
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Name").sectionLabel()
-                GymNameField(gym: gym)
-            }
-            .drawer()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Units").sectionLabel()
-                Picker("Units", selection: Binding(get: { gym.unit }, set: { gym.switchUnit(to: $0) })) {
-                    Text("Kilograms").tag(WeightUnit.kg)
-                    Text("Pounds").tag(WeightUnit.lb)
-                }
-                .pickerStyle(.segmented)
+        VStack(alignment: .leading, spacing: 0) {
+            GymLabel(text: "Name")
+            GymNameField(gym: gym)
+            GymLabel(text: "Units")
+            Segmented(options: [(WeightUnit.kg, "Kilograms"), (.lb, "Pounds")],
+                      selection: Binding(get: { gym.unit }, set: { gym.switchUnit(to: $0) }))
                 .sensoryFeedback(.selection, trigger: gym.unit)
-            }
-            .drawer()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Plates").sectionLabel()
-                PlateChips(gym: gym)
-            }
-            .drawer()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Bar").sectionLabel()
-                BarChips(gym: gym)
-            }
-            .drawer()
+            GymLabel(text: "Plates")
+            PlateChips(gym: gym)
+            GymLabel(text: "Bar")
+            BarChips(gym: gym)
         }
     }
 }
 
-/// The gym's name: uppercase, up to 8 letters.
+/// The gym's name: uppercase, up to 8 letters; the flag follows as you type.
 struct GymNameField: View {
     @Bindable var gym: Gym
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TextField("BOX NAME", text: Binding(
-                get: { gym.name },
-                set: { gym.name = GymSetup.normalizedName($0) }
-            ))
-            .textFieldStyle(OutlineFieldStyle())
-            .textInputAutocapitalization(.characters)
-            .autocorrectionDisabled()
-        }
+        TextField("Add a name", text: Binding(
+            get: { gym.name },
+            set: { gym.name = GymSetup.normalizedName($0) }
+        ))
+        .textFieldStyle(OutlineFieldStyle(size: 20))
+        .textInputAutocapitalization(.characters)
+        .autocorrectionDisabled()
     }
 }
 
-/// One chip per plate size, with a colour dot sized by diameter.
+/// One chip per plate size, with a colour dot sized by its diameter; each toggle pops its pile on or off.
 struct PlateChips: View {
     @Bindable var gym: Gym
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], spacing: 8) {
+        Flow {
             ForEach(Plate.catalog(gym.unit), id: \.size) { plate in
                 let isOn = gym.plateSizes.contains(plate.size)
                 Chip(isOn: isOn, action: { gym.setPlate(plate.size, isOn: !isOn) }) {
-                    HStack(spacing: 6) {
-                        PlateDot(plate: plate, outline: isOn ? Theme.paper : Theme.ink)
-                        Text(WeightUnit.trimmed(plate.size))
+                    HStack(spacing: 8) {
+                        PlateDot(plate: plate, isOn: isOn)
+                        Text("\(WeightUnit.trimmed(plate.size)) \(gym.unit.rawValue)")
                     }
                 }
             }
@@ -152,12 +147,12 @@ struct PlateChips: View {
     }
 }
 
-/// The unit's bars as chips; kg bars show their names.
+/// The unit's bars as chips: "20 kg · Olympic".
 struct BarChips: View {
     @Bindable var gym: Gym
 
     var body: some View {
-        VStack(spacing: 8) {
+        Flow {
             ForEach(Bar.weights(gym.unit), id: \.self) { weight in
                 Chip(isOn: gym.barWeight == weight, action: { gym.barWeight = weight }) {
                     Text(label(weight))
@@ -167,7 +162,6 @@ struct BarChips: View {
         .sensoryFeedback(.selection, trigger: gym.barWeight)
     }
 
-    /// "20 kg · Olympic", "45 lb"
     private func label(_ weight: Double) -> String {
         let text = "\(WeightUnit.trimmed(weight)) \(gym.unit.rawValue)"
         guard let name = Bar.name(weight, gym.unit) else { return text }
@@ -175,15 +169,3 @@ struct BarChips: View {
     }
 }
 
-/// A plate's colour as a dot, sized by its diameter.
-struct PlateDot: View {
-    let plate: Plate
-    var outline: Color = Theme.ink
-
-    var body: some View {
-        Circle()
-            .fill(Color(hex: plate.colorHex))
-            .overlay(Circle().stroke(outline, lineWidth: 1))
-            .frame(width: 8 + 14 * plate.diameter, height: 8 + 14 * plate.diameter)
-    }
-}

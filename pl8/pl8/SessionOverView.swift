@@ -33,7 +33,7 @@ struct SessionOverView: View {
 
             VStack(spacing: 0) {
                 Text("Heaviest set")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(Theme.display(14))
                     .tracking(2.2)
                     .textCase(.uppercase)
                     .foregroundStyle(cream)
@@ -46,7 +46,7 @@ struct SessionOverView: View {
                             .opacity(index < words ? 1 : 0)
                     }
                 }
-                .font(.system(size: 26, weight: .black))
+                .font(Theme.display(24))
                 .foregroundStyle(cream)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)

@@ -7,7 +7,7 @@ import PlateKit
 /// in-memory store with demo data and opens that one screen, so the Simulator can take its picture.
 /// Screens: `room-<station>` (overview, corner, nameFlag, flag, bar, pr, board, kit, setv), `firstrun-name`,
 /// `firstrun-plates`, `session` (the kit), `session-sets` (the first set), `session-pull` (a deadlift set, bar on the floor), `opening-title`, `opening-box` (the closed
-/// box), `session-over` (the scale), `tab-<train|prs|gym|history>`.
+/// box), `session-over` (the scale), `home`, `tab-<train|prs|gym|history>` (home with that drawer open).
 enum ScreenshotMode {
     static let shot: String? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -32,8 +32,10 @@ struct ScreenshotHost: View {
                 FirstRunView(startAt: .opening) {}
             } else if shot == "opening-box" {
                 FirstRunView(startAt: .opening, openingAt: .closed) {}
-            } else if shot.hasPrefix("tab-"), let tab = HomeTabs.Tab(rawValue: String(shot.dropFirst(4))) {
-                HomeTabs(selection: tab)
+            } else if shot == "home" {
+                HomeView()
+            } else if shot.hasPrefix("tab-"), let tab = HomeView.Tab(rawValue: String(shot.dropFirst(4))) {
+                HomeView(open: tab)
             } else if shot == "session-over" {
                 SessionOverView(perSide: [25, 20, 2.5], unit: .kg, barWeight: 20) {}
             } else if shot == "firstrun-name" {

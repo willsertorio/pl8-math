@@ -18,6 +18,8 @@ struct RoomStage: View {
     var session: SessionProps?
     var interactive = false
     var opening: OpeningPhase?
+    /// Home: the room floats a little in space (prototype floatTick).
+    var floating = false
 
     @State private var orbit: Orbit
     /// The closed box's own move during the opening (pop, turn, float), round the room's centre.
@@ -29,8 +31,10 @@ struct RoomStage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(station: RoomLayout.Station, gymName: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double,
-         boards: Boards = Boards(), session: SessionProps? = nil, interactive: Bool = false, opening: OpeningPhase? = nil) {
+         boards: Boards = Boards(), session: SessionProps? = nil, interactive: Bool = false, opening: OpeningPhase? = nil,
+         floating: Bool = false) {
         self.opening = opening
+        self.floating = floating
         self.boards = boards
         self.session = session
         self.station = station
@@ -65,6 +69,24 @@ struct RoomStage: View {
         .onChange(of: station) { _, item in fly(to: item) }
         .onDisappear { flight?.cancel() }
         .task(id: opening) { await play(opening) }
+        .task(id: floating) { await float(floating) }
+    }
+
+    /// The prototype's floatTick: up and down by 0.2 ± 0.14 m and a slight rock, eased in.
+    private func float(_ on: Bool) async {
+        guard opening == nil else { return }
+        guard on, !reduceMotion else {
+            box = matrix_identity_float4x4
+            return
+        }
+        let start = ContinuousClock.now
+        while !Task.isCancelled {
+            let t = Float((ContinuousClock.now - start) / .seconds(1))
+            let k = 1 - exp(-t * 1.4)
+            let rock = simd_quatf(angle: k * 0.016 * sin(t * 0.52), axis: [1, 0, 0]) * simd_quatf(angle: k * 0.016 * sin(t * 0.43 + 1.2), axis: [0, 0, 1])
+            box = Transform(rotation: rock, translation: [0, k * (0.2 + 0.14 * sin(t * 0.75)), 0]).matrix
+            try? await Task.sleep(for: .milliseconds(16))
+        }
     }
 
     // MARK: - Opening (SPEC 2.2 step 0, prototype runOnb)

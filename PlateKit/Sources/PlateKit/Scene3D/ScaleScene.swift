@@ -41,13 +41,13 @@ public enum ScaleScene {
     }
 
     /// The prototype's sketch outline (rough, grainy, doubled) round each part, sized for the scale's camera.
-    public static func outline(_ parts: [PropPart], seed: UInt32) -> LowPolyMesh {
+    public static func outline(_ parts: [PropPart], seed: UInt32, width: Float = 0.012) -> LowPolyMesh {
         var mesh = LowPolyMesh()
         for (n, part) in parts.enumerated() where part.tone != .flat(Look.ink) {
             // Not the bar's thin shaft: its joints would draw rings across it, which the prototype doesn't.
             let ys = part.mesh.positions.map(\.y), zs = part.mesh.positions.map(\.z)
             guard (ys.max()! - ys.min()!) > 0.03 || (zs.max()! - zs.min()!) > 0.03 else { continue }
-            mesh.append(part.mesh.roughInk(width: 0.012, seed: seed &+ UInt32(n)))
+            mesh.append(part.mesh.roughInk(width: width, seed: seed &+ UInt32(n), step: max(LowPolyMesh.roughStep, width * 3)))
         }
         return mesh
     }

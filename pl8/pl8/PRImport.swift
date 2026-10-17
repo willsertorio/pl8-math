@@ -30,13 +30,15 @@ struct PRScreenshotPicker<Label: View>: View {
             .buttonStyle(.plain)
 
             if isReading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("Reading…")
+                HStack(spacing: 12) {
+                    PlateSpinner()
+                    Text("Reading your PRs…").font(Theme.text(17))
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
             if let message {
-                Text(message).font(.footnote.weight(.semibold))
+                Text(message).font(Theme.text(15)).padding(.horizontal, 16)
             }
             if let readText {
                 DisclosureGroup("Show the text it read") {
@@ -45,7 +47,8 @@ struct PRScreenshotPicker<Label: View>: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(.footnote)
+                .font(Theme.text(13))
+                .padding(.horizontal, 16)
             }
         }
         .sensoryFeedback(.success, trigger: savedCount)
@@ -112,52 +115,31 @@ struct PRScreenshotPicker<Label: View>: View {
     }
 }
 
-/// The PR list: tap to edit, swipe to delete, and a screenshot import on top.
+/// The PR list, like the prototype's prList: one row per lift with its PR in grey (or "Add"); tap to change it.
+/// Below: + Add PR and a screenshot import.
 struct PRList: View {
-    @Binding var editing: PRTarget?
-
-    @Environment(\.modelContext) private var context
     @Query(sort: \PersonalRecord.lift) private var records: [PersonalRecord]
+    @State private var editing: PRTarget?
 
     var body: some View {
-        List {
-            Section {
-                PRScreenshotPicker {
-                    Label("Upload a screenshot", systemImage: "photo.on.rectangle")
-                        .font(.headline)
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(records) { record in
+                Button { editing = PRTarget(lift: record.lift, record: record) } label: {
+                    ListRow(label: record.lift,
+                            value: record.value.map { "\(WeightUnit.trimmed($0)) \(record.unit.rawValue)" } ?? "Add",
+                            valueIsHint: record.value == nil, chevron: true)
                 }
-                .listRowBackground(Theme.paper)
+                .buttonStyle(.pressable)
             }
-
-            Section {
-                ForEach(records) { record in
-                    Button {
-                        editing = PRTarget(lift: record.lift, record: record)
-                    } label: {
-                        HStack {
-                            Text(record.lift).font(.headline)
-                            Spacer()
-                            if let value = record.value {
-                                Text("\(WeightUnit.trimmed(value)) \(record.unit.rawValue)")
-                                    .font(.headline)
-                                    .monospacedDigit()
-                            } else {
-                                Text("Add").foregroundStyle(.orange)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .tint(Theme.ink)
-                    .listRowBackground(Theme.paper)
-                }
-                .onDelete { offsets in
-                    for index in offsets { context.delete(records[index]) }
-                    try? context.save()
-                }
+            Button { editing = PRTarget(lift: nil, record: nil) } label: {
+                ListRow(label: "+  Add PR")
             }
+            .buttonStyle(.pressable)
+            PRScreenshotPicker {
+                OptionRow(title: "Upload a screenshot", icon: .photo, tag: "Fastest")
+            }
+            .padding(.top, 8)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .sheet(item: $editing) { target in
             PREditor(lift: target.lift, record: target.record)
         }

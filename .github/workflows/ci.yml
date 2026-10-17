@@ -98,7 +98,7 @@ jobs:
           xcrun simctl bootstatus "$DEVICE" -b
           xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/pl8.app
           mkdir -p screens
-          for shot in room-overview room-corner room-nameFlag room-pr room-board room-kit room-setv firstrun-name firstrun-plates session session-sets session-pull opening-title opening-box session-over tab-train tab-prs tab-gym tab-history; do
+          for shot in room-overview room-corner room-nameFlag room-pr room-board room-kit room-setv firstrun-name firstrun-plates session session-sets session-pull opening-title opening-box session-over home tab-train tab-prs tab-gym tab-history; do
             xcrun simctl launch --terminate-running-process "$DEVICE" com.williansertorio.pl8 -pl8Shot "$shot"
             sleep 15
             xcrun simctl io "$DEVICE" screenshot "screens/$shot.png"

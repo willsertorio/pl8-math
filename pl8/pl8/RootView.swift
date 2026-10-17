@@ -15,7 +15,7 @@ struct RootView: View {
         Group {
             if hasFinishedFirstRun {
                 if openedThisLaunch {
-                    HomeTabs()
+                    HomeView()
                 } else {
                     // The opening plays on every launch for now (SPEC open decision 2).
                     OpeningScreen { withAnimation(.easeInOut(duration: 0.4)) { openedThisLaunch = true } }
@@ -47,29 +47,5 @@ struct RootView: View {
         }
         try? context.save()
         didSeedDefaults = true
-    }
-}
-
-/// The four tabs, each with the room on top looking at its station.
-struct HomeTabs: View {
-    enum Tab: String { case train, prs, gym, history }
-    @State var selection: Tab = .train
-
-    var body: some View {
-        TabView(selection: $selection) {
-            TrainView()
-                .tabItem { Label("Train", systemImage: "figure.strengthtraining.traditional") }
-                .tag(Tab.train)
-            PRsView()
-                .tabItem { Label("PRs", systemImage: "trophy") }
-                .tag(Tab.prs)
-            GymView()
-                .tabItem { Label("Gym", systemImage: "dumbbell") }
-                .tag(Tab.gym)
-            HistoryView()
-                .tabItem { Label("History", systemImage: "clock") }
-                .tag(Tab.history)
-        }
-        .tint(Theme.ink)
     }
 }

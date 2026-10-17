@@ -2,30 +2,6 @@ import SwiftData
 import SwiftUI
 import PlateKit
 
-/// PRs tab: every PR, tap to edit, swipe to delete, + to add, or read a screenshot (SPEC 2.4).
-struct PRsView: View {
-    @State private var editing: PRTarget?
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                RoomHeader(station: .pr)
-                PRList(editing: $editing)
-            }
-            .background(Theme.background)
-            .navigationTitle("PRs")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                Button {
-                    editing = PRTarget(lift: nil, record: nil)
-                } label: {
-                    Label("Add PR", systemImage: "plus")
-                }
-            }
-        }
-    }
-}
-
 /// Which PR the editor is open for; `lift == nil` means a new lift.
 struct PRTarget: Identifiable {
     let lift: String?
@@ -63,6 +39,16 @@ struct PREditor: View {
                         Text("lb").tag(WeightUnit.lb)
                     }
                     .pickerStyle(.segmented)
+                }
+
+                if let record {
+                    Section {
+                        Button("Remove this PR", role: .destructive) {
+                            context.delete(record)
+                            try? context.save()
+                            dismiss()
+                        }
+                    }
                 }
 
                 if let record, !record.history.isEmpty {

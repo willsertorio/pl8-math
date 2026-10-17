@@ -3,48 +3,44 @@ import SwiftData
 import SwiftUI
 import PlateKit
 
-/// A session (SPEC 2.3): one scrolling page — the plate kit at the top, then every set in order with its bar
-/// and what to put on or take off, then stripping the bar and **End session**. Two buttons at the top jump
-/// between the kit and the sets. Nothing to tick off set by set, nothing to report (Will's first class, 2026-10-16).
+/// A session (SPEC 2.3), laid out like the prototype's showKit and showSetCard: the room on the whole screen and
+/// one frosted card at the bottom — the plate kit, then each set, then stripping the bar and **End session**.
+/// Swipe up anywhere for the next card, down for the one before (Will's first class, 2026-10-16: no Done per set,
+/// nothing to report). A Plates button over the room goes back to the kit.
 struct SessionView: View {
     let session: Session
     var onFinish: () -> Void
 
-
     @Environment(\.modelContext) private var context
     @State private var collected: Set<Double> = []
-    @State private var barCollected = false
-    /// The row at the top of the scroll.
-    @State private var topRow: String?
+    /// The card in view.
+    @State private var current: String
+    /// Which way the last page went, so the card slides in from the right side.
+    @State private var forward = true
+    @State private var jumps = 0
+    @State private var endCount = 0
 
     /// - Parameter startOnFirstSet: open on the first set instead of the kit (the CI's screenshots).
     init(session: Session, startOnFirstSet: Bool = false, onFinish: @escaping () -> Void) {
         self.session = session
         self.onFinish = onFinish
         let first = session.orderedLogs.first.map { "s-\($0.order)" }
-        _topRow = State(initialValue: startOnFirstSet ? first : "kit")
+        _current = State(initialValue: startOnFirstSet ? (first ?? "kit") : "kit")
     }
-    @State private var jumps = 0
-    @State private var endCount = 0
 
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
             if session.endedAt != nil {
-                if let heaviest = session.heaviestLog {
-                    SessionOverView(perSide: heaviest.perSide, unit: session.gymUnit, barWeight: session.barWeight) { onFinish() }
-                } else {
-                    finishedView
-                }
+                let heaviest = session.heaviestLog
+                SessionOverView(perSide: heaviest?.perSide ?? [], unit: session.gymUnit, barWeight: session.barWeight) { onFinish() }
             } else {
                 sessionPage
             }
         }
-        // Just Back on top: no title, no tab bar while you train.
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
+        .toolbar(.hidden, for: .navigationBar)
         .sensoryFeedback(.success, trigger: endCount)
+        .sensoryFeedback(.selection, trigger: jumps)
         .onAppear {
             // The clock starts when the session opens (SPEC 3.8).
             if session.startedAt == nil {
@@ -56,9 +52,9 @@ struct SessionView: View {
 
     // MARK: - The page
 
-    /// One card on the page; the room shows what the card in view is about.
+    /// One card; the room shows what it's about.
     private struct PageRow: Identifiable {
-        enum Kind { case kit, set(SetLog, label: String, number: Int, of: Int, previous: [Double]), end }
+        enum Kind { case kit, set(SetLog, label: String, number: Int, of: Int, group: [SetLog], previous: [Double]), end }
         let id: String
         let kind: Kind
         /// The plates on the bar while this card is in view.
@@ -75,7 +71,7 @@ struct SessionView: View {
             for (index, log) in group.enumerated() {
                 rows.append(PageRow(id: "s-\(log.order)",
                                     kind: .set(log, label: first.isWarmUp ? "WARM-UP · \(name)" : name, number: index + 1,
-                                               of: group.count, previous: previous(log, in: logs)),
+                                               of: group.count, group: group, previous: previous(log, in: logs)),
                                     perSide: log.perSide,
                                     onFloor: LiftNames.startsOnFloor(session.liftName(for: first.blockIndex))))
             }
@@ -84,112 +80,106 @@ struct SessionView: View {
         return rows
     }
 
-    /// The room on 80 % of the screen, following the card in view: the kit on the floor, or the sleeve with that
-    /// set's plates. Below, one card at a time; swipe up for the next.
     private var sessionPage: some View {
         let logs = session.orderedLogs
         let rows = rows(logs)
-        let top = rows.first { $0.id == (topRow ?? "kit") } ?? rows[0]
+        let top = rows.first { $0.id == current } ?? rows[0]
         let onKit = top.id == "kit"
-        let firstSet = rows.dropFirst().first?.id ?? "end"
-        return VStack(spacing: 0) {
+        return ZStack {
             RoomStage(station: onKit ? .kitFloor : top.onFloor ? .sleeveFloor : .sleeve, gymName: session.gymName, unit: session.gymUnit,
                       plateSizes: session.plateSizes, barWeight: session.barWeight,
                       session: SessionProps(kit: Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) }),
                                             unit: session.gymUnit, barWeight: session.barWeight, perSide: top.perSide,
                                             onFloor: top.onFloor, dim: !onKit))
-                .overlay(alignment: .topLeading) {
-                    HStack(spacing: 8) {
-                        Chip(isOn: onKit, action: { jump(to: "kit") }) { Text("Plate kit") }.fixedSize()
-                        Chip(isOn: !onKit, action: { jump(to: firstSet) }) { Text("Sets") }.fixedSize()
-                    }
-                    .padding(12)
-                    .sensoryFeedback(.selection, trigger: jumps)
-                }
-                .containerRelativeFrame(.vertical) { length, _ in length * 0.8 }
-                // Swipe up or down anywhere on the room for the next or the card before, like on the cards.
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 24).onEnded { value in
-                    let dy = value.translation.height
-                    guard abs(dy) > 40, abs(dy) > abs(value.translation.width),
-                          let index = rows.firstIndex(where: { $0.id == top.id }) else { return }
-                    let next = min(rows.count - 1, max(0, index + (dy < 0 ? 1 : -1)))
-                    if next != index { jump(to: rows[next].id) }
-                })
+                .ignoresSafeArea()
 
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(rows) { row in
-                        rowView(row, logs: logs)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .containerRelativeFrame(.vertical)
-                            .id(row.id)
+            VStack(spacing: 0) {
+                // Back home on the left; on the sets, the prototype's quiet way back to the plate kit on the right.
+                HStack {
+                    FloatButton(label: "Back", icon: .back) { onFinish() }
+                    Spacer()
+                    if !onKit {
+                        FloatButton(label: "Plates", icon: .plates) { page(to: "kit", in: rows) }
                     }
                 }
-                .scrollTargetLayout()
+                .padding(.horizontal, 16)
+                .padding(.top, 50)
+                Spacer()
+                card(top, logs: logs, rows: rows)
+                    .id(top.id)
+                    .transition(.asymmetric(insertion: .move(edge: forward ? .bottom : .top).combined(with: .opacity),
+                                            removal: .opacity))
+                    .padding(.leading, 10)
+                    .padding(.trailing, 12)
+                    .padding(.bottom, 2)
             }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: $topRow)
-            .scrollIndicators(.hidden)
         }
+        // Swipe up or down anywhere for the next card or the one before.
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 24).onEnded { value in
+            let dy = value.translation.height
+            guard abs(dy) > 40, abs(dy) > abs(value.translation.width),
+                  let index = rows.firstIndex(where: { $0.id == top.id }) else { return }
+            let next = min(rows.count - 1, max(0, index + (dy < 0 ? 1 : -1)))
+            if next != index { page(to: rows[next].id, in: rows) }
+        })
+    }
+
+    private func page(to id: String, in rows: [PageRow]) {
+        let from = rows.firstIndex { $0.id == current } ?? 0, to = rows.firstIndex { $0.id == id } ?? 0
+        forward = to >= from
+        jumps += 1
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.88)) { current = id }
     }
 
     @ViewBuilder
-    private func rowView(_ row: PageRow, logs: [SetLog]) -> some View {
+    private func card(_ row: PageRow, logs: [SetLog], rows: [PageRow]) -> some View {
         switch row.kind {
-        case .kit: kitCard(logs: logs)
-        case .set(let log, let label, let number, let count, let previous):
-            setCard(log, label: label, number: number, of: count, previous: previous)
-        case .end: endCard(logs: logs)
+        case .kit:
+            kitCard(logs: logs) { page(to: rows.dropFirst().first?.id ?? "end", in: rows) }
+        case .set(let log, let label, let number, let count, let group, let previous):
+            setCard(log, label: label, number: number, of: count, group: group, previous: previous)
+        case .end:
+            endCard(logs: logs)
         }
     }
 
-    private func jump(to id: String) {
-        jumps += 1
-        withAnimation(.snappy) { topRow = id }
-    }
+    // MARK: - Plate kit (SPEC 2.3 step 4, prototype showKit)
 
-    // MARK: - Plate kit (SPEC 2.3 step 4)
-
-    /// The kit as one row of chips to tick off as you collect them.
-    private func kitCard(logs: [SetLog]) -> some View {
+    /// The kit as chips to tick off as you collect them, then Start session.
+    private func kitCard(logs: [SetLog], start: @escaping () -> Void) -> some View {
         let kit = Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) })
         let unit = session.gymUnit
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("Plate kit").sectionLabel()
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    Chip(isOn: barCollected, action: { barCollected.toggle() }) {
-                        Text("BAR \(WeightUnit.trimmed(kit.bar)) \(unit.rawValue.uppercased())")
-                    }
-                    .fixedSize()
-                    ForEach(kit.plates, id: \.size) { item in
-                        let isOn = collected.contains(item.size)
-                        Chip(isOn: isOn, action: { toggle(item.size) }) {
-                            HStack(spacing: 6) {
-                                if let plate = Plate.find(item.size, unit) {
-                                    PlateDot(plate: plate, outline: isOn ? Theme.paper : Theme.ink)
+        return FrostedCard(padding: EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)) {
+            VStack(alignment: .leading, spacing: 12) {
+                if kit.plates.isEmpty {
+                    Text("Just the bar").font(Theme.text(15)).frame(maxWidth: .infinity).padding(.vertical, 4)
+                } else {
+                    Flow {
+                        ForEach(kit.plates, id: \.size) { item in
+                            let isOn = collected.contains(item.size)
+                            Chip(isOn: isOn, action: { toggle(item.size) }) {
+                                HStack(spacing: 8) {
+                                    if let plate = Plate.find(item.size, unit) { PlateDot(plate: plate, isOn: isOn) }
+                                    if isOn { Text("✓").font(Theme.text(14)) }
+                                    Text("\(item.count) × \(WeightUnit.trimmed(item.size)) \(unit.rawValue.uppercased())")
                                 }
-                                Text("\(item.count) × \(WeightUnit.trimmed(item.size)) \(unit.rawValue.uppercased())")
                             }
                         }
-                        .fixedSize()
                     }
+                    .sensoryFeedback(.impact(weight: .light), trigger: collected)
                 }
-                .padding(2)
+                Button("Start session", action: start)
+                    .buttonStyle(.black)
             }
-            .sensoryFeedback(.impact(weight: .light), trigger: collected)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .drawer()
     }
 
     private func toggle(_ size: Double) {
         if collected.contains(size) { collected.remove(size) } else { collected.insert(size) }
     }
 
-    // MARK: - Every set (SPEC 2.3 step 5)
+    // MARK: - Every set (SPEC 2.3 step 5, prototype showSetCard)
 
     /// The warm-up, then each lift: runs of logs with the same block and warm-up flag.
     private func groups(_ logs: [SetLog]) -> [[SetLog]] {
@@ -209,41 +199,52 @@ struct SessionView: View {
         return all[index - 1].perSide
     }
 
-    /// Text only: the bar in the room shows the plates.
-    private func setCard(_ log: SetLog, label: String, number: Int, of count: Int, previous: [Double]) -> some View {
+    /// The lift (small caps), "Round 1 of 3", reps and load on the right, the group's sets as a bar, and what to
+    /// change on the bar.
+    private func setCard(_ log: SetLog, label: String, number: Int, of count: Int, group: [SetLog], previous: [Double]) -> some View {
         let change = SetChange(from: previous, to: log.perSide)
         let total = session.gymUnit.display(log.plannedTotal, in: session.prUnit(for: log.blockIndex))
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(label).sectionLabel()
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(log.isWarmUp ? "Round" : "Set") \(number) of \(count)")
-                Spacer()
-                Text("\(log.reps) \(log.reps == 1 ? "rep" : "reps")")
+        return FrostedCard(padding: EdgeInsets(top: 14, leading: 16, bottom: 16, trailing: 16)) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .lastTextBaseline, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(label).sectionLabel().lineLimit(1)
+                        Text("\(log.isWarmUp ? "Round" : "Set") \(number) of \(count)")
+                            .font(Theme.heading)
+                            .tracking(-0.25)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Text("\(log.reps) \(log.reps == 1 ? "rep" : "reps") · \(total)")
+                        .font(Theme.text(17))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+                HStack(spacing: 6) {
+                    ForEach(group, id: \.order) { other in
+                        Capsule()
+                            .fill(other.order <= log.order ? Theme.ink : Color.black.opacity(0.12))
+                            .frame(height: 7)
+                    }
+                }
+                Text(change.text).font(Theme.text(15)).foregroundStyle(Theme.ink2).lineLimit(2)
             }
-            .font(.system(size: 26, weight: .bold))
-            .minimumScaleFactor(0.6)
-            .lineLimit(1)
-            Text("\(total) · \(log.pctText)").font(.headline)
-            Text(change.text).font(.subheadline.weight(.semibold)).lineLimit(2)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .drawer()
     }
 
     /// After the last set: everything comes off, then End session.
     private func endCard(logs: [SetLog]) -> some View {
         let last = logs.last?.perSide ?? []
-        return VStack(alignment: .leading, spacing: 8) {
-            Text(last.isEmpty ? "Put the bar back" : SetChange(from: last, to: []).text + ", then put the bar back")
-                .font(.headline)
-                .lineLimit(2)
-            Button("End session") { endSession() }
-                .buttonStyle(.bigBlack)
+        return FrostedCard(padding: EdgeInsets(top: 14, leading: 16, bottom: 16, trailing: 16)) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(last.isEmpty ? "Put the bar back" : SetChange(from: last, to: []).text + ", then put the bar back")
+                    .font(Theme.text(17))
+                    .lineLimit(2)
+                Button("End session") { endSession() }
+                    .buttonStyle(.black)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .drawer()
     }
-
 
     /// Saves the session to history with its planned loads (SPEC 3.8).
     private func endSession() {
@@ -254,86 +255,44 @@ struct SessionView: View {
         try? context.save()
         endCount += 1
     }
+}
 
-    // MARK: - Finished (SPEC 2.3 step 7)
+/// The prototype's floating card over the room: frosted (white at 78 % over a blur), 10 pt corners.
+struct FrostedCard<Content: View>: View {
+    var padding: EdgeInsets
+    @ViewBuilder let content: () -> Content
 
-    private var finishedView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Session done").font(Theme.heading)
-                    if let duration = session.duration {
-                        Text("\(Duration.seconds(duration).formatted(.time(pattern: .hourMinute))) in the box")
-                            .foregroundStyle(Theme.ink)
-                    }
-                }
-                .drawer()
-
-                // The "scale": the session's heaviest set, its plates and bar, and the total.
-                if let heaviest = session.heaviestLog {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Heaviest set").sectionLabel()
-                        BarDiagram(perSide: heaviest.perSide, unit: session.gymUnit)
-                            .frame(height: 140)
-                        Text(session.gymUnit.display(heaviest.liftedTotal, in: session.prUnit(for: heaviest.blockIndex)))
-                            .font(.system(size: 40, weight: .bold))
-                        Text("\(session.liftName(for: heaviest.blockIndex)) · \(heaviest.reps) \(heaviest.reps == 1 ? "rep" : "reps")")
-                            .font(.headline)
-                        Text(heaviest.perSide.isEmpty
-                             ? "Empty bar"
-                             : heaviest.perSide.map(WeightUnit.trimmed).joined(separator: " + ")
-                                + " \(session.gymUnit.rawValue) each side + \(WeightUnit.trimmed(session.barWeight)) \(session.gymUnit.rawValue) bar")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.ink)
-                    }
-                    .drawer()
-                }
-
-                Button("Finish") { onFinish() }
-                    .buttonStyle(.bigBlack)
+    var body: some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(Theme.ink)
+            .background {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(white: 249 / 255).opacity(0.78))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
             }
-            .padding(16)
-        }
     }
 }
 
-/// One side of the bar in 2D: the plates on the sleeve, sized and coloured like the real ones.
-struct BarDiagram: View {
-    let perSide: [Double]
-    let unit: WeightUnit
-
-    private struct Slot: Identifiable {
-        let id: String
-        let plate: Plate?
-    }
+/// A small frosted button over the room with a rough edge (the prototype's Plates button).
+struct FloatButton: View {
+    let label: String
+    let icon: ProtoIcon.Kind
+    var action: () -> Void
 
     var body: some View {
-        GeometryReader { geometry in
-            let height = geometry.size.height
-            let slots = perSide.enumerated().map { index, size in
-                Slot(id: "\(index)-\(size)", plate: Plate.find(size, unit))
+        Button(action: action) {
+            HStack(spacing: 6) {
+                ProtoIcon(kind: icon).frame(width: 16, height: 16)
+                Text(label).font(Theme.display(15))
             }
-            HStack(spacing: 0) {
-                Rectangle().fill(Color.gray).frame(width: 70, height: 10)
-                Rectangle().fill(Theme.ink).frame(width: 10, height: 34)
-                HStack(spacing: 2) {
-                    ForEach(slots) { slot in
-                        Rectangle()
-                            .fill(Color(hex: slot.plate?.colorHex ?? "#888888"))
-                            .overlay(Rectangle().stroke(Theme.ink, lineWidth: 2))
-                            .frame(
-                                width: max(10, (slot.plate?.thickness ?? 0.02) * 500),
-                                height: height * (slot.plate?.diameter ?? 0.2) / 0.45
-                            )
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
-                    }
-                }
-                Rectangle().fill(Color.gray).frame(height: 14)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(.snappy, value: perSide)
+            .foregroundStyle(Theme.ink)
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(RoughRectangle().fill(Theme.float))
         }
-        .accessibilityElement()
-        .accessibilityLabel(perSide.isEmpty ? "Empty bar" : "Plates each side: " + perSide.map(WeightUnit.trimmed).joined(separator: ", "))
+        .buttonStyle(.pressable)
+        .accessibilityLabel(label)
     }
 }

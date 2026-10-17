@@ -4,8 +4,8 @@ import UIKit
 import RealityKit
 import PlateKit
 
-/// First run (SPEC 2.2): opening → gym setup, one question per sheet → PRs.
-/// The room sits above the sheet and builds itself from the answers: the flag, the plate shelf, the bar.
+/// First run (SPEC 2.2): opening → gym setup, one question per drawer → PRs, like the prototype.
+/// The room sits above the drawer and builds itself from the answers: the flag, the plate shelf, the bar.
 struct FirstRunView: View {
     var onFinish: () -> Void
 
@@ -26,21 +26,12 @@ struct FirstRunView: View {
         _step = State(initialValue: step)
         _opening = State(initialValue: step == .opening ? openingAt : .done)
     }
-    /// The sheet's height, measured from its content, so the room gets the rest of the screen.
-    @State private var sheetHeight: CGFloat = 320
-    /// The keyboard's height, so the room shows above it and the sheet while you type the name.
+    /// The drawer's height, measured, so the room gets the rest of the screen.
+    @State private var drawerHeight: CGFloat = 320
+    /// The keyboard's height, so the room shows above it and the drawer while you type the name.
     @State private var keyboardHeight: CGFloat = 0
-    @State private var editingPR: PRTarget?
 
     private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
-
-    /// The PR list can grow long, so it keeps the half/full sheet; every other question fits its content.
-    private var fitsContent: Bool { step != .prList }
-
-    /// How much of a screen `height` tall the sheet covers.
-    private func visibleSheet(of height: CGFloat) -> CGFloat {
-        fitsContent ? sheetHeight : height / 2
-    }
 
     /// Where each question looks in the room (SPEC 2.1, 2.2).
     private var station: RoomLayout.Station {
@@ -54,24 +45,30 @@ struct FirstRunView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .bottom) {
             Theme.background.ignoresSafeArea()
 
-            // The sheet is only as tall as its question; the room fills the rest, a little behind the sheet's
-            // rounded top. During the opening it has the whole screen.
+            // The drawer is only as tall as its question; the room fills the rest, a little behind its rough top.
+            // During the opening it has the whole screen.
             GeometryReader { geometry in
                 RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
                           plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
                           boards: Boards(prs: Planner.boardRows(records)), opening: step == .opening ? opening : nil)
                     .frame(height: step == .opening
                            ? geometry.size.height
-                           : max(200, geometry.size.height - keyboardHeight - visibleSheet(of: geometry.size.height) + 24))
+                           : max(200, geometry.size.height - drawerHeight - max(keyboardHeight, HomeView.bottomInset) + 24))
             }
             .ignoresSafeArea()
 
             if step == .opening && opening == .title {
                 OpeningTitle()
                     .transition(.opacity.animation(.easeOut(duration: 0.55)))
+            }
+            if step != .opening {
+                drawer
+                    .id(step)
+                    .transition(.move(edge: .bottom))
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { drawerHeight = $0 }
             }
         }
         .contentShape(Rectangle())
@@ -82,89 +79,82 @@ struct FirstRunView: View {
             guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
             withAnimation(.snappy) { keyboardHeight = max(0, UIScreen.main.bounds.height - frame.minY) }
         }
-        .sheet(isPresented: Binding(get: { step != .opening }, set: { _ in })) {
-            sheet
-                .presentationDetents(fitsContent ? [.height(sheetHeight)] : [.medium, .large])
-                .presentationBackgroundInteraction(.enabled)
-                .interactiveDismissDisabled()
-        }
     }
 
-    // MARK: - Sheet
+    private func go(_ next: Step) {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.9)) { step = next }
+    }
+
+    // MARK: - Drawers (prototype showGym, showPRs, prList)
 
     @ViewBuilder
-    private var sheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            switch step {
-            case .opening:
-                EmptyView()
+    private var drawer: some View {
+        switch step {
+        case .opening:
+            EmptyView()
 
-            case .name:
-                // No field on screen: the keyboard types straight onto the flag in the room.
+        case .name:
+            // No field on screen: the keyboard types straight onto the flag in the room.
+            Drawer {
                 if let gym {
-                    NameTyper(gym: gym, question: "Where are you training now?") { step = .unit }
+                    NameTyper(gym: gym, question: "Where are you training now?") { go(.unit) }
                 } else {
-                    question("Where are you training now?")
+                    DrawerHeading(text: "Where are you training now?")
                 }
-                Button("Continue") { step = .unit }
-                    .buttonStyle(.bigBlack)
+                Button("Continue") { go(.unit) }
+                    .buttonStyle(.black)
                     .disabled(gym?.name.isEmpty ?? true)
+            }
 
-            case .unit:
-                question("Is the gym kilos or pounds?")
+        case .unit:
+            Drawer(back: { go(.name) }) {
+                DrawerHeading(text: "Is the gym kilos or pounds?")
                 if let gym { UnitList(gym: gym) }
-                Spacer(minLength: 0)
-                Button("Continue") { step = .plates }
-                    .buttonStyle(.bigBlack)
+                Button("Continue") { go(.plates) }
+                    .buttonStyle(.black)
+                    .padding(.top, 16)
+            }
 
-            case .plates:
-                question("Which plates does your gym have?")
-                if let gym {
-                    PlateChips(gym: gym).padding(2)
-                }
-                Button("Continue") { step = .bar }
-                    .buttonStyle(.bigBlack)
+        case .plates:
+            Drawer(back: { go(.unit) }) {
+                DrawerHeading(text: "Which plates does your gym have?")
+                if let gym { PlateChips(gym: gym) }
+                Button("Continue") { go(.bar) }
+                    .buttonStyle(.black)
                     .disabled(gym?.plateSizes.isEmpty ?? true)
+                    .padding(.top, 16)
+            }
 
-            case .bar:
-                question("Which bar do you use?")
-                if let gym { BarChips(gym: gym) }
-                Spacer(minLength: 0)
-                Button("Done") { step = .prChoice }
-                    .buttonStyle(.bigBlack)
+        case .bar:
+            Drawer(back: { go(.plates) }) {
+                DrawerHeading(text: "Which bar do you use?")
+                if let gym { BarList(gym: gym) }
+                Button("Done") { go(.prChoice) }
+                    .buttonStyle(.black)
+                    .padding(.top, 16)
+            }
 
-            case .prChoice:
-                question("Add your PRs")
+        case .prChoice:
+            Drawer {
+                DrawerHeading(text: "Add your PRs")
                 PRScreenshotPicker(onDone: { count in
-                    if count > 0 { step = .prList }
+                    if count > 0 { go(.prList) }
                 }) {
-                    OptionRow(title: "Upload a screenshot", systemImage: "photo.on.rectangle", tag: "Fastest")
+                    OptionRow(title: "Upload a screenshot", icon: .photo, tag: "Fastest")
                 }
-                OptionRow(title: "Scan with the camera", systemImage: "camera", tag: "Soon")
+                OptionRow(title: "Scan with the camera", icon: .camera)
                     .opacity(0.4)
-                Button { step = .prList } label: {
-                    OptionRow(title: "Type them in", systemImage: "keyboard")
+                Button { go(.prList) } label: {
+                    OptionRow(title: "Type them in", icon: .keys)
                 }
-                .buttonStyle(.plain)
-                Spacer(minLength: 0)
+                .buttonStyle(.pressable)
+            }
 
-            case .prList:
-                question("Your PRs")
-                PRList(editing: $editingPR)
-                Button("Continue") { onFinish() }
-                    .buttonStyle(.bigBlack)
+        case .prList:
+            Drawer(back: { go(.prChoice) }, action: "Next", onAction: onFinish) {
+                PRList()
             }
         }
-        .padding(20)
-        .padding(.top, 8)
-        .fixedSize(horizontal: false, vertical: fitsContent)
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
-            if fitsContent { sheetHeight = height }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .foregroundStyle(Theme.ink)
-        .background(Theme.paper)
-        .animation(.snappy, value: step)
     }
 
     /// Title → tap → the closed box → tap → it opens, the furniture comes in, and the setup starts (SPEC 2.2 step 0).
@@ -187,36 +177,45 @@ struct FirstRunView: View {
         }
     }
 
-    private func question(_ text: String) -> some View {
-        Text(text).font(Theme.heading)
-    }
 }
 
-/// Kilograms / Pounds as a list with a checkmark.
+/// Kilograms / Pounds as rows with a check (prototype showGym step 1).
 private struct UnitList: View {
     @Bindable var gym: Gym
 
     var body: some View {
         VStack(spacing: 0) {
             ForEach([WeightUnit.kg, WeightUnit.lb], id: \.self) { unit in
-                Button {
-                    gym.switchUnit(to: unit)
-                } label: {
-                    HStack {
-                        Text(unit == .kg ? "Kilograms" : "Pounds").font(.title3.weight(.semibold))
-                        Spacer()
-                        if gym.unit == unit {
-                            Image(systemName: "checkmark").font(.title3.weight(.bold))
-                        }
-                    }
-                    .padding(.vertical, 14)
-                    .contentShape(Rectangle())
+                Button { gym.switchUnit(to: unit) } label: {
+                    ListRow(label: unit == .kg ? "Kilograms" : "Pounds", checked: gym.unit == unit)
                 }
-                .buttonStyle(.plain)
-                Divider()
+                .buttonStyle(.pressable)
             }
         }
         .sensoryFeedback(.selection, trigger: gym.unit)
+    }
+}
+
+/// The unit's bars as rows with a check: "20 kg · Olympic bar" (prototype showGym step 3).
+private struct BarList: View {
+    @Bindable var gym: Gym
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Bar.weights(gym.unit), id: \.self) { weight in
+                Button { gym.barWeight = weight } label: {
+                    ListRow(label: label(weight), checked: gym.barWeight == weight)
+                }
+                .buttonStyle(.pressable)
+            }
+        }
+        .sensoryFeedback(.selection, trigger: gym.barWeight)
+    }
+
+    private func label(_ weight: Double) -> String {
+        let text = "\(WeightUnit.trimmed(weight)) \(gym.unit.rawValue)"
+        guard let name = Bar.name(weight, gym.unit) else { return text }
+        return "\(text) · \(name) bar"
     }
 }
 
@@ -230,8 +229,7 @@ private struct NameTyper: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        Text(question)
-            .font(Theme.heading)
+        DrawerHeading(text: question)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { focused = true }
@@ -322,7 +320,7 @@ private struct OpeningTitle: View {
                 .task { await stage.run() }
             }
             Text("pl8(math)")
-                .font(.system(size: 39, weight: .heavy))
+                .font(Theme.display(39))
                 .tracking(4.3)
                 .foregroundStyle(cream)
         }
@@ -353,7 +351,11 @@ final class TitleStage {
         plates = field.plates.indices.map { i in
             let plate = catalog[i % catalog.count]
             var parts = SessionScene.parts(.init(plate: plate, centre: .zero, axis: .x, turn: 0))
-            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17), tone: .flat(Look.ink), inked: false, casts: false))
+            // The outline about 2.5 points wide on screen, whatever the plate's depth and size (prototype skWidth).
+            let item = field.plates[i]
+            let scale = item.radius / (TitleStage.halfHeight * 2 * 0.9) / (Float(plate.diameter) / 2)
+            let width = 2.5 * item.z / (scale * TitleStage.halfHeight * 2 * 0.9)
+            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17, width: width), tone: .flat(Look.ink), inked: false, casts: false))
             let entity = Entity()
             for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
                 entity.addChild(child)

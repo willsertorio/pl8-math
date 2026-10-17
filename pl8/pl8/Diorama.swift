@@ -255,13 +255,7 @@ enum PictureArt {
     }
 
     /// The prototype's fonts that iOS doesn't have, loaded from the app once.
-    private static let registerFonts: Void = {
-        for name in ["PlayfairDisplay-Black", "PermanentMarker-Regular"] {
-            if let url = Bundle.main.url(forResource: name, withExtension: "ttf") {
-                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
-            }
-        }
-    }()
+    private static let registerFonts: Void = Fonts.register()
 
     // MARK: - Drawing helpers
 

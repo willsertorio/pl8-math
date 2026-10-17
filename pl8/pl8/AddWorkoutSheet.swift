@@ -5,72 +5,63 @@ import SwiftUI
 import UIKit
 import PlateKit
 
-/// "Add today's workout": scan the whiteboard, upload a screenshot, or type it in (SPEC 2.2 step 3).
-struct AddWorkoutSheet: View {
-    var onAdded: (Workout) -> Void
+/// "Add today's workout" (SPEC 2.2 step 3), like the prototype's chooser: scan the whiteboard, upload screenshots,
+/// or type it in. What it reads becomes today's workout, and the drawer turns into "Ready to lift?".
+struct WorkoutChooser: View {
+    var onAdded: (Workout) -> Void = { _ in }
 
     @Environment(\.modelContext) private var context
-    @Environment(\.dismiss) private var dismiss
     @State private var photos: [PhotosPickerItem] = []
     @State private var showScanner = false
+    @State private var showTyping = false
     @State private var isReading = false
     @State private var message: String?
     @State private var readCount = 0
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Add today's workout").font(Theme.heading)
-
-                if isReading {
-                    HStack(spacing: 16) {
-                        PlateSpinner()
-                        Text("Reading the workout…").font(.headline)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                } else {
-                    Button { showScanner = true } label: {
-                        OptionRow(title: "Scan the whiteboard", systemImage: "camera")
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!WhiteboardScanner.isAvailable)
-                    .opacity(WhiteboardScanner.isAvailable ? 1 : 0.4)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        PhotosPicker(selection: $photos, maxSelectionCount: 5, selectionBehavior: .ordered, matching: .images) {
-                            OptionRow(title: "Upload screenshots", systemImage: "photo.on.rectangle")
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    NavigationLink {
-                        TypedWorkoutForm(onSave: onAdded)
-                    } label: {
-                        OptionRow(title: "Type it in", systemImage: "keyboard")
-                    }
-                    .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 0) {
+            DrawerHeading(text: "Add today's workout")
+            if isReading {
+                HStack(spacing: 16) {
+                    PlateSpinner()
+                    Text("Reading the workout…").font(Theme.text(17))
                 }
-
-                if let message {
-                    Text(message).font(.footnote).foregroundStyle(.orange)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else {
+                Button { showScanner = true } label: {
+                    OptionRow(title: "Scan the whiteboard", icon: .camera)
                 }
-                Spacer(minLength: 0)
+                .buttonStyle(.pressable)
+                .disabled(!WhiteboardScanner.isAvailable)
+                .opacity(WhiteboardScanner.isAvailable ? 1 : 0.4)
+
+                PhotosPicker(selection: $photos, maxSelectionCount: 5, selectionBehavior: .ordered, matching: .images) {
+                    OptionRow(title: "Upload a screenshot", icon: .photo)
+                }
+                .buttonStyle(.pressable)
+
+                Button { showTyping = true } label: {
+                    OptionRow(title: "Type it in", icon: .keys)
+                }
+                .buttonStyle(.pressable)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .foregroundStyle(Theme.ink)
-            .background(Theme.paper)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
+            if let message {
+                Text(message).font(Theme.text(15)).padding(.horizontal, 16).padding(.top, 8)
             }
         }
         .sensoryFeedback(.success, trigger: readCount)
         .fullScreenCover(isPresented: $showScanner) {
             WhiteboardScanner { image in
                 Task { await read { [try await TextReader.lines(in: image).joined(separator: "\n")] } }
+            }
+        }
+        .sheet(isPresented: $showTyping) {
+            NavigationStack {
+                TypedWorkoutForm { workout in
+                    showTyping = false
+                    onAdded(workout)
+                }
             }
         }
         .onChange(of: photos) { _, items in
