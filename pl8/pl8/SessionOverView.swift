@@ -113,8 +113,11 @@ final class ScaleStage {
 
         drops = ScaleScene.drops(perSide: perSide, unit: unit, barWeight: barWeight)
         dropEntities = drops.map { drop in
-            let parts = drop.plate.map { SessionScene.parts(.init(plate: $0, centre: .zero, axis: .y, turn: drop.turn)) }
+            var parts = drop.plate.map { SessionScene.parts(.init(plate: $0, centre: .zero, axis: .y, turn: drop.turn)) }
                 ?? PropModels.barbellParts()
+            // The prototype's rough sketch line round it.
+            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(drop.at * 100)),
+                                  tone: .flat(Look.ink), inked: false, casts: false))
             let entity = Entity()
             for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
                 entity.addChild(child)

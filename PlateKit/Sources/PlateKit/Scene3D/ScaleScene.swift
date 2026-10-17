@@ -35,7 +35,21 @@ public enum ScaleScene {
         base.add(LowPolyMesh.box(size: [0.36, 0.19, 0.08]).rotatedX(screenTilt).translated(by: [0, 0.86, -0.39]), body)
         platform.box([0.78, 0.04, 0.78], [0, 0.11, 0], body)
         platform.box([0.72, 0.01, 0.72], [0, 0.135, 0], top)
+        base.add(outline(base.parts, seed: 70), .flat(Look.ink), ink: false, casts: false)
+        platform.add(outline(platform.parts, seed: 80), .flat(Look.ink), ink: false, casts: false)
         return (base.parts, platform.parts)
+    }
+
+    /// The prototype's sketch outline (rough, grainy, doubled) round each part, sized for the scale's camera.
+    public static func outline(_ parts: [PropPart], seed: UInt32) -> LowPolyMesh {
+        var mesh = LowPolyMesh()
+        for (n, part) in parts.enumerated() where part.tone != .flat(Look.ink) {
+            // Not the bar's thin shaft: its joints would draw rings across it, which the prototype doesn't.
+            let ys = part.mesh.positions.map(\.y), zs = part.mesh.positions.map(\.z)
+            guard (ys.max()! - ys.min()!) > 0.03 || (zs.max()! - zs.min()!) > 0.03 else { continue }
+            mesh.append(part.mesh.roughInk(width: 0.012, seed: seed &+ UInt32(n)))
+        }
+        return mesh
     }
 
     /// One thing that falls onto the scale: a plate (lying flat) or, with `plate == nil`, the bar.

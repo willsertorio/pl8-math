@@ -124,6 +124,69 @@ extension LowPolyMesh {
         return mesh
     }
 
+    /// The same rough, grainy line along any path (a plate's rim, a tilted edge): short rods every `step` along it,
+    /// wobbling off the path, some left out. Seen from far, use longer steps (the grain stays the same on screen).
+    public static func roughLine(_ points: [SIMD3<Float>], width: Float, seed: UInt32, step: Float = roughStep) -> LowPolyMesh {
+        var mesh = LowPolyMesh()
+        guard points.count > 1 else { return mesh }
+        var travelled: Float = 0, next: Float = step / 2, i = 0
+        let period: Float = 0.5 * step / roughStep
+        for (a, b) in zip(points, points.dropFirst()) {
+            let delta = b - a, length = delta.length
+            guard length > 0 else { continue }
+            let along = delta / length
+            let helper: SIMD3<Float> = abs(along.y) < 0.9 ? [0, 1, 0] : [1, 0, 0]
+            let u = along.cross(helper).normalized, v = along.cross(u).normalized
+            while next < travelled + length {
+                defer { next += step; i += 1 }
+                if hash(UInt32(i), seed &+ 7) < 0.2 { continue }                           // grain: a gap
+                let s = next
+                let wobbleU: Float = (smoothNoise(s / period, seed: seed) - 0.5) * width * 1.6      // slow wobble
+                let wobbleV: Float = (smoothNoise(s / period, seed: seed &+ 31) - 0.5) * width * 1.6
+                let onPath: SIMD3<Float> = a + along * (s - travelled)
+                let centre: SIMD3<Float> = onPath + u * wobbleU + v * wobbleV
+                let thickness: Float = width * (0.45 + 0.9 * hash(UInt32(i), seed &+ 13))
+                let half: SIMD3<Float> = along * (step * 0.55)
+                mesh.append(.rod(from: centre - half, to: centre + half, width: thickness))
+            }
+            travelled += length
+        }
+        return mesh
+    }
+
+    /// The prototype's sketch outline on a shape: a rough double line along every hard edge, joined into paths so
+    /// rims come out as one wobbling stroke.
+    public func roughInk(width: Float, seed: UInt32, step: Float = roughStep) -> LowPolyMesh {
+        var mesh = LowPolyMesh()
+        for (n, path) in Self.paths(hardEdges()).enumerated() {
+            let base = seed &* 7919 &+ UInt32(n) &* 2
+            mesh.append(.roughLine(path, width: width, seed: base, step: step))
+            mesh.append(.roughLine(path, width: width * 0.6, seed: base &+ 1, step: step))
+        }
+        return mesh
+    }
+
+    /// Edges chained end to end wherever exactly two meet.
+    static func paths(_ edges: [(SIMD3<Float>, SIMD3<Float>)]) -> [[SIMD3<Float>]] {
+        func key(_ p: SIMD3<Float>) -> SIMD3<Int32> { SIMD3(Int32((p.x * 10_000).rounded()), Int32((p.y * 10_000).rounded()), Int32((p.z * 10_000).rounded())) }
+        var at: [SIMD3<Int32>: [Int]] = [:]
+        for (i, edge) in edges.enumerated() { at[key(edge.0), default: []].append(i); at[key(edge.1), default: []].append(i) }
+        var used = Array(repeating: false, count: edges.count)
+        var paths: [[SIMD3<Float>]] = []
+        for start in edges.indices where !used[start] {
+            used[start] = true
+            var path = [edges[start].0, edges[start].1]
+            // Grow from the end while the path continues through a point where only two edges meet.
+            while let end = path.last, let around = at[key(end)], around.count == 2,
+                  let next = around.first(where: { !used[$0] }) {
+                used[next] = true
+                path.append(key(edges[next].0) == key(end) ? edges[next].1 : edges[next].0)
+            }
+            paths.append(path)
+        }
+        return paths
+    }
+
     /// Rotated around Y, then moved: a prop's mesh in room space.
     public func placed(_ placement: RoomLayout.Placement) -> LowPolyMesh {
         let angle = Double(placement.rotationDegrees) * Double.pi / 180

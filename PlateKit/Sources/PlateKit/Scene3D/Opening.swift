@@ -36,6 +36,8 @@ public enum Opening {
             }
             var b = PropModels.Builder()
             b.box(size, centre, .light, casts: false)
+            b.add(LowPolyMesh.box(size: size).translated(by: centre).roughInk(width: outlineWidth, seed: 50 + UInt32(Side.allCases.firstIndex(of: side)!), step: outlineWidth * 1.5),
+                  .flat(Look.ink), ink: false, casts: false)
             return Slab(side: side, position: [centre.x, 0, centre.z], parts: b.parts)
         }
     }
@@ -44,10 +46,14 @@ public enum Opening {
     public static func lid() -> [PropPart] {
         let r = RoomLayout.room
         var b = PropModels.Builder()
-        b.box([r.width + 0.34, 0.15, r.depth + 0.34], .zero, .light, casts: false)
+        let size = SIMD3<Float>(r.width + 0.34, 0.15, r.depth + 0.34)
+        b.box(size, .zero, .light, casts: false)
+        b.add(LowPolyMesh.box(size: size).roughInk(width: outlineWidth, seed: 60, step: outlineWidth * 1.5), .flat(Look.ink), ink: false, casts: false)
         return b.parts
     }
     public static var lidHeight: Float { cubeHeight + 0.075 }
+    /// The sketch outline's width: about the prototype's 2.5 px stroke from the far shot, 52 m away.
+    static let outlineWidth: Float = 0.18
 
     /// The walls facing the overview camera go all the way down (prototype openBox: the camera is outside them).
     public static func dropsAllTheWay(_ side: Side) -> Bool {

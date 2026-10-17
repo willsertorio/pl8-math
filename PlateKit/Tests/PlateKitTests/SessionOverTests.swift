@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import PlateKit
 
@@ -42,7 +43,7 @@ struct SessionOverTests {
     @Test func theScaleHasABaseAPlatformAndAHead() {
         let parts = ScaleScene.parts()
         #expect(parts.base.count > 4 && !parts.platform.isEmpty)
-        let top = parts.platform.flatMap { $0.mesh.positions.map(\.y) }.max() ?? 0
+        let top = parts.platform.filter { $0.tone != .flat(Look.ink) }.flatMap { $0.mesh.positions.map(\.y) }.max() ?? 0
         #expect(abs(top - ScaleScene.platformTop) < 0.006)
         #expect(ScaleScene.screenCentre.y > 0.8)
     }
@@ -101,5 +102,41 @@ struct DuotoneTests {
         #expect(Look.duotone(RGB(hex: "#1E5BC6")) == Look.boxDark)
         #expect(Look.duotone(RGB(hex: "#F2F2EE")) == Look.boxLight)       // white change plate
         #expect(Look.duotone(RGB(hex: "#CDD2D8")) == Look.boxLight)       // the bar's steel
+    }
+}
+
+@Suite("The prototype's rough sketch outline on the closed box and the scale")
+struct RoughOutlineTests {
+    @Test func aRoughLineFollowsACurveWithGaps() {
+        let circle = (0...64).map { i -> SIMD3<Float> in
+            let a = Float(i) / 64 * 2 * .pi
+            return [0.225 * cos(a), 0, 0.225 * sin(a)]
+        }
+        let line = LowPolyMesh.roughLine(circle, width: 0.01, seed: 3)
+        #expect(line.triangleCount > 0)
+        #expect(line.positions.allSatisfy { abs(SIMD2($0.x, $0.z).length - 0.225) < 0.03 && abs($0.y) < 0.03 })
+        let steps = Int(2 * Float.pi * 0.225 / LowPolyMesh.roughStep)
+        #expect(line.triangleCount / 8 < steps)                               // grain: some pieces drop out
+        #expect(line == LowPolyMesh.roughLine(circle, width: 0.01, seed: 3))  // the same every launch
+    }
+
+    @Test func roughInkTracesEveryHardEdgeIncludingRims() {
+        let box = LowPolyMesh.box(size: [1, 1, 1])
+        let ink = box.roughInk(width: 0.02, seed: 1)
+        // Something near each of the 12 edges' middles.
+        let middles: [SIMD3<Float>] = [[0, 0.5, 0.5], [0, -0.5, 0.5], [0, 0.5, -0.5], [0, -0.5, -0.5],
+                                       [0.5, 0, 0.5], [-0.5, 0, 0.5], [0.5, 0, -0.5], [-0.5, 0, -0.5],
+                                       [0.5, 0.5, 0], [-0.5, 0.5, 0], [0.5, -0.5, 0], [-0.5, -0.5, 0]]
+        for m in middles { #expect(ink.positions.contains { ($0 - m).length < 0.12 }) }
+        let disc = LowPolyMesh.cylinder(radius: 0.225, length: 0.05, sides: 48, axis: .y)
+        let rims = disc.roughInk(width: 0.01, seed: 2)
+        #expect(rims.positions.contains { $0.y > 0.02 } && rims.positions.contains { $0.y < -0.02 })
+    }
+
+    @Test func theClosedBoxAndTheScaleHaveTheirOutline() {
+        #expect(Opening.slabs().allSatisfy { $0.parts.contains { $0.tone == .flat(Look.ink) } })
+        #expect(Opening.lid().contains { $0.tone == .flat(Look.ink) })
+        #expect(ScaleScene.parts().base.contains { $0.tone == .flat(Look.ink) })
+        #expect(ScaleScene.outline(PropModels.barbellParts(), seed: 1).triangleCount > 0)
     }
 }
