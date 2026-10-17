@@ -1,3 +1,4 @@
+import Combine
 import RealityKit
 import SwiftUI
 import UIKit
@@ -259,7 +260,7 @@ final class SetupProps {
     /// The kit's plates once they're real bodies, to grab and throw (prototype bindTaps / kitHit).
     private var kitBodies: [ObjectIdentifier: KitBody] = [:]
     private var grab: Grab?
-    private var subscriptions: [EventSubscription] = []
+    private var subscriptions: [any Cancellable] = []
     /// The camera's kick on impacts (prototype shakeKick), and the room's pose before the kick was added.
     private var shake: Float = 0
     private var shakeBase: Transform?
