@@ -1,0 +1,141 @@
+# Checks every push so Will doesn't have to (DECISIONS 2026-10-16):
+#   platekit  — PlateKit's tests, then the 3D room compared with the prototype, station by station
+#   app       — the app built for the iPhone Simulator, then screenshots of its main screens
+# Results: the run's summary, the "prototype-check" and "screenshots" artifacts, and (for pull requests) the
+# pictures on the ci-screens branch, where Claude's session can fetch them with git.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  platekit:
+    name: PlateKit tests + prototype check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.1"
+
+      - name: PlateKit tests
+        working-directory: PlateKit
+        run: swift test
+
+      - name: Bake the room for the prototype check
+        working-directory: PlateKit
+        run: PL8_SCENE_DUMP="$GITHUB_WORKSPACE/tools/visual-check/out" swift test --filter SceneDump
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the checker
+        working-directory: tools/visual-check
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Compare with the prototype
+        working-directory: tools/visual-check
+        run: |
+          set -o pipefail
+          node compare.mjs | tee out/log.txt
+          echo "## 3D room vs prototype" >> "$GITHUB_STEP_SUMMARY"
+          cat out/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the side-by-side pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prototype-check
+          path: tools/visual-check/out/*.png
+          if-no-files-found: ignore
+
+  app:
+    name: App build + screenshots
+    runs-on: macos-26
+    needs: platekit
+    if: always()
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Build for the Simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project pl8/pl8.xcodeproj -scheme pl8 \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log | grep -E "error:|warning: .*deprecated|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Screenshots
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = [d for runtime, ds in json.load(sys.stdin)['devices'].items() if 'iOS' in runtime for d in ds if d['name'].startswith('iPhone')]
+          print(devices[-1]['udid'])")
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/pl8.app
+          mkdir -p screens
+          for shot in room-overview room-corner room-nameFlag room-pr room-board room-kit room-setv firstrun-name firstrun-plates session session-sets session-pull opening-title opening-box session-over home tab-train tab-prs tab-gym tab-history; do
+            xcrun simctl launch --terminate-running-process "$DEVICE" com.williansertorio.pl8 -pl8Shot "$shot"
+            sleep 15
+            xcrun simctl io "$DEVICE" screenshot "screens/$shot.png"
+          done
+
+      - name: Keep the screenshots and the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: |
+            screens/*.png
+            build.log
+          if-no-files-found: ignore
+
+      - name: Fetch the prototype check's pictures
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/download-artifact@v4
+        with:
+          name: prototype-check
+          path: prototype-check
+        continue-on-error: true
+
+      - name: Publish the pictures on the ci-screens branch
+        if: always() && github.event_name == 'pull_request'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p publish/screens publish/prototype-check
+          cp screens/*.png publish/screens/ 2>/dev/null || true
+          cp prototype-check/*.png publish/prototype-check/ 2>/dev/null || true
+          cp build.log publish/ 2>/dev/null || true
+          echo "$SHA" > publish/SHA
+          cd publish
+          git init -q
+          git checkout -q -b ci-screens
+          git add .
+          git -c user.name="pl8 CI" -c user.email="ci@users.noreply.github.com" commit -qm "Pictures for $SHA"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screens

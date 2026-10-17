@@ -1,0 +1,311 @@
+import RealityKit
+import SwiftUI
+import UIKit
+import CoreText
+import PlateKit
+
+/// Turns PlateKit's baked diorama (`SceneBake`) into RealityKit models. Every piece is an `UnlitMaterial` with
+/// tone mapping off, so the phone shows exactly the colours PlateKit worked out from the prototype's light.
+@MainActor
+enum Diorama {
+    static let background = uiColor(Look.background)
+
+    static func uiColor(_ colour: RGB) -> UIColor {
+        UIColor(red: CGFloat(colour.r), green: CGFloat(colour.g), blue: CGFloat(colour.b), alpha: 1)
+    }
+
+    /// A flat colour that keeps its exact value: RealityKit's tone mapping (which darkened the orange in M5) is off.
+    static func flat(_ colour: UIColor) -> UnlitMaterial {
+        var material = UnlitMaterial(applyPostProcessToneMap: false)
+        material.color = .init(tint: colour)
+        return material
+    }
+
+    /// One model per baked piece. Each is named after the walls it shows with ("walls:back,right"), so
+    /// `showWalls(from:in:)` can cut away the walls between the camera and the room.
+    /// With `duotone`, every colour and picture is posterized to box dark or box light (`Look.duotone`), like the
+    /// prototype's animation scenes.
+    private static var duotoneTextures: [BakedPiece.Paint: TextureResource] = [:]
+
+    static func entities(for pieces: [BakedPiece], duotone: Bool = false) -> [Entity] {
+        var textures: [Picture: TextureResource] = [:]
+        return pieces.compactMap { piece in
+            let material: UnlitMaterial
+            switch piece.paint {
+            case .colour(let colour):
+                material = flat(uiColor(duotone ? Look.duotone(colour) : colour))
+            case .picture(let picture, let tint) where duotone:
+                // Its own two-tone print for this much light, made once.
+                if duotoneTextures[piece.paint] == nil, let image = PictureArt.duotone(PictureArt.image(picture), tint: tint).cgImage {
+                    duotoneTextures[piece.paint] = try? TextureResource(image: image, options: .init(semantic: .color))
+                }
+                guard let texture = duotoneTextures[piece.paint] else { return nil }
+                var m = UnlitMaterial(applyPostProcessToneMap: false)
+                m.color = .init(tint: .white, texture: .init(texture))
+                material = m
+            case .picture(let picture, let tint):
+                if textures[picture] == nil, let image = PictureArt.image(picture).cgImage {
+                    textures[picture] = try? TextureResource(image: image, options: .init(semantic: .color))
+                }
+                var m = UnlitMaterial(applyPostProcessToneMap: false)
+                if let texture = textures[picture] {
+                    m.color = .init(tint: uiColor(tint), texture: .init(texture))
+                } else {
+                    m.color = .init(tint: uiColor(tint))
+                }
+                material = m
+            }
+            guard let model = try? ModelEntity(mesh: meshResource(piece.mesh), materials: [material]) else { return nil }
+            model.name = "walls:" + piece.walls.map(\.rawValue).sorted().joined(separator: ",")
+            return model
+        }
+    }
+
+    /// Hides every piece whose wall is between the camera (in room space) and the room, like the prototype's
+    /// cut-away.
+    static func showWalls(from camera: SIMD3<Float>, in world: Entity) {
+        for child in world.children {
+            if child.name.hasPrefix("walls:") {
+                let names = child.name.dropFirst("walls:".count).split(separator: ",")
+                child.isEnabled = names.allSatisfy { RoomLayout.Wall(rawValue: String($0))?.isVisible(from: camera) ?? true }
+            } else {
+                showWalls(from: camera, in: child)                     // the setup's own groups (flag, shelf, piles)
+            }
+        }
+    }
+
+    static func meshResource(_ mesh: LowPolyMesh) throws -> MeshResource {
+        var descriptor = MeshDescriptor(name: "part")
+        descriptor.positions = MeshBuffers.Positions(mesh.positions)
+        var normals = Array(repeating: SIMD3<Float>(0, 1, 0), count: mesh.positions.count)
+        for triangle in 0..<mesh.triangleCount {
+            let normal = mesh.faceNormal(triangle)
+            for corner in 0..<3 { normals[Int(mesh.indices[triangle * 3 + corner])] = normal }
+        }
+        descriptor.normals = MeshBuffers.Normals(normals)
+        if mesh.uvs.count == mesh.positions.count {
+            descriptor.textureCoordinates = MeshBuffers.TextureCoordinates(mesh.uvs)
+        }
+        descriptor.primitives = .triangles(mesh.indices)
+        return try MeshResource.generate(from: [descriptor])
+    }
+
+    /// The room's transform that puts the camera at `position` looking at `target`, for a camera fixed at the
+    /// origin looking down −Z. Moving the world instead of the camera works whether or not RealityView uses our
+    /// camera entity.
+    static func worldTransform(target: SIMD3<Float>, position: SIMD3<Float>) -> Transform {
+        let eye = Entity()
+        eye.look(at: target, from: position, relativeTo: nil)
+        return Transform(matrix: eye.transform.matrix.inverse)
+    }
+}
+
+/// The printed surfaces, drawn like the prototype's canvases (reference/prototype-app-logic.js faceTexture,
+/// buildPRWall, drawFlag) and recoloured to the palette the same way: its black becomes box dark, its white box
+/// light.
+@MainActor
+enum PictureArt {
+    static func image(_ picture: Picture) -> UIImage {
+        switch picture {
+        case .plateFace(let plate): plateFace(plate)
+        case .prTable(let rows): prTable(rows)
+        case .whiteboard(let lines): whiteboard(lines)
+        case .flag(let text): flag(text)
+        }
+    }
+
+    /// A plate's face: a darker band at the edge, two fine rings, the number at the top and the unit at the
+    /// bottom; bumpers also say COMPETITION and Ø 450 MM down the sides.
+    static func plateFace(_ plate: Plate) -> UIImage {
+        let size: CGFloat = 512, c = size / 2, r = size / 2
+        let base = RGB(hex: plate.colorHex)
+        let bumper = plate.kind == .bumper
+        let label = plate.size.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(plate.size)) : String(plate.size)
+        let unit = plate.unit == .kg ? "KG" : "LB"
+        // Dark print on the light plates (yellow, white), white on the rest — the prototype's `ink`.
+        let lightPlate = ["#F3C318", "#F2F2EE"].contains(plate.colorHex.uppercased())
+        let ink = lightPlate ? UIColor(Color(hex: "#1A1A1A")) : UIColor.white
+        return draw(CGSize(width: size, height: size)) { g in
+            g.setFillColor(Diorama.uiColor(base).cgColor)
+            g.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            g.setStrokeColor(Diorama.uiColor(base.offsetLightness(-0.08)).cgColor)
+            g.setLineWidth(14)
+            g.strokeEllipse(in: circle(c, r * 0.955))
+            g.setStrokeColor(Diorama.uiColor(base.offsetLightness(-0.14)).withAlphaComponent(0.55).cgColor)
+            g.setLineWidth(3)
+            g.strokeEllipse(in: circle(c, r * 0.905))
+            g.strokeEllipse(in: circle(c, r * (bumper ? 0.40 : 0.52)))
+            if bumper {
+                text(label, size: 104, weight: .bold, colour: ink, at: CGPoint(x: c, y: c - r * 0.66), in: g)
+                text(unit, size: 60, weight: .bold, colour: ink, at: CGPoint(x: c, y: c + r * 0.66), in: g)
+                text("COMPETITION", size: 26, weight: .semibold, colour: ink, at: CGPoint(x: c - r * 0.66, y: c), angle: -.pi / 2, in: g)
+                text("Ø 450 MM", size: 26, weight: .semibold, colour: ink, at: CGPoint(x: c + r * 0.66, y: c), angle: .pi / 2, in: g)
+            } else {
+                text(label, size: 118, weight: .bold, colour: ink, at: CGPoint(x: c, y: c - r * 0.73), in: g)
+                text(unit, size: 70, weight: .bold, colour: ink, at: CGPoint(x: c, y: c + r * 0.75), in: g)
+            }
+        }
+    }
+
+    /// The PR board (prototype drawPR): "My PR's", then one lift per row with its PR on the right; with no PRs
+    /// yet, the empty ruled table.
+    static func prTable(_ rows: [BoardRow]) -> UIImage {
+        let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
+        return draw(CGSize(width: 1024, height: 680)) { g in
+            g.setFillColor(light.cgColor)
+            g.fill(CGRect(x: 0, y: 0, width: 1024, height: 680))
+            text("My PR's", size: 58, weight: .bold, colour: dark, at: CGPoint(x: 40, y: 62), centred: false, in: g)
+            g.setFillColor(dark.cgColor)
+            g.setStrokeColor(dark.cgColor)
+            g.setLineWidth(2)
+            if rows.isEmpty {
+                // No PRs yet: the empty ruled table.
+                g.fill(CGRect(x: 30, y: 164, width: 964, height: 6))
+                for row in 0..<8 {
+                    let y = CGFloat(224 + row * 60)
+                    g.strokeLineSegments(between: [CGPoint(x: 30, y: y), CGPoint(x: 994, y: y)])
+                }
+                for x: CGFloat in [330, 500, 640, 820] {
+                    g.strokeLineSegments(between: [CGPoint(x: x - 18, y: 112), CGPoint(x: x - 18, y: 644)])
+                }
+                return
+            }
+            // One lift per row, best weight on the right (prototype drawPR).
+            g.fill(CGRect(x: 30, y: 112, width: 964, height: 6))
+            for (i, row) in rows.prefix(8).enumerated() {
+                let y = CGFloat(150 + i * 64)
+                text(row.left.uppercased(), size: 34, weight: .bold, colour: dark, at: CGPoint(x: 40, y: y + 4), centred: false, in: g)
+                text(row.right, font: UIFont(name: "Helvetica", size: 40) ?? .systemFont(ofSize: 40), colour: dark,
+                     at: CGPoint(x: 984, y: y + 4), alignRight: true, in: g)
+                g.strokeLineSegments(between: [CGPoint(x: 30, y: y + 34), CGPoint(x: 994, y: y + 34)])
+            }
+        }
+    }
+
+    /// The whiteboard (prototype drawWB): "Today's sesh" underlined in marker, then up to four lifts —
+    /// "A. BACK SQUAT", its sets, and "→ 80 kg" for the first working set. Blank with no workout yet.
+    static func whiteboard(_ lines: [BoardLine]) -> UIImage {
+        let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
+        return draw(CGSize(width: 1024, height: 688)) { g in
+            g.setFillColor(light.cgColor)
+            g.fill(CGRect(x: 0, y: 0, width: 1024, height: 688))
+            let title = "Today's sesh"
+            let titleWidth = marker(title, size: 64, colour: dark, baseline: CGPoint(x: 40, y: 92))
+            g.setStrokeColor(dark.cgColor)
+            g.setLineWidth(5)
+            g.setLineCap(.round)
+            g.strokeLineSegments(between: [CGPoint(x: 40, y: 118), CGPoint(x: 40 + titleWidth, y: 112)])
+            let letters = Array("ABCDEFGH")
+            var y: CGFloat = 196
+            let gap: CGFloat = lines.count > 3 ? 104 : 132
+            for (i, line) in lines.prefix(4).enumerated() {
+                _ = marker("\(letters[i]). \(line.name.uppercased())", size: 46, colour: dark, baseline: CGPoint(x: 40, y: y))
+                _ = marker(line.format, size: 36, colour: dark, baseline: CGPoint(x: 86, y: y + 50))
+                _ = marker("→ \(line.load)", size: 36, colour: dark, baseline: CGPoint(x: 560, y: y + 50))
+                y += gap
+            }
+        }
+    }
+
+    /// Permanent Marker (Apache License 2.0, Fonts/PermanentMarker-LICENSE.txt) on its baseline; returns the width.
+    private static func marker(_ string: String, size: CGFloat, colour: UIColor, baseline: CGPoint) -> CGFloat {
+        _ = registerFonts
+        let font = UIFont(name: "PermanentMarker-Regular", size: size) ?? .systemFont(ofSize: size, weight: .heavy)
+        let attributed = NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: colour])
+        attributed.draw(at: CGPoint(x: baseline.x, y: baseline.y - font.ascender))
+        return attributed.size().width
+    }
+
+    /// The flag: the gym's name, as big as fits two-thirds of the width and 60 % of the height, in light on the
+    /// dark cloth, in the prototype's Playfair Display Black.
+    static func flag(_ name: String) -> UIImage {
+        let size = CGSize(width: 740, height: 512)
+        let dark = Diorama.uiColor(Look.boxDark), light = Diorama.uiColor(Look.boxLight)
+        return draw(size) { g in
+            g.setFillColor(dark.cgColor)
+            g.fill(CGRect(origin: .zero, size: size))
+            guard !name.isEmpty else { return }
+            // Sized and centred on the letters' own outlines, like the prototype's measureText, so digits
+            // (no descenders) sit in the middle rather than on a line box that leaves room below them.
+            let probe = glyphBounds(name, font: flagFont(300))
+            let points = 300 * min(size.width * 0.66 / max(1, probe.width), size.height * 0.6 / max(1, probe.height))
+            let font = flagFont(points)
+            let glyphs = glyphBounds(name, font: font)
+            let attributed = NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: light])
+            // `draw(at:)` takes the line's top-left; the baseline sits `ascender` below it.
+            let baseline = size.height / 2 + glyphs.height / 2 + glyphs.minY
+            attributed.draw(at: CGPoint(x: size.width / 2 - glyphs.midX, y: baseline - font.ascender))
+        }
+    }
+
+    /// Playfair Display Black (SIL Open Font License, Fonts/PlayfairDisplay-OFL.txt), loaded from the app on first
+    /// use; the system's heaviest serif if it's missing.
+    /// The letters' outline box, from the baseline (y up, as Core Text measures it).
+    static func glyphBounds(_ string: String, font: UIFont) -> CGRect {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: [.font: font]))
+        return CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+    }
+
+    static func flagFont(_ size: CGFloat) -> UIFont {
+        _ = registerFonts
+        if let playfair = UIFont(name: "PlayfairDisplayRoman-Black", size: size) { return playfair }
+        let font = UIFont.systemFont(ofSize: size, weight: .black)
+        guard let serif = font.fontDescriptor.withDesign(.serif) else { return font }
+        return UIFont(descriptor: serif, size: size)
+    }
+
+    /// The prototype's fonts that iOS doesn't have, loaded from the app once.
+    private static let registerFonts: Void = Fonts.register()
+
+    // MARK: - Drawing helpers
+
+    /// A picture as lit by `tint`, posterized to box dark and box light pixel by pixel.
+    static func duotone(_ image: UIImage, tint: RGB) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let width = cg.width, height = cg.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let space = CGColorSpaceCreateDeviceRGB(), info = CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: space, bitmapInfo: info) else { return image }
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let dark = Look.boxDark, light = Look.boxLight
+        for i in stride(from: 0, to: pixels.count, by: 4) {
+            let colour = RGB(Float(pixels[i]) / 255 * tint.r, Float(pixels[i + 1]) / 255 * tint.g, Float(pixels[i + 2]) / 255 * tint.b)
+            let out = Look.duotone(colour) == light ? light : dark
+            pixels[i] = UInt8(out.r * 255); pixels[i + 1] = UInt8(out.g * 255); pixels[i + 2] = UInt8(out.b * 255); pixels[i + 3] = 255
+        }
+        guard let result = context.makeImage() else { return image }
+        return UIImage(cgImage: result)
+    }
+
+    private static func draw(_ size: CGSize, _ body: (CGContext) -> Void) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { body($0.cgContext) }
+    }
+
+    private static func circle(_ centre: CGFloat, _ radius: CGFloat) -> CGRect {
+        CGRect(x: centre - radius, y: centre - radius, width: radius * 2, height: radius * 2)
+    }
+
+    private static func text(_ string: String, size: CGFloat, weight: UIFont.Weight, colour: UIColor, at point: CGPoint,
+                             angle: CGFloat = 0, centred: Bool = true, in g: CGContext) {
+        let font = UIFont(name: "Helvetica-Bold", size: size) ?? .systemFont(ofSize: size, weight: weight)
+        text(string, font: weight == .semibold ? (UIFont(name: "Helvetica", size: size) ?? font) : font,
+             colour: colour, at: point, angle: angle, centred: centred, in: g)
+    }
+
+    /// Draws `string` with its centre (or, when not `centred`, its left edge's middle) at `point`, turned by `angle`.
+    private static func text(_ string: String, font: UIFont, colour: UIColor, at point: CGPoint, angle: CGFloat = 0,
+                             centred: Bool = true, alignRight: Bool = false, in g: CGContext) {
+        let attributed = NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: colour])
+        let bounds = attributed.size()
+        g.saveGState()
+        g.translateBy(x: point.x, y: point.y)
+        g.rotate(by: angle)
+        let x = alignRight ? -bounds.width : (centred ? -bounds.width / 2 : 0)
+        attributed.draw(at: CGPoint(x: x, y: -bounds.height / 2))
+        g.restoreGState()
+    }
+}
