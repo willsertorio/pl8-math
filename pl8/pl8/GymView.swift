@@ -36,6 +36,8 @@ struct GymDrawerContent: View {
             if let current {
                 GymSetupForm(gym: current)
             }
+            MotionToggle()
+                .padding(.top, 18)
             Button("Replay the first run") { confirmReplay = true }
                 .font(Theme.display(15))
                 .foregroundStyle(Color(hex: "#D70015"))
@@ -169,3 +171,17 @@ struct BarChips: View {
     }
 }
 
+
+/// The switch for the "move with the phone" effects (Will's test, 2026-10-19).
+struct MotionToggle: View {
+    @AppStorage(MotionSource.settingKey) private var motionEffects = true
+
+    var body: some View {
+        Toggle(isOn: $motionEffects) {
+            Text("Move with the phone").font(Theme.text(17))
+        }
+        .tint(Theme.ink)
+        .padding(.horizontal, 4)
+        .sensoryFeedback(.selection, trigger: motionEffects)
+    }
+}

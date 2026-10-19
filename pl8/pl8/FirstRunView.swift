@@ -53,7 +53,8 @@ struct FirstRunView: View {
             GeometryReader { geometry in
                 RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
                           plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
-                          boards: Boards(prs: Planner.boardRows(records)), opening: step == .opening ? opening : nil)
+                          boards: Boards(prs: Planner.boardRows(records)), opening: step == .opening ? opening : nil,
+                          tiltable: step == .opening)
                     .frame(height: step == .opening
                            ? geometry.size.height
                            : max(200, geometry.size.height - drawerHeight - max(keyboardHeight, HomeView.bottomInset) + 24))
@@ -276,7 +277,7 @@ struct OpeningScreen: View {
             RoomStage(station: opening == .title || opening == .closed ? .far : .overview, gymName: gym?.name ?? "",
                       unit: gym?.unit ?? .kg, plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20,
                       boards: Boards(prs: Planner.boardRows(records), workout: Planner.boardLines(for: today, gym: gym, records: records)),
-                      opening: opening)
+                      opening: opening, tiltable: true)
                 .ignoresSafeArea()
             if opening == .title {
                 OpeningTitle()
@@ -308,6 +309,8 @@ struct OpeningScreen: View {
 /// prototype's two tones and rough outline drifting up on both sides, slowly tumbling. Tap anywhere to go on.
 private struct OpeningTitle: View {
     @State private var stage = TitleStage()
+    @AppStorage(MotionSource.settingKey) private var motionEffects = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let cream = Color(Diorama.uiColor(Look.boxLight))
 
     var body: some View {
@@ -317,7 +320,7 @@ private struct OpeningTitle: View {
                 RealityView { content in
                     for entity in stage.build(aspect: Float(geometry.size.width / max(1, geometry.size.height))) { content.add(entity) }
                 }
-                .task { await stage.run() }
+                .task { await stage.run(tilting: motionEffects && !reduceMotion) }
             }
             Text("pl8(math)")
                 .font(Theme.display(39))
@@ -373,25 +376,35 @@ final class TitleStage {
 
     static let halfHeight: Float = 422
 
-    func run() async {
+    /// - Parameter tilting: the plates move with the phone, nearer ones more (the switch in the Gym drawer).
+    func run(tilting: Bool) async {
+        if tilting { MotionSource.shared.start() }
+        defer { if tilting { MotionSource.shared.stop() } }
+        var spring = TiltSpring()
         var last = ContinuousClock.now
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(16))
             let now = ContinuousClock.now
+            let dt = min(0.05, Float((now - last) / .seconds(1)))
+            if tilting { tilt = spring.step(towards: MotionSource.shared.tilt, dt: dt) }
             if built {
-                field.step(min(0.05, Float((now - last) / .seconds(1))))
+                field.step(dt)
                 place()
             }
             last = now
         }
     }
 
+    private var tilt = SIMD2<Float>.zero
+
     /// Each plate at its spot: across and up by its screen position times its depth, turned by its tumble.
     private func place() {
         for (i, item) in field.plates.enumerated() where i < plates.count {
             let k = item.z / 0.9 * 0.5
             let entity = plates[i].entity
-            entity.position = SIMD3(item.u * aspect * k, -item.v * k, -item.z)
+            // Depth: plates nearer than 1.5 m slide with the tilt, farther ones against it.
+            let parallax = tilt * (1.5 - item.z) * 0.12
+            entity.position = SIMD3(item.u * aspect * k + parallax.x, -item.v * k + parallax.y, -item.z)
             entity.orientation = simd_quatf(angle: item.rotation.x, axis: [1, 0, 0]) * simd_quatf(angle: item.rotation.y, axis: [0, 1, 0])
                 * simd_quatf(angle: item.rotation.z, axis: [0, 0, 1])
             entity.scale = SIMD3(repeating: plates[i].scale)

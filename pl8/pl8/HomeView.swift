@@ -55,7 +55,7 @@ struct HomeView: View {
             GeometryReader { geometry in
                 RoomStage(station: station, gymName: gym?.name ?? "", unit: gym?.unit ?? .kg,
                           plateSizes: gym?.plateSizes ?? [], barWeight: gym?.barWeight ?? 20, boards: boards,
-                          interactive: open == nil, floating: open == nil)
+                          interactive: open == nil, floating: open == nil, tiltable: true)
                     .frame(height: open == nil
                            ? geometry.size.height
                            : max(220, geometry.size.height - drawerHeight - max(keyboardHeight, Self.bottomInset) + 24))

@@ -23,6 +23,11 @@ struct RoomStage: View {
     var floating = false
     /// Set when a drag picked up a kit plate, so the session's swipe leaves it alone.
     var grabFlag: GrabFlag?
+    /// The intro and home: the scene moves with the phone (the switch in the Gym drawer).
+    var tiltable = false
+    @AppStorage(MotionSource.settingKey) private var motionEffects = true
+    /// The tilt effect, as seen from the camera.
+    @State private var screen = matrix_identity_float4x4
     @State private var viewSize: CGSize = .zero
     @State private var grabbing = false
     @State private var grabStarted = false
@@ -38,7 +43,8 @@ struct RoomStage: View {
 
     init(station: RoomLayout.Station, gymName: String, unit: WeightUnit, plateSizes: [Double], barWeight: Double,
          boards: Boards = Boards(), session: SessionProps? = nil, interactive: Bool = false, opening: OpeningPhase? = nil,
-         floating: Bool = false, grabFlag: GrabFlag? = nil) {
+         floating: Bool = false, grabFlag: GrabFlag? = nil, tiltable: Bool = false) {
+        self.tiltable = tiltable
         self.opening = opening
         self.floating = floating
         self.grabFlag = grabFlag
@@ -64,12 +70,12 @@ struct RoomStage: View {
                 props.syncSession(session, animate: !reduceMotion)
                 props.syncOpening(opening)
             }
-            RoomScene.show(orbit, box: box, in: content.entities)
+            RoomScene.show(orbit, box: box, screen: screen, in: content.entities)
         } update: { content in
             props.sync(name: gymName, unit: unit, plateSizes: plateSizes, barWeight: barWeight, boards: boards, animate: !reduceMotion)
             props.syncSession(session, animate: !reduceMotion)
             props.syncOpening(opening)
-            RoomScene.show(orbit, box: box, in: content.entities)
+            RoomScene.show(orbit, box: box, screen: screen, in: content.entities)
         }
         .background(Theme.background)
         .gesture(gestures, including: interactive ? .all : .subviews)
@@ -80,6 +86,30 @@ struct RoomStage: View {
         .onDisappear { flight?.cancel() }
         .task(id: opening) { await play(opening) }
         .task(id: floating) { await float(floating) }
+        .task(id: tiltable && motionEffects && !reduceMotion) { await followTilt(tiltable && motionEffects && !reduceMotion) }
+    }
+
+    /// Moving the phone moves the scene: it swings towards the low side on a spring (as if gravity pulls it) and
+    /// turns a little round what the camera looks at, so near things move more than far ones.
+    private func followTilt(_ on: Bool) async {
+        guard on else {
+            screen = matrix_identity_float4x4
+            return
+        }
+        MotionSource.shared.start()
+        defer { MotionSource.shared.stop() }
+        var spring = TiltSpring()
+        var last = ContinuousClock.now
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(16))
+            let now = ContinuousClock.now
+            let s = spring.step(towards: MotionSource.shared.tilt, dt: min(0.05, Float((now - last) / .seconds(1))))
+            last = now
+            let pivot = SIMD3<Float>(0, 0, -orbit.distance)
+            let swing = Transform(rotation: simd_quatf(angle: s.x * 0.3, axis: [0, 1, 0]) * simd_quatf(angle: -s.y * 0.3, axis: [1, 0, 0]),
+                                  translation: SIMD3(s.x, s.y, 0) * orbit.distance * 0.05)
+            screen = Transform(translation: pivot).matrix * swing.matrix * Transform(translation: -pivot).matrix
+        }
     }
 
     /// The prototype's floatTick: up and down by 0.2 ± 0.14 m and a slight rock, eased in.

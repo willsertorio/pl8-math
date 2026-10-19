@@ -81,13 +81,15 @@ enum RoomScene {
     }
 
     /// Moves the room so the camera sits where `orbit` says, sets the field of view, and cuts away the walls
-    /// between the camera and the room. `box` moves the box itself (the opening's pop, turn and float); the sky
-    /// stays put.
-    static func show(_ orbit: Orbit, box: simd_float4x4 = matrix_identity_float4x4, in entities: some Sequence<Entity>) {
+    /// between the camera and the room. `box` moves the box itself (the opening's pop, turn and float); `screen`
+    /// moves everything as seen from the camera (the tilt effects); the sky stays put.
+    static func show(_ orbit: Orbit, box: simd_float4x4 = matrix_identity_float4x4, screen: simd_float4x4 = matrix_identity_float4x4,
+                     in entities: some Sequence<Entity>) {
         if let world = entities.first(where: { $0.name == worldName }) {
             let view = Diorama.worldTransform(target: orbit.target, position: orbit.position).matrix
-            world.transform = Transform(matrix: view * box)
-            let camera = box.inverse * SIMD4(orbit.position, 1)
+            let whole = screen * view * box
+            world.transform = Transform(matrix: whole)
+            let camera = whole.inverse * SIMD4<Float>(0, 0, 0, 1)
             Diorama.showWalls(from: SIMD3(camera.x, camera.y, camera.z), in: world)
             if let sky = world.findEntity(named: skyName) {
                 sky.transform = Transform(matrix: box.inverse * Transform(translation: RoomLayout.room.centre).matrix)
