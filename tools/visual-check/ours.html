@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{"three":"/tools/visual-check/node_modules/three/build/three.module.js"}}</script>
+<style>html,body{margin:0;background:#FF6200}canvas{display:block}</style></head><body>
+<script type="module">
+import * as T from 'three';
+const W = 390, H = 844;
+const r = new T.WebGLRenderer({ antialias: true }); r.setSize(W, H); r.setPixelRatio(1);
+r.outputColorSpace = T.SRGBColorSpace; r.toneMapping = T.NoToneMapping; document.body.appendChild(r.domElement);
+const scene = new T.Scene(); scene.background = new T.Color('#FF6200');
+const cam = new T.PerspectiveCamera(50, W / H, 0.05, 300);
+const walls = { back: [[0,0,1],[0.5,0,-4]], left: [[1,0,0],[-4,0,-0.5]], right: [[-1,0,0],[5,0,-0.5]] };
+function face(p) {   // the prototype's faceTexture
+  const S = 512, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), cx = S / 2, R = S / 2;
+  const base = new T.Color(p.colour), dark = base.clone().offsetHSL(0,0,-0.08).getStyle(), darker = base.clone().offsetHSL(0,0,-0.14).getStyle();
+  g.fillStyle = p.colour; g.fillRect(0,0,S,S); g.strokeStyle = dark; g.lineWidth = 14; g.beginPath(); g.arc(cx,cx,R*0.955,0,7); g.stroke();
+  g.strokeStyle = darker; g.globalAlpha = 0.55; g.lineWidth = 3; g.beginPath(); g.arc(cx,cx,R*0.905,0,7); g.stroke();
+  g.beginPath(); g.arc(cx,cx,R*(p.bumper?0.40:0.52),0,7); g.stroke(); g.globalAlpha = 1;
+  const lum = base.r*0.3+base.g*0.59+base.b*0.11; g.fillStyle = (p.colour === '#F3C318' || p.colour.toUpperCase() === '#F2F2EE') ? '#1A1A1A' : '#FFFFFF';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; const F = 'Helvetica, Arial, sans-serif';
+  if (p.bumper) { g.font = '700 104px ' + F; g.fillText(p.label, cx, cx - R*0.66); g.font = '700 60px ' + F; g.fillText(p.unit, cx, cx + R*0.66);
+    g.font = '600 26px ' + F; g.save(); g.translate(cx-R*0.66,cx); g.rotate(-Math.PI/2); g.fillText('COMPETITION',0,0); g.restore();
+    g.save(); g.translate(cx+R*0.66,cx); g.rotate(Math.PI/2); g.fillText('Ø 450 MM',0,0); g.restore(); }
+  else { g.font = '700 118px ' + F; g.fillText(p.label, cx, cx - R*0.73); g.font = '700 70px ' + F; g.fillText(p.unit, cx, cx + R*0.75); }
+  return c; }
+function recolour(c) { const x = c.getContext('2d'), d = x.getImageData(0,0,c.width,c.height), a = d.data, D = [0x6C,0x37,0x13], L = [0xF0,0xE2,0xF3];
+  for (let i = 0; i < a.length; i += 4) { const t = a[i]/255; for (let k = 0; k < 3; k++) a[i+k] = D[k] + (L[k]-D[k])*t; } x.putImageData(d,0,0); return c; }
+function pr() { const c = document.createElement('canvas'); c.width = 1024; c.height = 680; const x = c.getContext('2d');
+  x.fillStyle = '#FFF'; x.fillRect(0,0,1024,680); x.fillStyle = '#111'; x.textBaseline = 'middle'; x.font = '700 58px Helvetica, Arial'; x.fillText("My PR's", 40, 62);
+  x.fillRect(30,164,964,6); x.lineWidth = 2; x.strokeStyle = '#111'; for (let r = 0; r < 8; r++) { const y = 224 + r*60; x.beginPath(); x.moveTo(30,y); x.lineTo(994,y); x.stroke(); }
+  [330,500,640,820].forEach(cx => { x.beginPath(); x.moveTo(cx-18,112); x.lineTo(cx-18,644); x.stroke(); }); return recolour(c); }
+function blank() { const c = document.createElement('canvas'); c.width = 64; c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#F0E2F3'; x.fillRect(0, 0, 64, 64); return c; }
+function flag(text) { const c = document.createElement('canvas'); c.width = 740; c.height = 512; const x = c.getContext('2d');
+  x.font = '900 300px Georgia, serif'; const m = x.measureText(text); const size = Math.round(300 * Math.min(740*0.66/m.width, 512*0.6/((m.actualBoundingBoxAscent||215)+(m.actualBoundingBoxDescent||0))));
+  x.font = '900 ' + size + 'px Georgia, serif'; const m2 = x.measureText(text); const cy = 256 + (m2.actualBoundingBoxAscent - m2.actualBoundingBoxDescent)/2;
+  x.fillStyle = '#000'; x.fillRect(0,0,740,512); x.fillStyle = '#FFF'; x.textAlign = 'center'; x.fillText(text, 370, cy); return recolour(c); }
+const texCache = {};
+function tex(p) { const k = JSON.stringify(p); if (texCache[k]) return texCache[k]; const c = p.kind === 'plate' ? face(p) : p.kind === 'pr' ? pr() : p.kind === 'wb' ? blank() : flag(p.text);
+  const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 8; return texCache[k] = t; }
+const meshes = [];
+const data = await (await fetch("/tools/visual-check/out/ours.json")).json();
+for (const piece of data) {
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(piece.p, 3)); g.setIndex(piece.i);
+  if (piece.uv.length) g.setAttribute('uv', new T.Float32BufferAttribute(piece.uv, 2));
+  const m = piece.paint.colour ? new T.MeshBasicMaterial({ color: piece.paint.colour }) : new T.MeshBasicMaterial({ map: tex(piece.paint.picture), color: piece.paint.tint });
+  const mesh = new T.Mesh(g, m); mesh.userData.walls = piece.walls; scene.add(mesh); meshes.push(mesh); }
+window.show = (Tv, Pv, fov) => { cam.position.set(...Pv); cam.lookAt(...Tv); cam.fov = fov; cam.updateProjectionMatrix();
+  for (const m of meshes) m.visible = m.userData.walls.every(w => { const [n, p] = walls[w]; return (cam.position.x-p[0])*n[0] + (cam.position.y-p[1])*n[1] + (cam.position.z-p[2])*n[2] > 0; });
+  r.render(scene, cam); return 'ok'; };
+window.ready = 'ok';
+</script></body></html>
