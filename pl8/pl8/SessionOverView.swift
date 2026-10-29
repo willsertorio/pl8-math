@@ -267,6 +267,8 @@ enum Sounds {
     private static let engine = AVAudioEngine()
     private static var voices: [AVAudioPlayerNode] = []
     private static var nextVoice = 0
+    /// The audio session is set up once (the Flow's dials click many times a second).
+    private static var sessionReady = false
     static let rate = 44_100.0
 
     /// A plate seating on the sleeve (prototype clank): three short triangle tones, louder for heavier plates.
@@ -294,10 +296,13 @@ enum Sounds {
         buffer.frameLength = buffer.frameCapacity
         for (index, sample) in samples.enumerated() { channel[index] = sample }
         do {
-            try AVAudioSession.sharedInstance().setCategory(.ambient)          // quiet when the phone is on silent
-            try AVAudioSession.sharedInstance().setActive(true)
+            if !sessionReady {
+                try AVAudioSession.sharedInstance().setCategory(.ambient)      // quiet when the phone is on silent
+                try AVAudioSession.sharedInstance().setActive(true)
+                sessionReady = true
+            }
             if voices.isEmpty {
-                for _ in 0..<4 {
+                for _ in 0..<8 {
                     let voice = AVAudioPlayerNode()
                     engine.attach(voice)
                     engine.connect(voice, to: engine.mainMixerNode, format: format)

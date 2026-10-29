@@ -13,7 +13,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if opened {
-                FlowRoot(start: FlowRoot.startStep())
+                FlowRoot(start: FlowRoot.startStep(context))
                     .transition(.opacity)
             } else {
                 // The opening plays on every launch for now (SPEC open decision 2). Tap → the Flow.
@@ -70,16 +70,18 @@ struct FlowRoot: View {
             // The stage needs its size before the first question frames its camera.
             try? await Task.sleep(for: .milliseconds(50))
             made.mode = start == .menu ? .menu : .firstRun
-            made.again = UserDefaults.standard.bool(forKey: Flow.liftedKey)
+            made.again = start == .menu || UserDefaults.standard.bool(forKey: Flow.liftedKey)
             configure(made)
             made.go(start)
         }
     }
 
-    /// Where a launch starts: the menu once a session has been lifted, the workout once the gym is set up,
-    /// otherwise the first question.
-    static func startStep() -> Flow.Step {
-        if UserDefaults.standard.bool(forKey: Flow.liftedKey) { return .menu }
+    /// Where a launch starts: the menu once a session has been lifted (here or with the screens before the Flow),
+    /// the workout once the gym is set up, otherwise the first question.
+    static func startStep(_ context: ModelContext) -> Flow.Step {
+        var ended = FetchDescriptor<Session>(predicate: #Predicate { $0.endedAt != nil })
+        ended.fetchLimit = 1
+        if UserDefaults.standard.bool(forKey: Flow.liftedKey) || ((try? context.fetchCount(ended)) ?? 0) > 0 { return .menu }
         if UserDefaults.standard.bool(forKey: Flow.setUpKey) { return .wod }
         return .name
     }
