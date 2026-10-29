@@ -125,7 +125,7 @@ extension Flow {
             let made = FlowDial(flow: self, labels: values.map { WeightUnit.trimmed($0) }, radius: 1.05, step: 0.33, width: 1.5,
                                 labelWidth: 1.35, size: 112, wrap: false)
             made.root.position.y = -0.2
-            made.onDetent = { [weak self] in self?.click(1) }
+            made.onDetent = { [weak self] in self?.click(1); self?.buzz(.selection) }
             self.add(made.root)
             let start = keep ?? convert(record.value ?? (typical[record.lift] ?? 60), record.value != nil ? record.unit : .kg, unit)
             made.set(max(0, min(values.count - 1, Int((start / step).rounded()))))

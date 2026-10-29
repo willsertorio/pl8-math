@@ -133,7 +133,7 @@ extension Flow {
             for (i, x) in [Float(-0.62), 0.62].enumerated() {
                 let dial = FlowDial(flow: self, labels: chars, radius: 0.95, step: 0.38, width: 0.95, labelWidth: 0.7, size: 120)
                 dial.root.position = [-5, -0.45, 0]
-                dial.onDetent = { [weak self] in self?.click(1) }
+                dial.onDetent = { [weak self] in self?.click(1); self?.buzz(.selection) }
                 self.add(dial.root)
                 if self.editOne, name.indices.contains(i) { dial.set(max(0, chars.firstIndex(of: String(name[i])) ?? 0)) }
                 let x0 = -5 - Float(i) * 0.6
