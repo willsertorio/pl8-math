@@ -99,8 +99,9 @@ struct ScreenshotHost: View {
                 action()
             }
         }
-        /// A finger drag from a to b over `duration`, released or held.
-        func drag(_ a: @escaping @MainActor () -> CGPoint, by delta: CGPoint, at start: Double, duration: Double = 0.6, release: Bool) {
+        /// A finger drag from a to b over `duration`, then still for `hold`, released or held.
+        func drag(_ a: @escaping @MainActor () -> CGPoint, by delta: CGPoint, at start: Double, duration: Double = 0.6,
+                  hold: Double = 0, release: Bool) {
             at(start) {
                 let from = a(), t0 = flow.t
                 flow.pointerDown(from)
@@ -109,10 +110,11 @@ struct ScreenshotHost: View {
                     while last < 1 {
                         try? await Task.sleep(for: .milliseconds(15))
                         last = min(1, (flow.t - t0) / duration)
-                        let p = CGPoint(x: from.x + delta.x * CGFloat(last), y: from.y + delta.y * CGFloat(last))
-                        flow.pointerMove(p)
-                        if last >= 1 && release { flow.pointerUp(p) }
+                        flow.pointerMove(CGPoint(x: from.x + delta.x * CGFloat(last), y: from.y + delta.y * CGFloat(last)))
                     }
+                    let end = CGPoint(x: from.x + delta.x, y: from.y + delta.y)
+                    while flow.t < t0 + duration + hold { try? await Task.sleep(for: .milliseconds(15)) }
+                    if release { flow.pointerUp(end) }
                 }
             }
         }
@@ -125,20 +127,22 @@ struct ScreenshotHost: View {
             tap({ project([-0.62, -0.45, 0.95]) }, at: 3.0)
             tap({ project([0.62, -0.45, 0.95]) }, at: 3.6)
         case "flow-unit-abduct":
-            // KG picked up and carried over the scale (the finger aims at the carrying height), let go, then
-            // frozen a moment into the abduction.
+            // KG picked up and carried over the scale (the finger aims at the carrying height), held still, let go,
+            // then frozen a second later, like the prototype's 02b.
             at(5.0) {
                 let from = project([-0.95, 0.39, -0.55]), to = project([0, 0.94, 1.55])
-                drag({ from }, by: CGPoint(x: to.x - from.x, y: to.y - from.y), at: 0, duration: 0.6, release: true)
+                drag({ from }, by: CGPoint(x: to.x - from.x, y: to.y - from.y), at: 0, duration: 0.6, hold: 0.4, release: true)
             }
-            at(7.4) { flow.frozen = true }
+            at(7.0) { flow.frozen = true }
         case "flow-plates-stroke", "flow-plates-done":
             let from = { flow.screen(262, 214 + 576 / 10 * 0.5) }
             drag(from, by: CGPoint(x: 0, y: 576 * 0.9 * flow.layoutScale), at: 3.5, duration: 1.0, release: shot == "flow-plates-done")
             if shot == "flow-plates-stroke" { at(4.6) { flow.frozen = true } }
         case "flow-kit-down", "flow-kit-up":
-            let dy: CGFloat = shot == "flow-kit-down" ? 170 : -170
-            drag({ flow.screen(195, 150) }, by: CGPoint(x: 0, y: dy * flow.layoutScale), at: 4.0, duration: 0.5, release: false)
+            // As far as the prototype's 07c / 07d: 200 points down, 260 up.
+            let down = shot == "flow-kit-down"
+            drag({ flow.screen(195, down ? 150 : 600) }, by: CGPoint(x: 0, y: (down ? 200 : -260) * flow.layoutScale), at: 4.0,
+                 duration: 0.5, release: false)
             at(4.7) { flow.frozen = true }
         case "flow-sets-drag":
             drag({ flow.screen(195, 300) }, by: CGPoint(x: 0, y: -90 * flow.layoutScale), at: 2.0, duration: 0.5, release: false)
