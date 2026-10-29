@@ -138,6 +138,10 @@ final class ScaleStage {
         rest = world.transform
         let camera = PerspectiveCamera()
         camera.camera.fieldOfViewInDegrees = 2 * atan(ScaleScene.viewHeight / 2 / distance) * 180 / .pi
+        // The scene is 20 m off: a near plane close by would leave too little depth precision for the platform's
+        // 5 mm cream top (it vanished into the body in the ARView).
+        camera.camera.near = distance - 5
+        camera.camera.far = distance + 5
         built = true
         return [world, camera]
     }
