@@ -1,4 +1,3 @@
-import CoreImage
 import RealityKit
 import SwiftUI
 import UIKit
@@ -93,18 +92,9 @@ extension Flow {
         let instant = fromKit || fromMenu
         var busy = false
         var hasPlan = data.workout != nil
-        var shadow: Entity?
-        let restShadow = { [weak self] in
-            guard let self else { return }
-            shadow?.removeFromParent()
-            // The prototype's ShadowMaterial is 0.18, but its shadow comes out about twice as dark as ours at that.
-            shadow = self.groundShadow(of: board.entity, opacity: 0.33)
-            if let shadow { self.add(shadow) }
-        }
         if instant {
             board.entity.orientation = simd_quatf(angle: Self.boardTurn, axis: [0, 1, 0])
             board.canvas?.draw(data.boardLines)
-            restShadow()
         } else {
             board.canvas?.draw(data.boardLines)
             board.entity.isEnabled = false
@@ -121,7 +111,7 @@ extension Flow {
                 board.entity.position.x = 3.6 * (1 - e)
                 board.entity.orientation = simd_quatf(angle: -1.9 + (Self.boardTurn + 1.9) * er, axis: [0, 1, 0])
                 for wheel in board.wheels { wheel.orientation = simd_quatf(angle: -(1 - e) * 40, axis: [1, 0, 0]) }
-            }, done: { restShadow() })
+            })
         }
         let start = { [weak self] in
             guard let self else { return }
@@ -181,7 +171,8 @@ extension Flow {
     }
 
     /// A whiteboard whose face is a wipeable canvas.
-    func makeBoard() -> (entity: Entity, canvas: FlowBoardCanvas?, face: ModelEntity?, wheels: [Entity]) {
+    /// - Parameter shadow: its own soft blob (the menu gives its items theirs).
+    func makeBoard(shadow: Bool = true) -> (entity: Entity, canvas: FlowBoardCanvas?, face: ModelEntity?, wheels: [Entity]) {
         let entity = build(FlowProps.whiteboard(lines: nil))
         let canvas = FlowBoardCanvas()
         let face = entity.findEntity(named: "board")?.children.first { $0.name == "face" } as? ModelEntity
@@ -196,6 +187,13 @@ extension Flow {
             }
         }
         let wheels = (0..<4).compactMap { entity.findEntity(named: "wheel\($0)") }
+        // v2: the menu's soft blob under it, in its own units so it rolls in and turns with it (flBoardShadow).
+        if shadow {
+            let blob = softShadow(0.7 / 0.62)
+            blob.scale = [1, 0.6, 1]
+            blob.position.y = 0.004
+            entity.addChild(blob)
+        }
         return (entity, canvas, face, wheels)
     }
 
@@ -218,70 +216,5 @@ extension Flow {
             sparkles(at: board.entity.convert(position: [0, 1.45, 0.3], to: nil), count: 5, spread: 0.9)
         }
         return cleaned
-    }
-
-    /// One for all: making a Core Image context is slow (it was most of a 0.4 s stall when the board stopped).
-    static let imageContext = CIContext()
-
-    /// The sun's shadow of a still prop on the floor (the prototype's ShadowMaterial under a shadow-casting sun):
-    /// every face of it flattened along the sun's rays onto y = 0, softened a little, at `opacity`.
-    func groundShadow(of entity: Entity, opacity: Float, pixelsPerMetre: Float = 160) -> Entity? {
-        let sun = FlowLight.sun
-        var triangles: [[SIMD2<Float>]] = []
-        for item in shadedModels(under: entity) where item.part.shade != .occluder {
-            let matrix = item.model.transformMatrix(relativeTo: nil)
-            let mesh = item.part.mesh
-            for tri in 0..<mesh.triangleCount {
-                let flat: [SIMD2<Float>] = (0..<3).map { c in
-                    let p = mesh.positions[Int(mesh.indices[tri * 3 + c])]
-                    let w = matrix * SIMD4(p, 1)
-                    let q = SIMD3(w.x, w.y, w.z) - sun * (w.y / sun.y)
-                    return SIMD2(q.x, q.z)
-                }
-                // All turned the same way: a closed shape's back faces land reversed and would cancel its front
-                // faces under the winding fill (the legs cast nothing).
-                let a = flat[1] - flat[0], b = flat[2] - flat[0], area = a.x * b.y - a.y * b.x
-                if abs(area) > 1e-9 { triangles.append(area > 0 ? flat : Array(flat.reversed())) }
-            }
-        }
-        guard !triangles.isEmpty else { return nil }
-        let all = triangles.flatMap { $0 }
-        let lo = all.reduce(SIMD2<Float>(repeating: .infinity)) { simd_min($0, $1) } - 0.1
-        let hi = all.reduce(SIMD2<Float>(repeating: -.infinity)) { simd_max($0, $1) } + 0.1
-        let size = hi - lo
-        let width = max(4, min(1024, Int(size.x * pixelsPerMetre))), height = max(4, min(1024, Int(size.y * pixelsPerMetre)))
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = false
-        format.preferredRange = .standard        // sRGB like the textures read it, not the phone's Display P3
-        let mask = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
-            let g = context.cgContext
-            g.setFillColor(UIColor(white: 0, alpha: CGFloat(opacity)).cgColor)
-            let path = CGMutablePath()
-            for tri in triangles {
-                let points = tri.map { CGPoint(x: CGFloat(($0.x - lo.x) / size.x) * CGFloat(width), y: CGFloat(($0.y - lo.y) / size.y) * CGFloat(height)) }
-                path.addLines(between: points)
-                path.closeSubpath()
-            }
-            g.addPath(path)
-            g.fillPath(using: .winding)
-        }
-        // PCF-soft edges: a small blur.
-        var image = mask.cgImage
-        if let input = mask.cgImage.map({ CIImage(cgImage: $0) }),
-           let blurred = CIFilter(name: "CIGaussianBlur", parameters: [kCIInputImageKey: input, kCIInputRadiusKey: 2.0])?.outputImage {
-            image = Self.imageContext.createCGImage(blurred, from: input.extent)
-        }
-        guard let image, let texture = try? TextureResource(image: image, options: .init(semantic: .color)) else { return nil }
-        var material = UnlitMaterial(applyPostProcessToneMap: false)
-        material.color = .init(tint: .white, texture: .init(texture))
-        material.blending = .transparent(opacity: .init(floatLiteral: 1))
-        let plane = ModelEntity(mesh: (try? Flow.meshResource(Geo.plane(size.x, size.y), palette: false)) ?? .generatePlane(width: size.x, depth: size.y),
-                                materials: [material])
-        // Laid flat facing up (like softShadow): the picture's top row, the far side (smallest z), goes to −Z.
-        plane.orientation = simd_quatf(angle: -.pi / 2, axis: [1, 0, 0])
-        plane.position = [(lo.x + hi.x) / 2, 0.002, (lo.y + hi.y) / 2]
-        plane.name = "groundShadow"
-        return plane
     }
 }

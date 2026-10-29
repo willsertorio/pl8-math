@@ -96,7 +96,7 @@ extension Flow {
         var active: Int?, k: Float = 0, busy = false
 
         // Train: the board shows the last session.
-        let board = makeBoard()
+        let board = makeBoard(shadow: false)
         board.entity.scale = SIMD3(repeating: 0.62)
         board.canvas?.draw(data.boardLines)
         var boardHasPlan = data.workout != nil
@@ -253,8 +253,11 @@ extension Flow {
             for (j, r) in rooms.enumerated() {
                 r.entity.position = right * (Float(j) - rowPosition) * roomSpacing
                 if r !== room {
-                    r.entity.scale = SIMD3(repeating: max(0.0001, show))
-                    r.entity.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
+                    // v2: the empty slot at about 70 %, slowly growing and shrinking (65–75 % over 4.8 s) and
+                    // turning gently side to side (±0.35 rad over 11 s), so it reads as something to tap.
+                    let breathe: Float = r.isAdd ? 0.7 + 0.05 * sin(Float(t) * 1.3) : 1
+                    r.entity.scale = SIMD3(repeating: max(0.0001, show * breathe))
+                    r.entity.orientation = simd_quatf(angle: r.isAdd ? 0.35 * sin(Float(t) * 0.55) : 0, axis: [0, 1, 0])
                 }
                 // The cloth is a new mesh each time: only rooms in view, 30 times a second.
                 if show > 0.5 && abs(Float(j) - rowPosition) < 1.5 && Int(t * 60) % 2 == 0 { r.wave(Float(t) + Float(j)) }

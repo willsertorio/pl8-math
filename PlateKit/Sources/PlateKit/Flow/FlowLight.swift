@@ -34,16 +34,16 @@ public enum FlowLook {
     public static let boardGridOpacity: Float = 0.11
     /// Dust from impacts.
     public static let dust = RGB(hex: "#E9E2D6")
-    /// A plate you don't have: grey and see-through. The prototype's grey at 30 % comes out #B85C22 over the
-    /// orange once lit; this flat grey gives the same.
-    public static let missing = RGB(hex: "#4F4F4F")
-    public static let missingOpacity: Float = 0.4
+    /// A plate you don't have: grey and see-through. The prototype's lit grey at 30 % comes out about
+    /// (148, 60, 48) over the red (v2); this flat grey gives about the same.
+    public static let missing = RGB(hex: "#484848")
+    public static let missingOpacity: Float = 0.455
     /// The abduction's beam as the prototype shows it once its sketch pass has run: a grainy haze that mutes the
     /// orange (its additive white mostly lands in the bell it takes). Each wall of the beam at most this opaque.
     public static let beam = RGB(hex: "#70808C")
     public static let beamOpacity: Float = 0.163
-    /// What the beam washes the bell it takes towards.
-    public static let wash = RGB(hex: "#BEB4B2")
+    /// What the beam washes the bell it takes towards: a neutral grey (v2's 02c).
+    public static let wash = RGB(hex: "#9B9B9B")
 }
 
 /// The prototype's light, worked out per face so RealityKit can draw exact flat colours (unlit, no tone

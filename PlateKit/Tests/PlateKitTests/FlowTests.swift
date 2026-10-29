@@ -173,29 +173,45 @@ struct FlowDetailTests {
         #expect(faces.contains(where: up) && faces.contains(where: down))
     }
 
-    @Test("The abduction's beam reads like the prototype's: a grainy haze over the orange, not a white column")
+    @Test("The abduction's beam reads like the prototype's: a grainy haze over the red, not a white column")
     func beamHaze() {
         let beam = FlowProps.beam().beam
         guard case .colour(let colour) = beam.parts.first?.paint else { Issue.record("the beam has no colour"); return }
         // Seen through both walls of the open cylinder, at full strength: about (212, 107, 42) in the prototype's 02c.
-        var seen = FlowPalette.orange.bg      // measured on the first handoff's orange
+        var seen = FlowLook.bg
         for _ in 0..<2 {
             let a = FlowLook.beamOpacity
             seen = RGB(seen.r + (colour.r - seen.r) * a, seen.g + (colour.g - seen.g) * a, seen.b + (colour.b - seen.b) * a)
         }
-        #expect(abs(seen.r * 255 - 212) < 6 && abs(seen.g * 255 - 107) < 6 && abs(seen.b * 255 - 42) < 6)
-        // The bell it takes is washed towards light grey, about (175, 159, 155) by then.
-        #expect(abs(FlowLook.wash.r * 255 - 190) < 16 && abs(FlowLook.wash.g * 255 - 175) < 16 && abs(FlowLook.wash.b * 255 - 170) < 16)
+        // Through both walls over the red, about (180, 73, 61) in the v2 prototype's 02c.
+        #expect(abs(seen.r * 255 - 180) < 16 && abs(seen.g * 255 - 73) < 8 && abs(seen.b * 255 - 61) < 8)
+        // The bell it takes is washed towards a neutral grey, about (155, 155, 155) by then.
+        #expect(abs(FlowLook.wash.r * 255 - 155) < 8 && abs(FlowLook.wash.g * 255 - 155) < 8 && abs(FlowLook.wash.b * 255 - 155) < 8)
     }
 
-    @Test("A missing plate's ghost is flat grey and reads like the prototype's over the orange (#B85C22)")
+    @Test("A missing plate's ghost is flat grey and reads like the v2 prototype's over the red, about (148, 60, 48)")
     func ghost() {
         let ghost = FlowProps.ghost(Plate.find(5, .kg)!)
         #expect(ghost.parts.allSatisfy { $0.shade == .flat && $0.opacity == FlowLook.missingOpacity })
-        let o = FlowPalette.orange.bg, g = FlowLook.missing, a = FlowLook.missingOpacity      // measured on the orange
+        let o = FlowLook.bg, g = FlowLook.missing, a = FlowLook.missingOpacity
         let seen = RGB(o.r + (g.r - o.r) * a, o.g + (g.g - o.g) * a, o.b + (g.b - o.b) * a)
-        #expect(abs(seen.r * 255 - 184) < 8 && abs(seen.g * 255 - 92) < 8 && abs(seen.b * 255 - 34) < 8)
+        #expect(abs(seen.r * 255 - 148) < 12 && abs(seen.g * 255 - 60) < 6 && abs(seen.b * 255 - 48) < 6)
         #expect(g.r == g.g && g.g == g.b)
+    }
+
+    @Test("The empty gym slot's edges are dashed: 0.07 dashes, 0.05 gaps, centred on each edge (CHANGES-v2 §6)")
+    func dashedSlot() {
+        let dashes = FlowProps.dashes(from: [0, 0, 0], to: [1, 0, 0])
+        // As many as fit: 8 dashes and 7 gaps make 0.91, centred with 0.045 to spare at each end.
+        #expect(dashes.count == 8)
+        #expect(abs(dashes[0].start.x - 0.045) < 1e-4 && abs(dashes[0].end.x - 0.115) < 1e-4)
+        #expect(abs(dashes[1].start.x - 0.165) < 1e-4)
+        #expect(abs((dashes.last?.end.x ?? 0) - 0.955) < 1e-4)
+        // The slot: thin dark lines, nothing else.
+        let slot = FlowProps.addCube()
+        #expect(slot.parts.count == 1 && slot.parts[0].shade == .flat)
+        let ys = slot.parts[0].mesh.positions.map(\.y)
+        #expect((ys.min() ?? 1) > -0.01 && (ys.max() ?? 0) < 1.16)
     }
 
     @Test("The gym room's edges are faint hairlines, like the prototype's one-pixel lines")

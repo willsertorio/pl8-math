@@ -298,30 +298,38 @@ public enum FlowProps {
         return room
     }
 
-    /// The last slot in the row of gyms (gymAddModel): an empty cube in thin wobbly dark lines, no fill.
+    /// The last slot in the row of gyms (gymAddModel, v2): an empty cube of thin dashed dark edges, no fill.
     public static func addCube() -> FlowNode {
         let s: Float = 1.15, h = s / 2
         let corners: [SIMD3<Float>] = [[-h, 0, -h], [h, 0, -h], [h, 0, h], [-h, 0, h], [-h, s, -h], [h, s, -h], [h, s, h], [-h, s, h]]
         let edges = [(0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4), (0, 4), (1, 5), (2, 6), (3, 7)]
-        var seed = 7.0
-        func rnd() -> Float {
-            seed = (seed * 16807).truncatingRemainder(dividingBy: 2_147_483_647)
-            return Float(seed / 2_147_483_647 - 0.5)
-        }
         var lines = LowPolyMesh()
         for (i, j) in edges {
-            let a = corners[i], b = corners[j]
-            var points: [SIMD3<Float>] = []
-            for k in 0...6 {
-                var p = a + (b - a) * (Float(k) / 6)
-                if k > 0 && k < 6 { p += SIMD3(rnd(), rnd(), rnd()) * 0.022 }
-                points.append(p)
+            for dash in dashes(from: corners[i], to: corners[j]) {
+                // A thin stroke along the edge (the cube's edges run along x, y or z).
+                var piece = Geo.cylinder(top: 0.007, bottom: 0.007, height: (dash.end - dash.start).length, segments: 6)
+                let along = (dash.end - dash.start).normalized
+                if abs(along.x) > 0.5 { piece = piece.rotatedZ(.pi / 2) } else if abs(along.z) > 0.5 { piece = piece.rotatedX(.pi / 2) }
+                lines.append(piece.translated(by: (dash.start + dash.end) / 2))
             }
-            lines.append(.tube(through: Geo.catmullRom(points, count: 24), width: 0.011))
         }
         var cube = FlowNode("addCube", parts: [.flat("lines", lines, dark)])
         cube.add(FlowNode("hit", position: [0, s / 2, 0], hitBox: [s, s, s]))
         return cube
+    }
+
+    /// Dashes along a line: as many `dash`-long strokes with `gap`s between as fit, centred.
+    public static func dashes(from a: SIMD3<Float>, to b: SIMD3<Float>, dash: Float = 0.07, gap: Float = 0.05)
+        -> [(start: SIMD3<Float>, end: SIMD3<Float>)] {
+        let length = (b - a).length
+        guard length > 0 else { return [] }
+        let direction = (b - a) / length
+        let n = Int(((length + gap) / (dash + gap)).rounded(.down))
+        let offset = (length - (Float(n) * dash + Float(max(0, n - 1)) * gap)) / 2
+        return (0..<n).map { k in
+            let start = offset + Float(k) * (dash + gap)
+            return (a + direction * start, a + direction * (start + dash))
+        }
     }
 
     // MARK: - Little things
