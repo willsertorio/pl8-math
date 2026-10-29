@@ -478,19 +478,21 @@ struct SetCard: View {
         let group = plan.sets.indices.filter { plan.sets[$0].groupIndex == set.groupIndex }
         VStack(alignment: .leading, spacing: 0) {
             Text(set.group.uppercased())
-                .font(.custom("SpaceGrotesk-Bold", size: 13))
-                .tracking(13 * 0.08)
+                .font(FlowType.smallCaps)
+                .tracking(FlowType.smallCapsTracking)
                 .foregroundStyle(dark.opacity(0.6))
                 .lineLimit(1)
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(set.label)
-                    .font(.custom("SpaceGrotesk-Bold", size: 30))
-                    .tracking(-0.6)
+                    .font(FlowType.display)
+                    .tracking(FlowType.displayTracking)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
                 Text(set.totalText)
-                    .font(.custom("SpaceGrotesk-Bold", size: 17))
+                    .font(FlowType.body())
+                    .tracking(FlowType.bodyTracking())
+                    .monospacedDigit()
                     .lineLimit(1)
             }
             .padding(.top, 2)
@@ -505,7 +507,8 @@ struct SetCard: View {
             if index == plan.sets.count - 1 {
                 Button { flow.endSession() } label: {
                     Text("End session")
-                        .font(.custom("SpaceGrotesk-Bold", size: 19))
+                        .font(.custom(FlowType.medium, size: 19))
+                        .tracking(FlowType.bodyTracking(19))
                         .foregroundStyle(Color(rgb: FlowLook.light))
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)

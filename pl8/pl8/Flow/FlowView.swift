@@ -185,6 +185,10 @@ struct QuestionLabel: UIViewRepresentable {
     let words: [String]
     let shown: Int
     let colour: UIColor
+    /// The letters' "collage" (CHANGES-v2 §7), 0 (clean, what ships) to 1: each letter spaced out by k × 0.09 em,
+    /// hopped up or down by up to 5 k points and sized 1 ± 0.12 k, always the same way for the same letter. (The
+    /// prototype also tilts each letter by up to 14 k degrees; a label can't, a glyph-by-glyph view would.)
+    var collage: CGFloat = 0
 
     func makeUIView(context: Context) -> UILabel {
         let label = UILabel()
@@ -205,24 +209,43 @@ struct QuestionLabel: UIViewRepresentable {
     }
 
     var attributed: NSAttributedString {
-        let font = UIFont(name: "SpaceGrotesk-Bold", size: 30) ?? .boldSystemFont(ofSize: 30)
+        let font = FlowType.displayUIFont, line = FlowType.displayLineHeight
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        paragraph.minimumLineHeight = 33
-        paragraph.maximumLineHeight = 33
+        paragraph.minimumLineHeight = line
+        paragraph.maximumLineHeight = line
+        let kern = FlowType.displayTracking + collage * 0.09 * font.pointSize
         let text = NSMutableAttributedString()
+        var letter = 0
         for (i, word) in words.enumerated() {
-            text.append(NSAttributedString(string: word + (i < words.count - 1 ? " " : ""), attributes: [
-                .font: font, .kern: -0.3, .paragraphStyle: paragraph,
-                .foregroundColor: i < shown ? colour : UIColor.clear,
-                .baselineOffset: (33 - font.lineHeight) / 4,
-            ]))
+            let tint = i < shown ? colour : UIColor.clear
+            if collage == 0 {
+                text.append(NSAttributedString(string: word + (i < words.count - 1 ? " " : ""), attributes: [
+                    .font: font, .kern: kern, .paragraphStyle: paragraph, .foregroundColor: tint,
+                    .baselineOffset: (line - font.lineHeight) / 4,
+                ]))
+                continue
+            }
+            for character in word + (i < words.count - 1 ? " " : "") {
+                let scaled = font.withSize(font.pointSize * (1 + Self.jitter(letter, 3) * 0.12 * collage))
+                text.append(NSAttributedString(string: String(character), attributes: [
+                    .font: scaled, .kern: kern, .paragraphStyle: paragraph, .foregroundColor: tint,
+                    .baselineOffset: (line - font.lineHeight) / 4 + Self.jitter(letter, 1) * 5 * collage,
+                ]))
+                if character != " " { letter += 1 }
+            }
         }
         return text
     }
+
+    /// The prototype's fixed per-letter seed: −1 … 1, the same for the same letter every time.
+    static func jitter(_ i: Int, _ s: Double) -> CGFloat {
+        let x = sin(Double(i + 1) * 12.9898 + s * 78.233) * 43758.5453
+        return CGFloat((x - x.rounded(.down)) * 2 - 1)
+    }
 }
 
-/// Labels under 3D objects (22 pt, ink), placed by the stage every frame.
+/// Labels under 3D objects (Helvetica Neue Medium 21, ink), placed by the stage every frame.
 struct FlowLabels: View {
     let flow: Flow
 
@@ -230,7 +253,9 @@ struct FlowLabels: View {
         ZStack(alignment: .topLeading) {
             ForEach(flow.labels) { label in
                 Text(label.text)
-                    .font(.custom("SpaceGrotesk-Bold", size: 22))
+                    .font(FlowType.label())
+                    .tracking(FlowType.labelTracking())
+                    .monospacedDigit()
                     .foregroundStyle(flow.inkColor)
                     .fixedSize()
                     .position(label.point)

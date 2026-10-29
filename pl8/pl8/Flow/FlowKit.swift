@@ -295,7 +295,9 @@ struct KitOverlay: View {
                                         .overlay(Circle().strokeBorder(Color.black.opacity(0.2), lineWidth: 1))
                                 }
                                 Text("\(chip.count) × \(WeightUnit.trimmed(chip.size)) \(ui.unit.rawValue)")
-                                    .font(.custom("SpaceGrotesk-Bold", size: 16))
+                                    .font(FlowType.body(16))
+                                    .tracking(FlowType.bodyTracking(16))
+                                    .monospacedDigit()
                             }
                             .foregroundStyle(Color(rgb: on ? FlowLook.light : FlowLook.dark))
                             .padding(.leading, 10)

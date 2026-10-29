@@ -256,7 +256,7 @@ struct PlatesOverlay: View {
             if let at = ui.headersAt {
                 let alpha = min(1, max(0, (ui.now - at) / 0.2))
                 for (text, x) in [("YES", CGFloat(262)), ("NO", 334)] {
-                    let label = Text(text).font(.custom("SpaceGrotesk-Bold", size: 13)).tracking(13 * 0.08).foregroundColor(ink)
+                    let label = Text(text).font(FlowType.smallCaps).tracking(FlowType.smallCapsTracking).foregroundColor(ink)
                     var c = context
                     c.opacity = alpha
                     c.draw(label, at: CGPoint(x: x, y: 214 - 16))
@@ -267,7 +267,8 @@ struct PlatesOverlay: View {
                 guard alpha > 0 else { continue }
                 var c = context
                 c.opacity = alpha
-                let label = Text(row.label).font(.custom("SpaceGrotesk-Bold", size: ui.fontSize)).foregroundColor(ink)
+                let label = Text(row.label).font(FlowType.label(ui.fontSize)).tracking(FlowType.labelTracking(ui.fontSize)).monospacedDigit()
+                    .foregroundColor(ink)
                 c.draw(label, at: CGPoint(x: 106, y: row.y), anchor: .leading)
             }
             for box in ui.boxes where box.scale > 0.001 {

@@ -354,7 +354,7 @@ enum FlowArt {
         switch picture {
         case .text(let text, let width, let height, let size, let colour, let dy):
             return draw(width, height, opaque: false) { _ in
-                let font = UIFont(name: "SpaceGrotesk-Bold", size: CGFloat(size)) ?? .boldSystemFont(ofSize: CGFloat(size))
+                let font = FlowType.uiMedium(CGFloat(size))
                 centred(text, font: font, colour: colour.uiColor, at: CGPoint(x: CGFloat(width) / 2, y: CGFloat(height) / 2 + CGFloat(dy)))
             }
         case .plateFace(let plate):
@@ -388,13 +388,13 @@ enum FlowArt {
             return draw(256, 256) { g in
                 g.setFillColor(FlowLook.light.uiColor.cgColor)
                 g.fill(CGRect(x: 0, y: 0, width: 256, height: 256))
-                centred(name, font: grotesk(84), colour: FlowLook.dark.uiColor, at: CGPoint(x: 128, y: 134))
+                centred(name, font: FlowType.uiMedium(84), colour: FlowLook.dark.uiColor, at: CGPoint(x: 128, y: 134))
             }
         case .flag(let name):
             return draw(320, 200) { g in
                 g.setFillColor(FlowLook.dark.uiColor.cgColor)
                 g.fill(CGRect(x: 0, y: 0, width: 320, height: 200))
-                centred(name, font: grotesk(74), colour: FlowLook.light.uiColor, at: CGPoint(x: 160, y: 104))
+                centred(name, font: FlowType.uiMedium(74), colour: FlowLook.light.uiColor, at: CGPoint(x: 160, y: 104))
             }
         case .shadowBlob:
             return draw(128, 128, opaque: false) { g in
@@ -468,7 +468,6 @@ enum FlowArt {
     }
 
     static func marker(_ size: CGFloat) -> UIFont { UIFont(name: "PermanentMarker-Regular", size: size) ?? .systemFont(ofSize: size) }
-    static func grotesk(_ size: CGFloat) -> UIFont { UIFont(name: "SpaceGrotesk-Bold", size: size) ?? .boldSystemFont(ofSize: size) }
 
     /// Canvas fillText with textAlign centre, textBaseline middle.
     static func centred(_ text: String, font: UIFont, colour: UIColor, at point: CGPoint) {

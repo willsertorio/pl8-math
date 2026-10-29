@@ -187,7 +187,7 @@ struct PRDialOverlay: View {
                     let on = ui.unit == unit
                     Button { ui.onSwitch?(unit) } label: {
                         Text(unit.rawValue.uppercased())
-                            .font(.custom("SpaceGrotesk-Bold", size: 17))
+                            .font(.custom(FlowType.medium, size: 17))
                             .foregroundStyle(on ? background : ink)
                             .frame(width: 68, height: 38)
                             .background(Capsule().fill(on ? ink : Color.clear))
