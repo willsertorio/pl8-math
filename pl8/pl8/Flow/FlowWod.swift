@@ -228,12 +228,16 @@ extension Flow {
             let matrix = item.model.transformMatrix(relativeTo: nil)
             let mesh = item.part.mesh
             for tri in 0..<mesh.triangleCount {
-                triangles.append((0..<3).map { c in
+                let flat: [SIMD2<Float>] = (0..<3).map { c in
                     let p = mesh.positions[Int(mesh.indices[tri * 3 + c])]
                     let w = matrix * SIMD4(p, 1)
                     let q = SIMD3(w.x, w.y, w.z) - sun * (w.y / sun.y)
                     return SIMD2(q.x, q.z)
-                })
+                }
+                // All turned the same way: a closed shape's back faces land reversed and would cancel its front
+                // faces under the winding fill (the legs cast nothing).
+                let a = flat[1] - flat[0], b = flat[2] - flat[0], area = a.x * b.y - a.y * b.x
+                if abs(area) > 1e-9 { triangles.append(area > 0 ? flat : Array(flat.reversed())) }
             }
         }
         guard !triangles.isEmpty else { return nil }
