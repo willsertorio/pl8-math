@@ -145,7 +145,7 @@ struct ScreenshotHost: View {
                  duration: 0.5, release: false)
             at(4.7) { flow.frozen = true }
         case "flow-sets-drag":
-            drag({ flow.screen(195, 300) }, by: CGPoint(x: 0, y: -90 * flow.layoutScale), at: 2.0, duration: 0.5, release: false)
+            drag({ flow.screen(195, 300) }, by: CGPoint(x: 0, y: -120 * flow.layoutScale), at: 2.0, duration: 0.5, release: false)
             at(2.7) { flow.frozen = true }
         case "flow-menu-back":
             drag({ flow.screen(195, 600) }, by: CGPoint(x: 0, y: -160 * flow.layoutScale), at: 2.0, duration: 0.5, release: false)

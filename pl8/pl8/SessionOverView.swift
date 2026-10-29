@@ -33,15 +33,13 @@ struct SessionOverView: View {
             VStack(spacing: 0) {
                 // The Flow's scale shows no label (the prototype passes "Heaviest set" but hides it).
                 Spacer()
-                // Each word simply appears, one after another (the prototype's dMsgIn "words", 260 ms apart).
-                HStack(spacing: 0) {
-                    ForEach(Array(message.enumerated()), id: \.offset) { index, word in
-                        Text(word + (index < message.count - 1 ? " " : ""))
-                            .opacity(index < words ? 1 : 0)
-                    }
+                // Each word simply appears, one after another (the prototype's dMsgIn "words", 260 ms apart). One Text,
+                // so the spaces are a font's spaces (separate words each with a trailing space lost some of it).
+                message.enumerated().reduce(Text("")) { text, item in
+                    text + Text(item.element + (item.offset < message.count - 1 ? " " : ""))
+                        .foregroundStyle(cream.opacity(item.offset < words ? 1 : 0))
                 }
                 .font(Theme.display(24))
-                .foregroundStyle(cream)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 200)

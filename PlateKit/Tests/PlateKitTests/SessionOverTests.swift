@@ -89,6 +89,14 @@ struct SessionOverTests {
         let body = parts.platform.filter { $0.tone == .paint(Look.boxDark) }
         #expect(!body.isEmpty)
         #expect(body.allSatisfy { part in (0..<part.mesh.triangleCount).allSatisfy { part.mesh.faceNormal($0).y < 0.5 } })
+        // Nor the base: under the top it has no top face, only the rim round the platform (seen from 20 m in the
+        // Simulator even 5 cm wasn't enough). The feet, 11 cm down, are far enough.
+        for part in parts.base where part.tone != .flat(Look.ink) {
+            for t in 0..<part.mesh.triangleCount where part.mesh.faceNormal(t).y > 0.5 {
+                let c = part.mesh.faceCentre(t)
+                #expect(c.y > ScaleScene.platformTop || c.y < ScaleScene.platformTop - 0.08 || abs(c.x) > 0.37 || abs(c.z) > 0.37)
+            }
+        }
     }
 }
 

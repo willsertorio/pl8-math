@@ -97,7 +97,8 @@ extension Flow {
         let restShadow = { [weak self] in
             guard let self else { return }
             shadow?.removeFromParent()
-            shadow = self.groundShadow(of: board.entity, opacity: 0.18)
+            // The prototype's ShadowMaterial is 0.18, but its shadow comes out about twice as dark as ours at that.
+            shadow = self.groundShadow(of: board.entity, opacity: 0.33)
             if let shadow { self.add(shadow) }
         }
         if instant {

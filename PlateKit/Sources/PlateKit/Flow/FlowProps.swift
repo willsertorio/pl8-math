@@ -36,7 +36,7 @@ public enum FlowProps {
     public static func ghost(_ plate: Plate) -> FlowNode {
         var node = Self.plate(plate)
         node.name = "ghost"
-        node.parts = node.parts.map { FlowPart($0.name, mesh: $0.mesh, paint: .colour(FlowLook.missing), shade: .flat, opacity: 0.3) }
+        node.parts = node.parts.map { FlowPart($0.name, mesh: $0.mesh, paint: .colour(FlowLook.missing), shade: .flat, opacity: FlowLook.missingOpacity) }
         return node
     }
 
@@ -227,8 +227,12 @@ public enum FlowProps {
         var room = FlowNode("gymRoom")
         func slab(_ name: String, _ w: Float, _ h: Float, _ d: Float) -> FlowNode {
             var node = FlowNode(name)
-            node.parts = [.toon(name, Geo.solidBox(w, h, d), light), .flat("edges", Geo.solidBox(w, h, d).inkLines(width: 0.005, degrees: 1), dark)]
+            node.parts = [.toon(name, Geo.solidBox(w, h, d), light), edges(Geo.solidBox(w, h, d))]
             return node
+        }
+        // The prototype's edge lines are one device pixel: half a point of ink, which reads as a faint line.
+        func edges(_ mesh: LowPolyMesh) -> FlowPart {
+            FlowPart("edges", mesh: mesh.inkLines(width: 0.0035, degrees: 1), paint: .colour(dark), shade: .flat, opacity: 0.35)
         }
         var floor = slab("floor", s, th, s); floor.position = [0, th / 2, 0]; room.add(floor)
         var back = slab("back", s, s, th); back.position = [0, s / 2, -s / 2 + th / 2]; room.add(back)
@@ -239,7 +243,7 @@ public enum FlowProps {
             front.parts.append(i == 4 ? FlowPart("name", mesh: face, paint: .picture(.gymFront(name), tint: RGB(1, 1, 1)), shade: .toon)
                                       : .toon("wall", face, light))
         }
-        front.parts.append(.flat("edges", Geo.solidBox(s, s, th).inkLines(width: 0.005, degrees: 1), dark))
+        front.parts.append(edges(Geo.solidBox(s, s, th)))
         frontPivot.add(front)
         room.add(frontPivot)
         var rightPivot = FlowNode("rightPivot", position: [s / 2, 0, 0])

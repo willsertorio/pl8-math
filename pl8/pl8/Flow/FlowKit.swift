@@ -26,11 +26,17 @@ final class FlowKitPlate {
     var clicked = false
     /// When it first touched the floor: for a moment after, it doesn't skid (cannon's plates stay on their spot).
     var landedAt: Double?
+    /// Its own spot on the floor, when it was dropped, and whether a finger has moved it since (then it stays
+    /// where it's put).
+    let spot: SIMD2<Float>
+    var droppedAt: Double?
+    var held = false
 
-    init(entity: Entity, model: Entity, plate: Plate) {
+    init(entity: Entity, model: Entity, plate: Plate, spot: SIMD2<Float>) {
         self.entity = entity
         self.model = model
         self.plate = plate
+        self.spot = spot
     }
 }
 
@@ -61,7 +67,7 @@ extension Flow {
             entity.addChild(model)
             entity.isEnabled = false
             world.root.addChild(entity)
-            let item = FlowKitPlate(entity: entity, model: model, plate: plate)
+            let item = FlowKitPlate(entity: entity, model: model, plate: plate, spot: [spot.x, spot.z])
             items.append(item)
             // One after another, flat, straight down onto its spot: easy to count.
             let drop = { [weak self] in
@@ -78,6 +84,7 @@ extension Flow {
                 let body = world.add(entity, shape: FlowPhysicsWorld.cylinderShape(top: radius, bottom: radius, height: thickness, sides: 28),
                                      mass: mass, radius: radius, squash: model)
                 item.body = body
+                item.droppedAt = self.t
                 if let scene = entity.scene {
                     self.stepSubscriptions.append(scene.subscribe(to: CollisionEvents.Began.self, on: entity) { [weak self] event in
                         guard let self else { return }
@@ -107,12 +114,26 @@ extension Flow {
         world.onStep = { [weak self] dt in
             guard let self else { return }
             for item in items {
-                guard let landed = item.landedAt, self.t - landed < 0.8, world.grab?.body !== item.body,
+                if world.grab?.body === item.body { item.held = true }
+                // Each plate flat on its own spot (the handoff), from the drop until a moment after it lands, unless
+                // a finger has moved it. The prototype's land like that by themselves; in a slow Simulator the
+                // physics bounced one onto a neighbour's rim and stood another on its edge.
+                guard let dropped = item.droppedAt, self.t - dropped < 2.5, !item.held,
                       var motion = item.entity.components[PhysicsMotionComponent.self] else { continue }
-                let k = exp(-14 * dt)
-                motion.linearVelocity.x *= k
-                motion.linearVelocity.z *= k
-                motion.angularVelocity.y *= k
+                let x = item.entity.orientation(relativeTo: nil).act([1, 0, 0])
+                item.entity.setOrientation(simd_quatf(angle: atan2(-x.z, x.x), axis: [0, 1, 0]), relativeTo: nil)
+                motion.angularVelocity.x = 0
+                motion.angularVelocity.z = 0
+                // Down after about 0.55 s from 1.5 m, on the floor or on a neighbour.
+                if item.landedAt != nil || self.t - dropped > 0.6 {
+                    let k = exp(-14 * dt)
+                    motion.linearVelocity.x *= k
+                    motion.linearVelocity.z *= k
+                    motion.angularVelocity.y *= k
+                    let p = item.entity.position(relativeTo: nil)
+                    motion.linearVelocity.x += (item.spot.x - p.x) * 6 * (1 - k)
+                    motion.linearVelocity.z += (item.spot.y - p.z) * 6 * (1 - k)
+                }
                 item.entity.components.set(motion)
             }
         }

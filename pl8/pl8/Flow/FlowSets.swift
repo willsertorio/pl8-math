@@ -222,7 +222,8 @@ extension Flow {
     func cardDrag() -> FlowDrag? {
         guard let plan, let ui = setsUI, !ui.settling else { return nil }
         let n = plan.sets.count, i0 = setIndex
-        let off = ui.cardHeight + 40 * layoutScale
+        // The next card waits 40 points under this one (the card's height includes its 24-point bottom margin).
+        let off = ui.cardHeight - 24 + 40 * layoutScale
         var direction = 0, dy: CGFloat = 0
         var swap: FlowPlateSwap?
         let place = { () -> Bool in

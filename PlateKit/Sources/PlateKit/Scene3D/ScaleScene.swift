@@ -27,7 +27,15 @@ public enum ScaleScene {
         let body = PropPart.Tone.paint(Look.boxDark), top = PropPart.Tone.paint(Look.boxLight)
         let dark = PropPart.Tone.paint(RGB(hex: "#2B1E16"))
         var base = PropModels.Builder(), platform = PropModels.Builder()
-        base.box([0.84, 0.07, 0.84], [0, 0.055, 0], body)
+        // Seen from 20 m, the Simulator draws faces a few cm apart in the wrong order, and the cream top vanished
+        // into the dark under it. So nothing dark faces up under the top: the base's top is only its rim round the
+        // platform.
+        base.add(LowPolyMesh.box(size: [0.84, 0.07, 0.84]).keepingFaces { $0.y < 0.5 }.translated(by: [0, 0.055, 0]), body)
+        let rim = { (size: SIMD3<Float>, at: SIMD3<Float>) in LowPolyMesh.box(size: size).keepingFaces { $0.y > 0.5 }.translated(by: at) }
+        for side: Float in [-1, 1] {
+            base.add(rim([0.84, 0.002, 0.03], [0, 0.089, side * 0.405]), body)
+            base.add(rim([0.03, 0.002, 0.78], [side * 0.405, 0.089, 0]), body)
+        }
         for sx: Float in [-1, 1] {
             for sz: Float in [-1, 1] { base.cylinder(0.04, 0.03, .y, 10, [sx * 0.36, 0.015, sz * 0.36], dark) }
         }

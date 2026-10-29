@@ -140,7 +140,7 @@ extension Flow {
         if state.grey {
             var material = UnlitMaterial(applyPostProcessToneMap: false)
             material.color = .init(tint: FlowLook.missing.uiColor)
-            material.blending = .transparent(opacity: .init(floatLiteral: 0.3 * opacity))
+            material.blending = .transparent(opacity: .init(floatLiteral: FlowLook.missingOpacity * opacity))
             item.model.model?.materials = [material]
             return
         }
@@ -308,8 +308,9 @@ enum FlowArt {
             }
         case .shadowBlob:
             return draw(128, 128, opaque: false) { g in
-                // The prototype's 0.38 / 0.16, plus the dark the sketch pass adds over its soft edge (measured: 0.46 at the centre).
-                let colours = [UIColor(white: 0, alpha: 0.46).cgColor, UIColor(white: 0, alpha: 0.19).cgColor, UIColor(white: 0, alpha: 0).cgColor]
+                // The prototype's 0.38 / 0.16 come out about 1.45 times darker and wider on its screens than ours did at
+                // 0.46 / 0.19 (measured on six screens), so these are scaled up to match what it shows.
+                let colours = [UIColor(white: 0, alpha: 0.67).cgColor, UIColor(white: 0, alpha: 0.28).cgColor, UIColor(white: 0, alpha: 0).cgColor]
                 guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colours as CFArray,
                                                 locations: [0, 0.55, 1]) else { return }
                 g.drawRadialGradient(gradient, startCenter: CGPoint(x: 64, y: 64), startRadius: 4, endCenter: CGPoint(x: 64, y: 64),

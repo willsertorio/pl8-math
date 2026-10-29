@@ -217,7 +217,7 @@ extension Flow {
                     let a = bell.abducted
                     let beamA = min(1, a / 0.3) * (a > 1.7 ? max(0, 1 - (a - 1.7) / 0.4) : 1)
                     if let beam = bell.beam { self.setOpacity(FlowLook.beamOpacity * beamA, under: beam) }
-                    if let pool = bell.pool { self.setOpacity(FlowLook.beamOpacity * 1.25 * beamA, under: pool) }
+                    if let pool = bell.pool { self.setOpacity(FlowLook.beamOpacity * 0.5 * beamA, under: pool) }
                     let lift = a < 0.35 ? 0 : pow(a - 0.35, 2) * 1.6, shrink = a < 0.9 ? 1 : max(0.0001, 1 - (a - 0.9) / 0.8)
                     bell.position.y = bell.lift0 + lift + 0.04 * sin(a * 9)
                     bell.outer.orientation = Flow.quaternion([0.06 * sin(a * 5), a * a * 3, 0])
@@ -229,7 +229,8 @@ extension Flow {
                 }
                 bell.outer.position = bell.position
                 let p = bell.position
-                bell.shadow.position = [p.x, bell === chosen ? padY + 0.105 : 0.003, p.z]
+                // On the pad 1.5 cm up, not the prototype's 5 mm: that close to the pad's top it didn't draw at all.
+                bell.shadow.position = [p.x, bell === chosen ? padY + 0.115 : 0.003, p.z]
                 let s = 1 + max(0, p.y - 0.4) * 0.4
                 bell.shadow.scale = SIMD3(repeating: s)
                 if !bell.raptured { self.setOpacity(1 / (s * s), under: bell.shadow) }

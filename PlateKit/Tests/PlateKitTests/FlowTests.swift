@@ -171,9 +171,21 @@ struct FlowDetailTests {
         #expect(abs(FlowLook.wash.r * 255 - 190) < 16 && abs(FlowLook.wash.g * 255 - 175) < 16 && abs(FlowLook.wash.b * 255 - 170) < 16)
     }
 
-    @Test("A missing plate's ghost is flat grey at 30 %")
+    @Test("A missing plate's ghost is flat grey and reads like the prototype's over the orange (#B85C22)")
     func ghost() {
         let ghost = FlowProps.ghost(Plate.find(5, .kg)!)
-        #expect(ghost.parts.allSatisfy { $0.shade == .flat && $0.opacity == 0.3 })
+        #expect(ghost.parts.allSatisfy { $0.shade == .flat && $0.opacity == FlowLook.missingOpacity })
+        let o = FlowLook.orange, g = FlowLook.missing, a = FlowLook.missingOpacity
+        let seen = RGB(o.r + (g.r - o.r) * a, o.g + (g.g - o.g) * a, o.b + (g.b - o.b) * a)
+        #expect(abs(seen.r * 255 - 184) < 8 && abs(seen.g * 255 - 92) < 8 && abs(seen.b * 255 - 34) < 8)
+        #expect(g.r == g.g && g.g == g.b)
+    }
+
+    @Test("The gym room's edges are faint hairlines, like the prototype's one-pixel lines")
+    func gymRoomEdges() {
+        func edges(_ node: FlowNode) -> [FlowPart] { node.parts.filter { $0.name == "edges" } + node.children.flatMap(edges) }
+        let all = edges(FlowProps.gymRoom(name: "79", unit: .kg, plates: [25, 20, 15, 10, 5]))
+        #expect(!all.isEmpty)
+        #expect(all.allSatisfy { $0.opacity <= 0.4 })
     }
 }
