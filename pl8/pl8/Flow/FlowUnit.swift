@@ -216,13 +216,15 @@ extension Flow {
                     bell.abducted += dt
                     let a = bell.abducted
                     let beamA = min(1, a / 0.3) * (a > 1.7 ? max(0, 1 - (a - 1.7) / 0.4) : 1)
-                    if let beam = bell.beam { self.setOpacity(0.32 * beamA, under: beam) }
-                    if let pool = bell.pool { self.setOpacity(0.4 * beamA, under: pool) }
+                    if let beam = bell.beam { self.setOpacity(FlowLook.beamOpacity * beamA, under: beam) }
+                    if let pool = bell.pool { self.setOpacity(FlowLook.beamOpacity * 1.25 * beamA, under: pool) }
                     let lift = a < 0.35 ? 0 : pow(a - 0.35, 2) * 1.6, shrink = a < 0.9 ? 1 : max(0.0001, 1 - (a - 0.9) / 0.8)
                     bell.position.y = bell.lift0 + lift + 0.04 * sin(a * 9)
                     bell.outer.orientation = Flow.quaternion([0.06 * sin(a * 5), a * a * 3, 0])
                     bell.outer.scale = SIMD3(repeating: shrink)
                     self.setOpacity(min(1, shrink * 1.4), under: bell.model)
+                    // The light takes its colour: greyer the longer it's in the beam.
+                    self.setWash(beamA * min(1, a / 1.2), under: bell.model)
                     self.setOpacity(0.5 * shrink, under: bell.shadow)
                 }
                 bell.outer.position = bell.position

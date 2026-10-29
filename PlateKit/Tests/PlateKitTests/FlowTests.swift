@@ -156,6 +156,21 @@ struct FlowDetailTests {
         #expect(faces.contains(where: up) && faces.contains(where: down))
     }
 
+    @Test("The abduction's beam reads like the prototype's: a grainy haze over the orange, not a white column")
+    func beamHaze() {
+        let beam = FlowProps.beam().beam
+        guard case .colour(let colour) = beam.parts.first?.paint else { Issue.record("the beam has no colour"); return }
+        // Seen through both walls of the open cylinder, at full strength: about (212, 107, 42) in the prototype's 02c.
+        var seen = FlowLook.orange
+        for _ in 0..<2 {
+            let a = FlowLook.beamOpacity
+            seen = RGB(seen.r + (colour.r - seen.r) * a, seen.g + (colour.g - seen.g) * a, seen.b + (colour.b - seen.b) * a)
+        }
+        #expect(abs(seen.r * 255 - 212) < 6 && abs(seen.g * 255 - 107) < 6 && abs(seen.b * 255 - 42) < 6)
+        // The bell it takes is washed towards light grey, about (175, 159, 155) by then.
+        #expect(abs(FlowLook.wash.r * 255 - 190) < 16 && abs(FlowLook.wash.g * 255 - 175) < 16 && abs(FlowLook.wash.b * 255 - 170) < 16)
+    }
+
     @Test("A missing plate's ghost is flat grey at 30 %")
     func ghost() {
         let ghost = FlowProps.ghost(Plate.find(5, .kg)!)

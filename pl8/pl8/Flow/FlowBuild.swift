@@ -22,6 +22,8 @@ final class FlowShadedModel {
         var shine: Float = 0
         var opacity: Float = 1
         var grey = false
+        /// How far towards `FlowLook.wash` (the abduction's beam greying a bell).
+        var wash: Float = 0
     }
 
     init(model: ModelEntity, part: FlowPart) {
@@ -147,10 +149,10 @@ extension Flow {
         case (.occluder, _):
             return
         case (.flat, .colour(let colour)):
-            material.color = .init(tint: colour.uiColor)
+            material.color = .init(tint: Self.washed(colour, state.wash).uiColor)
         case (.flat, .picture(let picture, let tint)):
             guard let texture = texture(picture) else { return }
-            material.color = .init(tint: tint.uiColor, texture: .init(texture))
+            material.color = .init(tint: Self.washed(tint, state.wash).uiColor, texture: .init(texture))
             if Self.hasAlpha(picture) || opacity < 1 {
                 material.blending = .transparent(opacity: .init(floatLiteral: opacity))
             }
@@ -166,20 +168,21 @@ extension Flow {
             default:
                 light = FlowLight.toon(tint, normal: normal, shine: state.shine)
             }
-            material.color = .init(tint: light.uiColor, texture: .init(texture))
+            material.color = .init(tint: Self.washed(light, state.wash).uiColor, texture: .init(texture))
         case (_, .colour(let base)):
             // One texel per triangle, lit where it faces now.
             let layout = Self.paletteLayout(item.normals.count)
             var bytes = [UInt8](repeating: 255, count: layout.width * layout.rows * 4)
             for (index, normal) in item.normals.enumerated() {
                 let world = orientation.act(normal)
-                let colour: RGB
+                var colour: RGB
                 switch part.shade {
                 case .standard(let roughness, let metalness):
                     colour = FlowLight.standard(base, normal: world, roughness: roughness, metalness: metalness, shine: state.shine)
                 default:
                     colour = FlowLight.toon(base, normal: world, shine: state.shine)
                 }
+                colour = Self.washed(colour, state.wash)
                 bytes[index * 4] = UInt8((colour.r * 255).rounded())
                 bytes[index * 4 + 1] = UInt8((colour.g * 255).rounded())
                 bytes[index * 4 + 2] = UInt8((colour.b * 255).rounded())
@@ -195,6 +198,12 @@ extension Flow {
         }
         if opacity < 1 { material.blending = .transparent(opacity: .init(floatLiteral: opacity)) }
         item.model.model?.materials = [material]
+    }
+
+    static func washed(_ colour: RGB, _ amount: Float) -> RGB {
+        guard amount > 0 else { return colour }
+        let w = FlowLook.wash
+        return RGB(colour.r + (w.r - colour.r) * amount, colour.g + (w.g - colour.g) * amount, colour.b + (w.b - colour.b) * amount)
     }
 
     static func image(_ bytes: [UInt8], width: Int, height: Int) -> CGImage? {
@@ -223,6 +232,10 @@ extension Flow {
 
     func setGrey(_ grey: Bool, under entity: Entity) {
         for item in shadedModels(under: entity) { item.state.grey = grey }
+    }
+
+    func setWash(_ amount: Float, under entity: Entity) {
+        for item in shadedModels(under: entity) { item.state.wash = amount }
     }
 
     // MARK: - Pictures

@@ -12,6 +12,12 @@ public enum FlowLook {
     public static let dust = RGB(hex: "#E9E2D6")
     /// A plate you don't have: grey and see-through (opacity 0.3).
     public static let missing = RGB(hex: "#9A9690")
+    /// The abduction's beam as the prototype shows it once its sketch pass has run: a grainy haze that mutes the
+    /// orange (its additive white mostly lands in the bell it takes). Each wall of the beam at most this opaque.
+    public static let beam = RGB(hex: "#70808C")
+    public static let beamOpacity: Float = 0.163
+    /// What the beam washes the bell it takes towards.
+    public static let wash = RGB(hex: "#BEB4B2")
 }
 
 /// The prototype's light, worked out per face so RealityKit can draw exact flat colours (unlit, no tone
