@@ -214,7 +214,8 @@ Default PR list: Back squat, Front squat, Deadlift, Clean, Snatch, Bench press (
 - **Vision** (`VNRecognizeTextRequest`, accurate) for screenshots; **VisionKit** `DataScannerViewController` for the camera; `PhotosPicker` for uploads.
 - **RealityKit** `RealityView` for the room; procedural meshes (box, cylinder) like the prototype; `PhysicsBodyComponent` for the kit drop; a camera entity animated between shots.
 - Haptics: `.sensoryFeedback`. Sound: `AVAudioEngine` (bell can be a short bundled file).
-- **Hand-drawn outline** (spiked in M5): an inverted hull — a slightly bigger, inside-out copy of each shape in the dark brown, two of them with noise-jittered corners for the sketch line — built by `PlateKit.LowPolyMesh`, drawn with `UnlitMaterial`. No custom shaders. Limits: silhouettes only (no inner lines or real gap between the two lines).
+- **The Flow** (M7): an `ARView` without AR, transparent, with the prototype's sketch pass as a Metal post-process (`FlowSketch.metal`); everything else as above.
+- **Hand-drawn outline** (spiked in M5, used by the scale and the opening): an inverted hull — a slightly bigger, inside-out copy of each shape in the dark brown, two of them with noise-jittered corners for the sketch line — built by `PlateKit.LowPolyMesh`, drawn with `UnlitMaterial`. No custom shaders. Limits: silhouettes only (no inner lines or real gap between the two lines).
 
 ---
 
