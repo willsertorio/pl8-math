@@ -13,7 +13,7 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false   # a new push waits, so every commit gets its pictures
 
 jobs:
   platekit:
