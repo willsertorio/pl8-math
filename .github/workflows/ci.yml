@@ -130,6 +130,8 @@ jobs:
         run: |
           mkdir -p publish/screens publish/prototype-check
           cp screens/*.png publish/screens/ 2>/dev/null || true
+          # The prototype's renders are 780 px wide: the same size keeps the push small (a full set timed out).
+          for f in publish/screens/*.png; do sips --resampleWidth 780 "$f" >/dev/null 2>&1 || true; done
           cp prototype-check/*.png publish/prototype-check/ 2>/dev/null || true
           cp build.log publish/ 2>/dev/null || true
           echo "$SHA" > publish/SHA
@@ -138,4 +140,7 @@ jobs:
           git checkout -q -b ci-screens
           git add .
           git -c user.name="pl8 CI" -c user.email="ci@users.noreply.github.com" commit -qm "Pictures for $SHA"
-          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screens
+          for attempt in 1 2 3; do
+            git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screens && break
+            sleep $((attempt * 10))
+          done
