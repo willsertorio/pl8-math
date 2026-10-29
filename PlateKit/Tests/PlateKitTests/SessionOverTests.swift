@@ -84,6 +84,11 @@ struct SessionOverTests {
         let top = parts.platform.filter { $0.tone != .flat(Look.ink) }.flatMap { $0.mesh.positions.map(\.y) }.max() ?? 0
         #expect(abs(top - ScaleScene.platformTop) < 0.006)
         #expect(ScaleScene.screenCentre.y > 0.8)
+        // Nothing dark faces up under the cream top: seen from 20 m, 1 cm below it would win the depth test (the
+        // top vanished in the sketch stage). The base shows through the thin rim instead, dark either way.
+        let body = parts.platform.filter { $0.tone == .paint(Look.boxDark) }
+        #expect(!body.isEmpty)
+        #expect(body.allSatisfy { part in (0..<part.mesh.triangleCount).allSatisfy { part.mesh.faceNormal($0).y < 0.5 } })
     }
 }
 

@@ -156,8 +156,8 @@ extension Flow {
         proxy.addChild(build(FlowProps.barbell()))
         proxy.isEnabled = false
         add(proxy)
-        let kitBackground = Color(rgb: alt ? FlowLook.light : FlowLook.orange)
-        let boardBackground = Color(rgb: userBackground ? FlowLook.light : FlowLook.orange)
+        let kitBackground = alt ? FlowLook.light : FlowLook.orange
+        let boardBackground = userBackground ? FlowLook.light : FlowLook.orange
         var v: Float = 0
         let pose = { [weak self] (value: Float) in
             guard let self else { return }
@@ -176,7 +176,7 @@ extension Flow {
                     board.entity.isEnabled = true
                     self.cam = FlowCam(position: zoom.position + (rest.position - zoom.position) * e2,
                                        target: zoom.target + (rest.target - zoom.target) * e2, fov: kit.fov)
-                    self.backgroundOverride = Color.mix(kitBackground, boardBackground, Double(e2))
+                    self.backgroundOverride = Color(rgb: .mix(kitBackground, boardBackground, e2))
                 }
             } else {
                 // Next: a pan straight down; the bar comes up from below.
@@ -245,15 +245,11 @@ extension Flow {
     }
 }
 
-extension Color {
-    static func mix(_ a: Color, _ b: Color, _ t: Double) -> Color {
-        let ua = UIColor(a), ub = UIColor(b)
-        var (ar, ag, ab, aa) = (CGFloat(0), CGFloat(0), CGFloat(0), CGFloat(0))
-        var (br, bg, bb, ba) = (CGFloat(0), CGFloat(0), CGFloat(0), CGFloat(0))
-        ua.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
-        ub.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
-        let f = CGFloat(t)
-        return Color(red: ar + (br - ar) * f, green: ag + (bg - ag) * f, blue: ab + (bb - ab) * f)
+extension RGB {
+    /// Part way from a to b in linear light, like three.js Color.lerp (half way from the light grid to the orange
+    /// is pink, not peach).
+    static func mix(_ a: RGB, _ b: RGB, _ t: Float) -> RGB {
+        RGB(linear: a.linear + (b.linear - a.linear) * t)
     }
 }
 

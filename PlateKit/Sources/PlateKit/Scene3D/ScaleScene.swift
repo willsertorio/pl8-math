@@ -33,15 +33,15 @@ public enum ScaleScene {
         }
         base.cylinder(0.022, 0.72, .y, 10, [0, 0.45, -0.39], body)
         base.add(LowPolyMesh.box(size: [0.36, 0.19, 0.08]).rotatedX(screenTilt).translated(by: [0, 0.86, -0.39]), body)
-        platform.box([0.78, 0.04, 0.78], [0, 0.11, 0], body)
+        // Without its top face: the cream top covers it, and seen from 20 m it would win the depth test against a
+        // top only 1 cm higher. The base shows through the thin rim, dark either way.
+        platform.add(LowPolyMesh.box(size: [0.78, 0.04, 0.78]).keepingFaces { $0.y < 0.5 }.translated(by: [0, 0.11, 0]), body)
         platform.box([0.72, 0.01, 0.72], [0, 0.135, 0], top)
         base.add(outline(base.parts, seed: 70), .flat(Look.ink), ink: false, casts: false)
         platform.add(outline(platform.parts, seed: 80), .flat(Look.ink), ink: false, casts: false)
         return (base.parts, platform.parts)
     }
 
-    /// The prototype's sketch outline (rough, grainy, doubled) round each part, sized for the scale's camera.
-    /// - Parameter justTheRim: only the plate's own rim, not its steel hub (the title's plates, seen big).
     /// buildDone's bar, not the room's: a dark #6E7378 shaft between #B9BEC4 collars and sleeves, along x.
     public static func barParts() -> [PropPart] {
         let steel = PropPart.Tone.paint(RGB(hex: "#B9BEC4")), shaft = PropPart.Tone.paint(RGB(hex: "#6E7378"))
@@ -54,6 +54,8 @@ public enum ScaleScene {
         return b.parts
     }
 
+    /// The prototype's sketch outline (rough, grainy, doubled) round each part, sized for the scale's camera.
+    /// - Parameter justTheRim: only the plate's own rim, not its steel hub (the title's plates, seen big).
     public static func outline(_ parts: [PropPart], seed: UInt32, width: Float = 0.012, justTheRim: Bool = false) -> LowPolyMesh {
         var mesh = LowPolyMesh()
         for (n, part) in parts.enumerated() where part.tone != .flat(Look.ink) {
