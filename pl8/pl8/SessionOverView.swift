@@ -71,6 +71,9 @@ final class ScaleStage {
     private var dropEntities: [Entity] = []
     private let platform = Entity()
     private var screen: ModelEntity?
+    /// The display's pictures, made before anything falls: a new texture in the middle of a landing stalled the
+    /// stage (the CI caught the scale frozen mid-drop).
+    private var readouts: [Double: TextureResource] = [:]
     private var unit: WeightUnit = .kg
     private var barWeight: Double = 0
     private var built = false
@@ -109,6 +112,11 @@ final class ScaleStage {
         }
 
         drops = ScaleScene.drops(perSide: perSide, unit: unit, barWeight: barWeight)
+        var reading = 0.0
+        for drop in drops {
+            reading += drop.plate?.size ?? barWeight
+            readouts[reading] = Self.texture(reading, unit: unit)
+        }
         dropEntities = drops.map { drop in
             var parts = drop.plate.map { SessionScene.parts(.init(plate: $0, centre: .zero, axis: .y, turn: drop.turn)) }
                 ?? ScaleScene.barParts()
@@ -195,11 +203,15 @@ final class ScaleStage {
 
     /// The scale's screen: the reading in cream on dark brown, like the prototype's drawReadout.
     private func show(_ value: Double) {
-        guard let screen, let image = Self.readout(value, unit: unit).cgImage,
-              let texture = try? TextureResource(image: image, options: .init(semantic: .color)) else { return }
+        guard let screen, let texture = readouts[value] ?? Self.texture(value, unit: unit) else { return }
         var material = UnlitMaterial(applyPostProcessToneMap: false)
         material.color = .init(tint: .white, texture: .init(texture))
         screen.model?.materials = [material]
+    }
+
+    private static func texture(_ value: Double, unit: WeightUnit) -> TextureResource? {
+        guard let image = readout(value, unit: unit).cgImage else { return nil }
+        return try? TextureResource(image: image, options: .init(semantic: .color))
     }
 
     private static func readout(_ value: Double, unit: WeightUnit) -> UIImage {

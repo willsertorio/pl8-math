@@ -266,6 +266,10 @@ public enum FlowProps {
             bar.position = [0, y, 0]; bar.scale = [0.4, 0.4, 0.4]; bar.rotation = [0, .pi / 2, 0]
             bars.add(bar)
             for hz: Float in [-0.25, 0.25] { bars.add(.toon("hook", Geo.solidBox(0.09, 0.03, 0.04), RGB(hex: "#2B2B2B")), at: [-0.03, y - 0.03, hz]) }
+            // Its shadow on the wall 6 cm behind, cast along the sun (2.5, 6, 4): 0.06 × 6/2.5 lower, × 4/2.5
+            // back. A soft strip (the prototype's is a real blurred shadow), 1.5 cm off the wall so it draws.
+            bars.add(FlowPart("barShadow", mesh: Geo.plane(0.95, 0.08), paint: .picture(.shadowBlob, tint: RGB(1, 1, 1)), shade: .flat),
+                     at: [-0.045, y - 0.144, -0.096], rotation: [0, .pi / 2, 0])
         }
         bars.add(FlowNode("hit", position: [0.02, 0.6, 0], hitBox: [0.22, 0.62, 1.0]))
         inside.add(bars)

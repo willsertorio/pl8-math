@@ -224,7 +224,8 @@ extension Flow {
                     bell.outer.scale = SIMD3(repeating: shrink)
                     self.setOpacity(min(1, shrink * 1.4), under: bell.model)
                     // The light takes its colour: greyer the longer it's in the beam.
-                    self.setWash(beamA * min(1, a / 0.6), under: bell.model)
+                    // Half grey at once, like the prototype's (#585858 a second after the drop), then all the way.
+                    self.setWash(min(1, 0.5 + a / 1.2), under: bell.model)
                     self.setOpacity(0.5 * shrink, under: bell.shadow)
                 }
                 bell.outer.position = bell.position

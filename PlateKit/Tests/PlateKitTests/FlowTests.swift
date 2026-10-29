@@ -189,13 +189,15 @@ struct FlowDetailTests {
         #expect(abs(FlowLook.wash.r * 255 - 155) < 8 && abs(FlowLook.wash.g * 255 - 155) < 8 && abs(FlowLook.wash.b * 255 - 155) < 8)
     }
 
-    @Test("A missing plate's ghost is flat grey and reads like the v2 prototype's over the red, about (148, 60, 48)")
+    @Test("A missing plate's ghost is flat grey and reads like the v2 prototype's over the red, about (138, 58, 47)")
     func ghost() {
         let ghost = FlowProps.ghost(Plate.find(5, .kg)!)
         #expect(ghost.parts.allSatisfy { $0.shade == .flat && $0.opacity == FlowLook.missingOpacity })
-        let o = FlowLook.bg, g = FlowLook.missing, a = FlowLook.missingOpacity
-        let seen = RGB(o.r + (g.r - o.r) * a, o.g + (g.g - o.g) * a, o.b + (g.b - o.b) * a)
-        #expect(abs(seen.r * 255 - 148) < 12 && abs(seen.g * 255 - 60) < 6 && abs(seen.b * 255 - 48) < 6)
+        // Seen through two of its see-through layers, as it draws (one layer's maths came out too light).
+        let g = FlowLook.missing, a = FlowLook.missingOpacity
+        var seen = FlowLook.bg
+        for _ in 0..<2 { seen = RGB(seen.r + (g.r - seen.r) * a, seen.g + (g.g - seen.g) * a, seen.b + (g.b - seen.b) * a) }
+        #expect(abs(seen.r * 255 - 138) < 10 && abs(seen.g * 255 - 58) < 6 && abs(seen.b * 255 - 47) < 6)
         #expect(g.r == g.g && g.g == g.b)
     }
 
@@ -212,6 +214,17 @@ struct FlowDetailTests {
         #expect(slot.parts.count == 1 && slot.parts[0].shade == .flat)
         let ys = slot.parts[0].mesh.positions.map(\.y)
         #expect((ys.min() ?? 1) > -0.01 && (ys.max() ?? 0) < 1.16)
+    }
+
+    @Test("The racked bars cast soft shadows on the room's left wall, below and behind them like the sun's")
+    func barShadowsOnTheWall() {
+        func find(_ node: FlowNode, _ name: String) -> FlowNode? { node.name == name ? node : node.children.lazy.compactMap { find($0, name) }.first }
+        guard let bars = find(FlowProps.gymRoom(name: "79", unit: .kg, plates: [25]), "bars") else { Issue.record("no bars"); return }
+        let shadows = bars.children.filter { $0.parts.contains { $0.name == "barShadow" } }
+        #expect(shadows.count == 3)
+        // On the wall (6 cm behind the bars; 1.5 cm off it so it draws), 0.06 × 6 / 2.5 lower and 0.06 × 4 / 2.5 back.
+        #expect(shadows.allSatisfy { abs($0.position.x + 0.045) < 0.003 && abs($0.position.z + 0.096) < 0.003 })
+        #expect(Set(shadows.map { (($0.position.y + 0.144) * 100).rounded() }) == [42, 60, 78])
     }
 
     @Test("The gym room's edges are faint hairlines, like the prototype's one-pixel lines")

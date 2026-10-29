@@ -34,10 +34,10 @@ public enum FlowLook {
     public static let boardGridOpacity: Float = 0.11
     /// Dust from impacts.
     public static let dust = RGB(hex: "#E9E2D6")
-    /// A plate you don't have: grey and see-through. The prototype's lit grey at 30 % comes out about
-    /// (148, 60, 48) over the red (v2); this flat grey gives about the same.
-    public static let missing = RGB(hex: "#484848")
-    public static let missingOpacity: Float = 0.455
+    /// A plate you don't have: grey and see-through. The prototype's grey at 30 % comes out about (138, 58, 47)
+    /// over the red (v2); this flat grey, seen through two of the plate's layers as it draws, gives the same.
+    public static let missing = RGB(hex: "#3E3E3E")
+    public static let missingOpacity: Float = 0.33
     /// The abduction's beam as the prototype shows it once its sketch pass has run: a grainy haze that mutes the
     /// orange (its additive white mostly lands in the bell it takes). Each wall of the beam at most this opaque.
     public static let beam = RGB(hex: "#70808C")

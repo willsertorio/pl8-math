@@ -20,8 +20,8 @@ extension Flow {
         book.isEnabled = false
         add(book)
         let shadow = add(Entity())
+        // Round: the prototype squashes it (1, 0.5, 1), but its pop-in sets the scale back to uniform.
         let blob = softShadow(0.6)
-        blob.scale = [1, 0.5, 1]
         shadow.addChild(blob)
         shadow.position = [0, -0.95, 0]
         shadow.isEnabled = false

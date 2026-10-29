@@ -495,6 +495,8 @@ struct SetCard: View {
                     .monospacedDigit()
                     .lineLimit(1)
             }
+            // The display role's line is 1.02 × 33: a Text's own line is the font's (about 1.2), 5 points taller.
+            .frame(height: FlowType.displayLineHeight)
             .padding(.top, 2)
             .padding(.bottom, 12)
             HStack(spacing: 6) {

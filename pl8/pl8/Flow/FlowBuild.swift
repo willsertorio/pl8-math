@@ -398,9 +398,8 @@ enum FlowArt {
             }
         case .shadowBlob:
             return draw(128, 128, opaque: false) { g in
-                // The prototype's 0.38 / 0.16 come out about 1.45 times darker and wider on its screens than ours did at
-                // 0.46 / 0.19 (measured on six screens), so these are scaled up to match what it shows.
-                let colours = [UIColor(white: 0, alpha: 0.67).cgColor, UIColor(white: 0, alpha: 0.28).cgColor, UIColor(white: 0, alpha: 0).cgColor]
+                // Measured against the v2 prototype on the red (seven screens): its 0.38 / 0.16 come out like these.
+                let colours = [UIColor(white: 0, alpha: 0.5).cgColor, UIColor(white: 0, alpha: 0.21).cgColor, UIColor(white: 0, alpha: 0).cgColor]
                 guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colours as CFArray,
                                                 locations: [0, 0.55, 1]) else { return }
                 g.drawRadialGradient(gradient, startCenter: CGPoint(x: 64, y: 64), startRadius: 4, endCenter: CGPoint(x: 64, y: 64),

@@ -124,15 +124,17 @@ extension Flow {
                 item.entity.setOrientation(simd_quatf(angle: atan2(-x.z, x.x), axis: [0, 1, 0]), relativeTo: nil)
                 motion.angularVelocity.x = 0
                 motion.angularVelocity.z = 0
-                // Down after about 0.55 s from 1.5 m, on the floor or on a neighbour.
+                // Down after about 0.55 s from 1.5 m, on the floor or on a neighbour: then it's moved onto its own
+                // spot (its position, not its speed: a plate at rest ignores a nudge, and two still overlapped).
                 if item.landedAt != nil || self.t - dropped > 0.6 {
-                    let k = exp(-14 * dt)
-                    motion.linearVelocity.x *= k
-                    motion.linearVelocity.z *= k
+                    let k = exp(-10 * dt)
+                    motion.linearVelocity.x = 0
+                    motion.linearVelocity.z = 0
                     motion.angularVelocity.y *= k
-                    let p = item.entity.position(relativeTo: nil)
-                    motion.linearVelocity.x += (item.spot.x - p.x) * 6 * (1 - k)
-                    motion.linearVelocity.z += (item.spot.y - p.z) * 6 * (1 - k)
+                    var p = item.entity.position
+                    p.x = item.spot.x + (p.x - item.spot.x) * k
+                    p.z = item.spot.y + (p.z - item.spot.y) * k
+                    item.entity.position = p
                 }
                 item.entity.components.set(motion)
             }
