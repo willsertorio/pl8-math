@@ -268,7 +268,7 @@
     };
     // the chips, on a white card
     const c = this.flCard(), got = this.d.kitGot = this.d.kitGot || {};
-    Object.assign(c.style, { background: '#FFFFFF', color: this.pal.boxDark, boxShadow: '0 10px 30px rgba(0,0,0,0.18)' });
+    Object.assign(c.style, { background: this.pal.card || '#FFFFFF', color: this.pal.boxDark, boxShadow: '0 10px 30px rgba(0,0,0,0.18)' });
     const wrap = this.fh('div', { display: 'flex', flexWrap: 'wrap', gap: '8px' }, c);
     P.kit.forEach((k) => {
       const s = sp.find((q) => q.kg === k.w) || { color: '#999', d: 0.3 };

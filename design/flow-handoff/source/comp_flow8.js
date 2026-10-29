@@ -40,7 +40,7 @@
   flPlates() {
     const F = this.FL, T = this.THREE, specs = this.specs(), n = specs.length;
     this.flCam([0, 0, 8.2], [0, 0, 0], 35);
-    const k = 2 * 8.2 * Math.tan(17.5 * Math.PI / 180) / 844, top = 214, bot = 790, rowH = (bot - top) / n;
+    const k = 2 * 8.2 * Math.tan(17.5 * Math.PI / 180) / 844, top = 214 + ((this.flQTop || 150) - 92), bot = 800, rowH = (bot - top) / n;
     const wx = (px) => (px - 195) * k, wy = (py) => (422 - py) * k;
     const ink = this.flInk(), box = Math.round(Math.min(46, rowH * 0.74)), XY = 262, XN = 334, dpr = 2;
     const gray = new T.MeshBasicMaterial({ color: 0x9a9690, transparent: true, opacity: 0.3, depthWrite: false });
@@ -88,7 +88,7 @@
         this.flAnim((u) => { B.tick = u; B.draw(); }, 0.16);
       };
       B.draw();
-      cv.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 360, delay: r.i * 60 + (which === 'yes' ? 0 : 40), easing: 'cubic-bezier(.3,1.5,.5,1)', fill: 'backwards' });
+      cv.style.visibility = 'hidden';
       boxes.push(B); return B;
     };
     const decide = (B) => {
@@ -141,23 +141,24 @@
     const winUp = (e) => { if (!pad.isConnected) { window.removeEventListener('pointerup', winUp); window.removeEventListener('pointercancel', winUp); return; } up(e); };
     window.addEventListener('pointerup', winUp); window.addEventListener('pointercancel', winUp);
     this.flAfter('What are the plates available?', () => {
-      [['YES', XY], ['NO', XN]].forEach(([l, x]) => { const h = this.fh('div', { position: 'absolute', left: x + 'px', top: (top - 16) + 'px', transform: 'translate(-50%,-50%)', color: ink, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 800, fontSize: '13px', letterSpacing: '0.08em', pointerEvents: 'none' }, F.ui, l); h.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, fill: 'backwards' }); });
+      [['YES', XY], ['NO', XN]].forEach(([l, x]) => { const h = this.fh('div', { position: 'absolute', left: x + 'px', top: (top - 16) + 'px', transform: 'translate(-50%,-50%)', color: ink, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 800, fontSize: '13px', letterSpacing: '0.08em', pointerEvents: 'none' }, F.ui, l); });
       specs.forEach((s, i) => {
         const y = top + rowH * (i + 0.5), g = this.plate(s), w = new T.Group(); w.add(g); g.rotation.x = Math.PI / 2;
         const dia = rowH * 0.84 * k * (0.62 + 0.38 * Math.min(1, s.d / 0.45)), sc = dia / s.d; w.scale.setScalar(sc);
-        const ty = wy(y); w.position.set(wx(58), ty + 4, 0); this.flAdd(w);
+        const ty = wy(y); w.position.set(wx(58), ty, 0); this.flAdd(w);
         const meshes = []; g.traverse((m) => { if (m.isMesh) { m.userData.m0 = m.material; meshes.push(m); } });
         const r = { s, i, w, g, meshes, state: null };
         w.visible = false;
-        this.flLater(() => { w.visible = true; this.flAnim((u) => { const b = u < 0.6 ? (u / 0.6) ** 2 : 1 - 0.18 * Math.sin((u - 0.6) / 0.4 * Math.PI) * (1 - u); w.position.y = ty + (1 - Math.min(1, b)) * 4; }, 0.55, () => this.flClick(0.5)); }, i * 70);
         const lab = this.fh('div', { position: 'absolute', left: '106px', top: y + 'px', transform: 'translateY(-50%)', color: ink, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: Math.round(Math.min(20, rowH * 0.36)) + 'px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, this.fmt(s.kg) + ' ' + this.d.unit);
-        lab.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: i * 70 + 300, fill: 'backwards' });
+        lab.style.visibility = 'hidden';
         r.yes = makeBox(r, 'yes', XY, y); r.no = makeBox(r, 'no', XN, y);
+        // each row just appears, plate, weight and boxes together — one after another
+        this.flLater(() => { w.visible = true; lab.style.visibility = 'visible'; r.yes.cv.style.visibility = 'visible'; r.no.cv.style.visibility = 'visible'; this.flClick(0.5); }, i * 90);
         rows.push(r);
       });
       pad.style.pointerEvents = 'auto'; ready = true; F.ui.appendChild(pad);
       // editing: what you said before is already ticked
-      if (editing) { const own = (this.d.own && this.d.own[this.d.unit]) || []; rows.forEach((r, i) => { r.state = own.indexOf(r.s.kg) >= 0 ? 'yes' : 'no'; paintPlate(r); this.flLater(() => (r.state === 'yes' ? r.yes : r.no).set(true), 380 + i * 60); }); }
+      if (editing) { const own = (this.d.own && this.d.own[this.d.unit]) || []; rows.forEach((r, i) => { r.state = own.indexOf(r.s.kg) >= 0 ? 'yes' : 'no'; paintPlate(r); this.flLater(() => (r.state === 'yes' ? r.yes : r.no).set(true), 140 + i * 90); }); }
     });
     F.tick = (dt, t) => { rows.forEach((r, i) => { r.g.rotation.y = Math.sin(t * 0.8 + i) * 0.12; }); this.flSpkTick(dt); };
   }
@@ -166,8 +167,7 @@
   flWod() {
     const F = this.FL, T = this.THREE, R = this.WB_REST;
     this.flCam(R.cam.P, R.cam.T, 35);
-    const fl = new T.Mesh(new T.PlaneGeometry(12, 12), new T.ShadowMaterial({ opacity: 0.18 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; this.flAdd(fl);
-    const wb = this.whiteboardModel(); wb.scale.setScalar(R.s); this.flAdd(wb);
+    const wb = this.whiteboardModel(); wb.scale.setScalar(R.s); this.flAdd(wb); this.flBoardShadow(wb);
     const instant = this.flFromKit || this.flFromMenu;
     let busy = false, hasPlan = false;
     if (instant) { wb.rotation.y = R.ry; if (this.plan) { this.flDrawBoard(wb, this.plan); hasPlan = true; } } else wb.visible = false;
@@ -179,7 +179,7 @@
     });
     const start = () => {
       busy = true; this.flCheckSound(); this.buzz('light');
-      const cam = F.cam, P0 = cam.position.clone(), T0 = new T.Vector3(...R.cam.T), cy = 1.45 * R.s, T1 = new T.Vector3(0, cy, 0), P1 = new T.Vector3(0.15, cy, 0.7), tgt = new T.Vector3();
+      const cam = F.cam, P0 = cam.position.clone(), T0 = this.flCamT ? this.flCamT.clone() : new T.Vector3(...R.cam.T), cy = 1.45 * R.s, T1 = new T.Vector3(0, cy, 0), P1 = new T.Vector3(0.15, cy, 0.7), tgt = new T.Vector3();
       this.flAnim((u) => { const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; cam.position.lerpVectors(P0, P1, e); tgt.lerpVectors(T0, T1, e); cam.lookAt(tgt); }, 1.0, () => { this.flGo('kit'); });
     };
     const ready = () => {
@@ -210,9 +210,14 @@
   flKitPreview() {
     const F = this.FL, T = this.THREE, R = this.WB_REST, c = F.cam;
     const WB = new T.Vector3(0, 0, -40);
-    const wb = this.whiteboardModel(); wb.scale.setScalar(R.s); wb.rotation.y = R.ry; wb.position.copy(WB); if (this.plan) this.flDrawBoard(wb, this.plan); wb.visible = false; this.flAdd(wb);
+    const wb = this.whiteboardModel(); this.flBoardShadow(wb); wb.scale.setScalar(R.s); wb.rotation.y = R.ry; wb.position.copy(WB); if (this.plan) this.flDrawBoard(wb, this.plan); wb.visible = false; this.flAdd(wb);
     const cy = 1.45 * R.s, Z = { P: WB.clone().add(new T.Vector3(0.15, cy, 0.7)), T: WB.clone().add(new T.Vector3(0, cy, 0)) };
     const Bv = { P: WB.clone().add(new T.Vector3(...R.cam.P)), T: WB.clone().add(new T.Vector3(...R.cam.T)) };
+    { // the board's resting view sits lower to clear the question: match it so the hand-off has no jump
+      const tc = new T.PerspectiveCamera(35, 1, 0.1, 100); tc.position.copy(Bv.P); tc.lookAt(Bv.T);
+      const up = new T.Vector3(0, 1, 0).applyQuaternion(tc.quaternion), H = F.L.clientHeight || 844, wpp = 2 * Bv.P.distanceTo(Bv.T) * Math.tan(17.5 * Math.PI / 180) / H, dq = ((this.flQTop || 150) - 92) * wpp;
+      Bv.P.addScaledVector(up, dq); Bv.T.addScaledVector(up, dq);
+    }
     const K = { P: c.position.clone(), Q: c.quaternion.clone(), T: c.position.clone().add(c.getWorldDirection(new T.Vector3()).multiplyScalar(6.5)), fov: this.flFov || 35 };
     // below the kit, one screen down, the bar waits exactly as the sets will show it
     const G0 = this.flPanGeo(), down = G0.up.clone().multiplyScalar(-G0.H * G0.wpp), KP = K.P.clone().add(down);
@@ -458,7 +463,7 @@
         const show = act === gy ? k * k * (3 - 2 * k) : 0;
         if (act !== gy) { gtgt = gcur; }
         if (!gdrag) gpos += (gtgt - gpos) * (1 - Math.exp(-dt * 9));
-        rooms.forEach((r, j) => { r.position.copy(RIGHT).multiplyScalar((j - gpos) * GSP); if (r !== gy.m) { r.scale.setScalar(Math.max(0.0001, show)); r.rotation.y = 0; } if (show > 0.5) r.userData.wave(t + j); });
+        rooms.forEach((r, j) => { r.position.copy(RIGHT).multiplyScalar((j - gpos) * GSP); if (r !== gy.m) { r.scale.setScalar(Math.max(0.0001, show * (r.userData.add ? 0.7 + 0.05 * Math.sin(t * 1.3) : 1))); r.rotation.y = r.userData.add ? 0.35 * Math.sin(t * 0.55) : 0; } if (show > 0.5) r.userData.wave(t + j); });
         if (!gdrag && Math.abs(gtgt - gpos) < 0.02) gymSettle();
         gy.sh.position.x = gy.m.position.x; gy.sh.position.z = gy.m.position.z; gy.sh.visible = Math.abs(gpos - gcur) < 0.5;
       }

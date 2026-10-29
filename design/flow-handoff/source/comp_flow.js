@@ -41,7 +41,7 @@
     R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap; sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
     { const c = sun.shadow.camera; c.left = -4; c.right = 4; c.top = 4; c.bottom = -4; c.near = 0.5; c.far = 20; } sun.shadow.bias = -0.0008; this.flSun = sun;
     // the question, top and centred; then the swipe hint, an icon only
-    const q = this.fh('div', { position: 'absolute', left: '28px', right: '28px', top: '92px', textAlign: 'center', color: this.FC.light, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '30px', lineHeight: 1.1, letterSpacing: '-0.01em', pointerEvents: 'none', zIndex: 3 }, L);
+    const q = this.fh('div', { position: 'absolute', left: '28px', right: '28px', top: (this.flQTop || 150) + 'px', textAlign: 'center', color: this.FC.light, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '30px', lineHeight: 1.1, letterSpacing: '-0.01em', pointerEvents: 'none', zIndex: 3 }, L);
     q.setAttribute('aria-live', 'polite');
     const sw = this.fh('div', { position: 'absolute', left: '50%', bottom: '34px', width: '44px', height: '44px', marginLeft: '-22px', display: 'none', visibility: 'hidden', color: this.FC.light, pointerEvents: 'none', zIndex: 3 }, L);
     sw.innerHTML = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14l6-6 6 6"/></svg>';

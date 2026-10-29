@@ -1,3 +1,4 @@
+/* the Flow's palette, picked by tapping the clock */;(function(){ var L = [['#E5321C','#F4F1EA','#151515'],['#FF6200','#F0E2F3','#6C3713'],['#2A4BFF','#EEF0F6','#0C1A4A'],['#1F6B49','#EEE9DC','#16261D'],['#141414','#F2F2F0','#141414']]; var i = 0; try { i = parseInt(localStorage.getItem('pl8.flow.pal') || '0', 10) || 0; } catch (e) {} var p = L[((i % 5) + 5) % 5]; window.__flPal = { bgColor: p[0], boxLight: p[1], boxDark: p[2] }; })();
 // Will's palette and layout, for browsers that have none saved
 ;(function(){ try { var S = {"layoutlab-v4": "{\"v\": 1, \"room\": {\"cols\": 9, \"rows\": 7}, \"objects\": {\"platform\": {\"p\": [0.66, 0, -1.86], \"r\": 0, \"s\": 1}, \"rack\": {\"p\": [0.61, 0, -2.31], \"r\": 0, \"s\": 1}, \"bench\": {\"p\": [0.95, 0, 0.63], \"r\": 180, \"s\": 1}, \"bottle\": {\"p\": [0.56, 0.1, -0.26], \"r\": 0, \"s\": 1, \"removed\": true}, \"board\": {\"p\": [-2.16, 0, -3.07], \"r\": 25, \"s\": 1}, \"shelf\": {\"p\": [0.06, 0.3, 2.32], \"r\": 0, \"s\": 1}, \"flag\": {\"p\": [3.2, 1.95, -3.99], \"r\": 0, \"s\": 1}, \"pr\": {\"p\": [-3.97, 1.15, -2.76], \"r\": 90, \"s\": 1}, \"bell\": {\"p\": [3.65, 1.75, -3.95], \"r\": 0, \"s\": 1, \"removed\": true}, \"window\": {\"p\": [0, -0.25, 0.65], \"r\": 0, \"s\": 1, \"removed\": true}, \"clip\": {\"p\": [3.94, 1.3, -3], \"r\": -90, \"s\": 1, \"removed\": true}}, \"added\": [{\"kind\": \"kitplates\", \"p\": [3.45, 0, -1.85], \"r\": 0, \"s\": 1}, {\"kind\": \"wallfan\", \"p\": [4.94, 2, -2.75], \"r\": -90, \"s\": 1}, {\"kind\": \"barholder\", \"p\": [5, 0, -0.45], \"r\": -90, \"s\": 1}, {\"kind\": \"wallwindow\", \"p\": [5, -0.15, 1.2], \"r\": -90, \"s\": 1}], \"shots\": {\"overview\": {\"T\": [0.44, 1.33, -0.89], \"P\": [13.28, 10.8, 14.36], \"fov\": 50}, \"corner\": {\"T\": [-4.31, 0.69, -0.22], \"P\": [1.27, 2.01, 3.24], \"fov\": 50}, \"flag\": {\"T\": [3.03, 0.98, -2.31], \"P\": [-0.45, 6.06, 1.46], \"fov\": 50}, \"pr\": {\"T\": [-3.93, 1.18, -2.72], \"P\": [-0.81, 1.77, -0.02], \"fov\": 50}, \"board\": {\"T\": [-0.93, 1.97, 2.15], \"P\": [-0.65, 2.21, 3.29], \"fov\": 40}, \"kit\": {\"T\": [2.59, 1.44, -1.05], \"P\": [-0.31, 5.35, 4.42], \"fov\": 50}, \"setv\": {\"T\": [2.38, 1.54, -1.86], \"P\": [3.04, 1.75, -0.89], \"fov\": 50}}, \"palette\": {\"light\": \"#F0E2F3\", \"dark\": \"#6C3713\", \"bg\": \"#FF6200\", \"bgStyle\": \"flat\"}}", "dz-art": "{\"boxLight\": \"#F0E2F3\", \"boxDark\": \"#6C3713\", \"bgColor\": \"#FF6200\", \"bgMode\": \"colour\", \"cloudReal\": 1, \"flagFont\": \"playfair\"}"}; for (var k in S) if (localStorage.getItem(k) == null) localStorage.setItem(k, S[k]); } catch (e) {} })();
 // ===================== GLFX: the boards' SVG looks (duotone, posterize, sketch line) as one WebGL pass =====================
@@ -122,7 +123,7 @@ class AnimLayer {
   constructor(el, scene, opts) {
     this.stage = el; this.opts = opts || {}; this.state = { scene };
     let art = null; try { art = JSON.parse(localStorage.getItem('dz-art') || 'null'); } catch (e) {}
-    this.pal = Object.assign({ boxLight: '#EFE3CF', boxDark: '#4A3426', bgColor: '#E8742C' }, art || {});
+    this.pal = Object.assign({ boxLight: '#EFE3CF', boxDark: '#4A3426', bgColor: '#E8742C' }, art || {}, window.__flPal || {});
     this.FONTS = [
       ['Playfair Display', 900, 'Georgia, serif'], ['Fraunces', 900, 'Georgia, serif'], ['DM Serif Display', 400, 'Georgia, serif'],
       ['Archivo Black', 400, 'Arial, sans-serif'], ['Bebas Neue', 400, 'Arial, sans-serif'], ['Anton', 400, 'Arial, sans-serif'],
@@ -1096,6 +1097,7 @@ class Component extends DCLogic {
       if (saved && isFinite(saved.cloudReal)) this.state.cloudReal = Math.min(1, Math.max(0, +saved.cloudReal));
     } catch (e) {}
     this.pal = { boxLight: this.state.boxLight, boxDark: this.state.boxDark, bgColor: this.state.bgColor };
+    if (window.__flPal) { Object.assign(this.state, window.__flPal); this.pal = Object.assign({}, window.__flPal); }
     // the Layout Lab is the source of truth for the palette: follow it live
     this.onArtStore = (e) => {
       if (this.dead) return;
@@ -4576,7 +4578,7 @@ class Component extends DCLogic {
     R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap; sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
     { const c = sun.shadow.camera; c.left = -4; c.right = 4; c.top = 4; c.bottom = -4; c.near = 0.5; c.far = 20; } sun.shadow.bias = -0.0008; this.flSun = sun;
     // the question, top and centred; then the swipe hint, an icon only
-    const q = this.fh('div', { position: 'absolute', left: '28px', right: '28px', top: '92px', textAlign: 'center', color: this.FC.light, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '30px', lineHeight: 1.1, letterSpacing: '-0.01em', pointerEvents: 'none', zIndex: 3 }, L);
+    const q = this.fh('div', { position: 'absolute', left: '28px', right: '28px', top: (this.flQTop || 150) + 'px', textAlign: 'center', color: this.FC.light, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, fontSize: '33px', lineHeight: 1.02, letterSpacing: '-0.035em', pointerEvents: 'none', zIndex: 3 }, L);
     q.setAttribute('aria-live', 'polite');
     const sw = this.fh('div', { position: 'absolute', left: '50%', bottom: '34px', width: '44px', height: '44px', marginLeft: '-22px', display: 'none', visibility: 'hidden', color: this.FC.light, pointerEvents: 'none', zIndex: 3 }, L);
     sw.innerHTML = '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14l6-6 6 6"/></svg>';
@@ -4649,7 +4651,7 @@ class Component extends DCLogic {
     c.width = W; c.height = H; const x = c.getContext('2d');
     if (o.bg) { x.fillStyle = o.bg; x.fillRect(0, 0, W, H); }
     x.fillStyle = o.col || this.FC.light; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.font = (o.weight || 900) + ' ' + (o.size || 190) + "px 'Space Grotesk', Arial, sans-serif";
+    x.font = '500 ' + (o.size || 190) + "px 'Helvetica Neue', Helvetica, Arial, sans-serif";
     x.fillText(txt, W / 2, H / 2 + (o.dy || 8));
     const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4; return t;
   }
@@ -4899,7 +4901,7 @@ class Component extends DCLogic {
     // the reading line: a small cream notch each side of the dial
     [-1, 1].forEach((s) => { const m = new this.THREE.Mesh(new this.THREE.ConeGeometry(0.09, 0.2, 3), new this.THREE.MeshBasicMaterial({ color: this.FC.light })); m.rotation.z = s * Math.PI / 2; m.position.set(s * 0.98, -0.2, 0.05); this.flAdd(m); this.popIn(m, 400); });
     const start = q[1] != null ? q[1] : this.demoPR(q); D.set(Math.max(0, Math.round(start / stp)));
-    const unit = this.fh('div', { position: 'absolute', right: '34px', top: 'calc(50% + 8px)', color: this.FC.light, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '22px' }, F.ui, u);
+    const unit = this.fh('div', { position: 'absolute', right: '34px', top: 'calc(50% + 8px)', color: this.FC.light, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, fontSize: '21px', letterSpacing: '-0.02em' }, F.ui, u);
     unit.setAttribute('aria-hidden', 'true');
     F.hit = (e) => (this.flRay(e).intersectObject(D.g, true).length ? this.flDrumDrag(D, e, 40) : null);
     F.tick = (dt) => D.tick(dt, !!D.dragging);
@@ -4929,12 +4931,12 @@ class Component extends DCLogic {
 
   // ---------------- the bottom card (kit and sets), in the opening's colours ----------------
   flCard() {
-    const F = this.FL, c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px', borderRadius: '22px', background: this.FC.light, color: this.FC.dark, fontFamily: "'Space Grotesk', Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 8px 0 ' + this.FC.dark }, F.ui);
+    const F = this.FL, c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px', borderRadius: '22px', background: this.FC.light, color: this.FC.dark, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 8px 0 ' + this.FC.dark }, F.ui);
     c.animate([{ transform: 'translateY(120%)' }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.9,.25,1)' });
     return c;
   }
   flBtn(parent, label, fn) {
-    const b = this.fh('button', { width: '100%', height: '56px', border: 0, borderRadius: '16px', background: this.FC.dark, color: this.FC.light, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '19px', cursor: 'pointer' }, parent, label);
+    const b = this.fh('button', { width: '100%', height: '56px', border: 0, borderRadius: '16px', background: this.FC.dark, color: this.FC.light, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, fontSize: '19px', letterSpacing: '-0.01em', cursor: 'pointer' }, parent, label);
     b.className = 'tap'; b.onclick = () => { this.buzz('light'); fn(); }; return b;
   }
 
@@ -4957,7 +4959,7 @@ class Component extends DCLogic {
     const wrap = this.fh('div', { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }, c);
     kit.forEach((k) => {
       const s = sp.find((q) => q.kg === k.w) || { color: '#999', d: 0.3 };
-      const b = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.FC.dark, fontFamily: 'inherit', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }, wrap);
+      const b = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.FC.dark, fontFamily: 'inherit', fontWeight: 400, fontSize: '16px', letterSpacing: '-0.01em', cursor: 'pointer' }, wrap);
       b.className = 'tap'; b.setAttribute('role', 'checkbox');
       const dot = this.fh('span', { width: Math.round(10 + s.d * 14) + 'px', height: Math.round(10 + s.d * 14) + 'px', borderRadius: '50%', background: s.color, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)' }, b);
       this.fh('span', {}, b, k.qty + ' × ' + this.fmt(k.w) + ' ' + P.unit);
@@ -5014,14 +5016,14 @@ class Component extends DCLogic {
     const F = this.FL, P = this.plan, i = Math.min(this.setIdx, P.flat.length - 1), x = P.flat[i], grp = P.groups[x.gi];
     F.ui.innerHTML = '';
     const c = this.flCard();
-    this.fh('div', { fontSize: '13px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.75 }, c, x.group);
+    this.fh('div', { fontSize: '12px', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', opacity: 0.75 }, c, x.group);
     const row = this.fh('div', { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', margin: '2px 0 10px' }, c);
-    this.fh('div', { fontSize: '30px', fontWeight: 900, letterSpacing: '-0.02em' }, row, x.label + ' of ' + x.of);
-    this.fh('div', { fontSize: '17px', fontWeight: 800, whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
+    this.fh('div', { fontSize: '33px', fontWeight: 500, letterSpacing: '-0.035em', lineHeight: 1.02 }, row, x.label + ' of ' + x.of);
+    this.fh('div', { fontSize: '17px', fontWeight: 400, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
     const dots = this.fh('div', { display: 'flex', gap: '6px', marginBottom: '14px' }, c), base = P.flat.findIndex((q) => q.gi === x.gi);
     grp.sets.forEach((q, k) => { const j = base + k; this.fh('span', { flex: 1, height: '7px', borderRadius: '4px', background: this.doneSets[j] ? '#34C759' : j === i ? this.FC.dark : 'rgba(0,0,0,0.12)' }, dots); });
     this.flBtn(c, 'Done', () => this.flCheck());
-    const pl = this.fh('button', { position: 'absolute', right: '16px', top: '64px', display: 'flex', alignItems: 'center', gap: '6px', height: '38px', padding: '0 14px', border: 0, borderRadius: '19px', background: this.FC.light, color: this.FC.dark, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '15px', cursor: 'pointer', pointerEvents: 'auto' }, F.ui);
+    const pl = this.fh('button', { position: 'absolute', right: '16px', top: '64px', display: 'flex', alignItems: 'center', gap: '6px', height: '38px', padding: '0 14px', border: 0, borderRadius: '19px', background: this.FC.light, color: this.FC.dark, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 900, fontSize: '15px', cursor: 'pointer', pointerEvents: 'auto' }, F.ui);
     pl.className = 'tap'; pl.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>Plates';
     pl.setAttribute('aria-label', 'See the plate kit'); pl.onclick = () => { this.buzz('light'); this.flClear(); this.flStep = 'kit'; this.flKit(true); };
   }
@@ -5337,7 +5339,7 @@ class Component extends DCLogic {
     const wrap = this.fh('div', { display: 'flex', flexWrap: 'wrap', gap: '8px' }, c);
     kit.forEach((k) => {
       const s = sp.find((q) => q.kg === k.w) || { color: '#999', d: 0.3 };
-      const b = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.FC.dark, fontFamily: 'inherit', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }, wrap);
+      const b = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.FC.dark, fontFamily: 'inherit', fontWeight: 400, fontSize: '16px', letterSpacing: '-0.01em', cursor: 'pointer' }, wrap);
       b.className = 'tap'; b.setAttribute('role', 'checkbox');
       this.fh('span', { width: Math.round(10 + s.d * 14) + 'px', height: Math.round(10 + s.d * 14) + 'px', borderRadius: '50%', background: s.color, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)' }, b);
       this.fh('span', {}, b, k.qty + ' × ' + this.fmt(k.w) + ' ' + P.unit);
@@ -5378,20 +5380,20 @@ class Component extends DCLogic {
     const old = F.ui.querySelector('[data-setcard]');
     if (old) { old.removeAttribute('data-setcard'); old.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(-60px)', opacity: 0 }], { duration: 260, easing: 'ease-in', fill: 'forwards' }); setTimeout(() => old.remove(), 270); }
     [...F.ui.querySelectorAll('[data-plates]')].forEach((e) => e.remove());
-    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: '#FFFFFF', color: '#000000', fontFamily: "'Space Grotesk', Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
+    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: '#FFFFFF', color: '#000000', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
     c.setAttribute('data-setcard', '');
     c.animate([{ transform: dir ? 'translateY(70px)' : 'translateY(120%)', opacity: dir ? 0 : 1 }, { transform: 'none', opacity: 1 }], { duration: dir ? 320 : 420, delay: dir ? 120 : 0, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'backwards' });
-    this.fh('div', { fontSize: '13px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.5)' }, c, x.group);
+    this.fh('div', { fontSize: '12px', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.5)' }, c, x.group);
     const row = this.fh('div', { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', margin: '2px 0 12px' }, c);
-    this.fh('div', { fontSize: '30px', fontWeight: 900, letterSpacing: '-0.02em' }, row, x.label + ' of ' + x.of);
-    this.fh('div', { fontSize: '17px', fontWeight: 800, whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
+    this.fh('div', { fontSize: '33px', fontWeight: 500, letterSpacing: '-0.035em', lineHeight: 1.02 }, row, x.label + ' of ' + x.of);
+    this.fh('div', { fontSize: '17px', fontWeight: 400, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
     const dots = this.fh('div', { display: 'flex', gap: '6px' }, c), base = P.flat.findIndex((q) => q.gi === x.gi);
     grp.sets.forEach((q, k) => { const j = base + k; this.fh('span', { flex: 1, height: '7px', borderRadius: '4px', background: this.doneSets[j] ? '#34C759' : j === i ? '#000000' : 'rgba(0,0,0,0.12)' }, dots); });
     if (last) {
-      const b = this.fh('button', { width: '100%', height: '56px', marginTop: '16px', border: 0, borderRadius: '16px', background: '#000000', color: '#FFFFFF', fontFamily: 'inherit', fontWeight: 900, fontSize: '19px', cursor: 'pointer' }, c, 'End session');
+      const b = this.fh('button', { width: '100%', height: '56px', marginTop: '16px', border: 0, borderRadius: '16px', background: '#000000', color: '#FFFFFF', fontFamily: 'inherit', fontWeight: 500, fontSize: '19px', letterSpacing: '-0.01em', cursor: 'pointer' }, c, 'End session');
       b.className = 'tap'; b.onclick = () => { this.buzz('success'); this.doneSets[this.setIdx] = true; this.flFinish(); };
     }
-    const pl = this.fh('button', { position: 'absolute', right: '16px', top: '64px', display: 'flex', alignItems: 'center', gap: '6px', height: '38px', padding: '0 14px', border: 0, borderRadius: '19px', background: '#FFFFFF', color: '#000000', fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '15px', cursor: 'pointer', pointerEvents: 'auto' }, F.ui);
+    const pl = this.fh('button', { position: 'absolute', right: '16px', top: '64px', display: 'flex', alignItems: 'center', gap: '6px', height: '38px', padding: '0 14px', border: 0, borderRadius: '19px', background: '#FFFFFF', color: '#000000', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 900, fontSize: '15px', cursor: 'pointer', pointerEvents: 'auto' }, F.ui);
     pl.setAttribute('data-plates', ''); pl.className = 'tap'; pl.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>Plates';
     pl.setAttribute('aria-label', 'See the plate kit'); pl.onclick = () => { this.buzz('light'); this.flClear(); this.flKit(true); };
     // the next set: swipe up (or tap); the last one ends with its button
@@ -5574,7 +5576,7 @@ class Component extends DCLogic {
     const wrap = this.fh('div', { display: 'flex', flexWrap: 'wrap', gap: '8px' }, c);
     kit.forEach((k) => {
       const s = sp.find((q) => q.kg === k.w) || { color: '#999', d: 0.3 };
-      const bt = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.FC.dark, fontFamily: 'inherit', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }, wrap);
+      const bt = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.FC.dark, fontFamily: 'inherit', fontWeight: 400, fontSize: '16px', letterSpacing: '-0.01em', cursor: 'pointer' }, wrap);
       bt.className = 'tap'; bt.setAttribute('role', 'checkbox');
       this.fh('span', { width: Math.round(10 + s.d * 14) + 'px', height: Math.round(10 + s.d * 14) + 'px', borderRadius: '50%', background: s.color, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)' }, bt);
       this.fh('span', {}, bt, k.qty + ' × ' + this.fmt(k.w) + ' ' + P.unit);
@@ -5652,17 +5654,17 @@ class Component extends DCLogic {
     const last = i >= P.flat.length - 1;
     const old = F.ui.querySelector('[data-setcard]');
     if (old) { old.removeAttribute('data-setcard'); old.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(' + (dir < 0 ? 60 : -60) + 'px)', opacity: 0 }], { duration: 260, easing: 'ease-in', fill: 'forwards' }); setTimeout(() => old.remove(), 270); }
-    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: '#FFFFFF', color: '#000000', fontFamily: "'Space Grotesk', Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
+    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: '#FFFFFF', color: '#000000', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
     c.setAttribute('data-setcard', '');
     c.animate([{ transform: dir ? 'translateY(' + (dir < 0 ? -70 : 70) + 'px)' : 'translateY(120%)', opacity: dir ? 0 : 1 }, { transform: 'none', opacity: 1 }], { duration: dir ? 320 : 420, delay: dir ? 120 : 0, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'backwards' });
-    this.fh('div', { fontSize: '13px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.5)' }, c, x.group);
+    this.fh('div', { fontSize: '12px', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.5)' }, c, x.group);
     const row = this.fh('div', { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', margin: '2px 0 12px' }, c);
-    this.fh('div', { fontSize: '30px', fontWeight: 900, letterSpacing: '-0.02em' }, row, x.label + ' of ' + x.of);
-    this.fh('div', { fontSize: '17px', fontWeight: 800, whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
+    this.fh('div', { fontSize: '33px', fontWeight: 500, letterSpacing: '-0.035em', lineHeight: 1.02 }, row, x.label + ' of ' + x.of);
+    this.fh('div', { fontSize: '17px', fontWeight: 400, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
     const dots = this.fh('div', { display: 'flex', gap: '6px' }, c), base = P.flat.findIndex((q) => q.gi === x.gi);
     grp.sets.forEach((q, k) => { const j = base + k; this.fh('span', { flex: 1, height: '7px', borderRadius: '4px', background: this.doneSets[j] ? '#34C759' : j === i ? '#000000' : 'rgba(0,0,0,0.12)' }, dots); });
     if (last) {
-      const b = this.fh('button', { width: '100%', height: '56px', marginTop: '16px', border: 0, borderRadius: '16px', background: '#000000', color: '#FFFFFF', fontFamily: 'inherit', fontWeight: 900, fontSize: '19px', cursor: 'pointer' }, c, 'End session');
+      const b = this.fh('button', { width: '100%', height: '56px', marginTop: '16px', border: 0, borderRadius: '16px', background: '#000000', color: '#FFFFFF', fontFamily: 'inherit', fontWeight: 500, fontSize: '19px', letterSpacing: '-0.01em', cursor: 'pointer' }, c, 'End session');
       b.className = 'tap'; b.onclick = () => { this.flCheckSound(); this.buzz('success'); this.doneSets[this.setIdx] = true; this.flFinish(); };
     }
     F.sw.style.display = last ? 'none' : 'block'; F.sw.style.bottom = '196px';
@@ -5689,7 +5691,7 @@ class Component extends DCLogic {
   flLinks(list, top) {
     const F = this.FL, row = this.fh('div', { position: 'absolute', left: 0, right: 0, top: top || '74%', display: 'flex', justifyContent: 'center', gap: '28px', pointerEvents: 'auto' }, F.ui);
     list.forEach(([label, fn], i) => {
-      const b = this.fh('button', { border: 0, background: 'none', padding: '10px 6px', color: this.flInk(), fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 800, fontSize: '17px', textDecoration: 'underline', textUnderlineOffset: '4px', cursor: 'pointer' }, row, label);
+      const b = this.fh('button', { border: 0, background: 'none', padding: '10px 6px', color: this.flInk(), fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 800, fontSize: '17px', textDecoration: 'underline', textUnderlineOffset: '4px', cursor: 'pointer' }, row, label);
       b.className = 'tap'; b.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 700 + i * 90, fill: 'backwards' });
       b.onclick = () => { this.buzz('light'); this.flCheckSound(); fn(); };
     });
@@ -5937,11 +5939,11 @@ class Component extends DCLogic {
     };
     // the chips, on a white card
     const c = this.flCard(), got = this.d.kitGot = this.d.kitGot || {};
-    Object.assign(c.style, { background: '#FFFFFF', color: this.pal.boxDark, boxShadow: '0 10px 30px rgba(0,0,0,0.18)' });
+    Object.assign(c.style, { background: this.pal.card || '#FFFFFF', color: this.pal.boxDark, boxShadow: '0 10px 30px rgba(0,0,0,0.18)' });
     const wrap = this.fh('div', { display: 'flex', flexWrap: 'wrap', gap: '8px' }, c);
     P.kit.forEach((k) => {
       const s = sp.find((q) => q.kg === k.w) || { color: '#999', d: 0.3 };
-      const bt = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.pal.boxDark, fontFamily: 'inherit', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }, wrap);
+      const bt = this.fh('button', { display: 'inline-flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 14px 0 10px', borderRadius: '999px', border: '2px solid ' + this.pal.boxDark, fontFamily: 'inherit', fontWeight: 400, fontSize: '16px', letterSpacing: '-0.01em', cursor: 'pointer' }, wrap);
       bt.className = 'tap'; bt.setAttribute('role', 'checkbox');
       this.fh('span', { width: Math.round(10 + s.d * 14) + 'px', height: Math.round(10 + s.d * 14) + 'px', borderRadius: '50%', background: s.color, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.2)' }, bt);
       this.fh('span', {}, bt, k.qty + ' × ' + this.fmt(k.w) + ' ' + P.unit);
@@ -5993,7 +5995,7 @@ class Component extends DCLogic {
     this.flBgAlt = alt;
     const bg = alt ? this.pal.boxLight : this.pal.bgColor, ink = alt ? this.pal.boxDark : this.pal.boxLight;
     this.FC.bg = bg; F.L.style.background = bg; F.q.style.color = ink; F.sw.style.color = ink;
-    const g = 'rgba(108,55,19,0.09)';
+    const g = this.flRgba(this.pal.boxDark, 0.09);
     F.L.style.backgroundImage = alt ? 'radial-gradient(ellipse at 50% 55%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%), linear-gradient(' + g + ' 1px, transparent 1px), linear-gradient(90deg, ' + g + ' 1px, transparent 1px)' : 'none';
     F.L.style.backgroundSize = alt ? '100% 100%, 26px 26px, 26px 26px' : '';
     F.L.style.backgroundPosition = alt ? 'center, center ' + (this.flGridY || 0) + 'px, center ' + (this.flGridY || 0) + 'px' : '';
@@ -6317,7 +6319,7 @@ class Component extends DCLogic {
         wrap.children.slice().forEach((c) => { if (c !== bar && c.material && c.material.map && c.position.y < -1.4) wrap.remove(c); });
         const tilt = new T.Group(); wrap.remove(bar); tilt.add(bar); wrap.add(tilt); tilt.rotation.z = -0.24; wrap.userData.tilt = tilt;
         wrap.position.set(-6 - i * 1.2, -0.3, 0); this.flAdd(wrap); bars.push(wrap);
-        const lab = this.fh('div', { position: 'absolute', left: 0, top: 0, transform: 'translate(-50%,-50%)', color: this.flInk(), fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '22px', whiteSpace: 'nowrap', opacity: 0, transition: 'opacity .3s', pointerEvents: 'none' }, F.ui, this.fmt(w) + ' ' + this.d.unit);
+        const lab = this.fh('div', { position: 'absolute', left: 0, top: 0, transform: 'translate(-50%,-50%)', color: this.flInk(), fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, fontSize: '21px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', opacity: 0, transition: 'opacity .3s', pointerEvents: 'none' }, F.ui, this.fmt(w) + ' ' + this.d.unit);
         labels.push(lab);
       });
       // they slide in from the left, one after another, each braking into its place
@@ -6424,7 +6426,7 @@ class Component extends DCLogic {
       opts = this.fh('div', { position: 'absolute', left: 0, right: 0, top: '78%', display: 'flex', justifyContent: 'center', gap: '12px', pointerEvents: 'auto' }, F.ui);
       [['Upload', () => this.flPickPhoto(() => this.reading('Reading your PRs…', () => { this.d.prs.forEach((q) => { q[1] = this.demoPR(q); }); nb.userData.drawPage(rows()); this.flLater(leave, 700); }))],
         ['Type', () => { this.flPrRet = this.flMode === 'menu' ? 'menu' : 'wod'; this.flGo('prDial'); }]].forEach(([l, fn], i) => {
-        const b = this.fh('button', { height: '50px', padding: '0 26px', borderRadius: '25px', border: 0, background: i ? 'transparent' : this.flInk(), boxShadow: i ? 'inset 0 0 0 2.5px ' + this.flInk() : 'none', color: i ? this.flInk() : this.FC.bg, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '18px', cursor: 'pointer' }, opts, l);
+        const b = this.fh('button', { height: '50px', padding: '0 26px', borderRadius: '25px', border: 0, background: i ? 'transparent' : this.flInk(), boxShadow: i ? 'inset 0 0 0 2.5px ' + this.flInk() : 'none', color: i ? this.flInk() : this.FC.bg, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 900, fontSize: '18px', cursor: 'pointer' }, opts, l);
         b.className = 'tap'; b.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 320, delay: i * 80, fill: 'backwards' });
         b.onclick = () => { this.buzz('light'); this.flCheckSound(); fn(); };
       });
@@ -6466,7 +6468,7 @@ class Component extends DCLogic {
       const sw = this.fh('div', { position: 'absolute', left: '50%', top: '79%', transform: 'translateX(-50%)', display: 'flex', padding: '4px', borderRadius: '22px', boxShadow: 'inset 0 0 0 2.5px ' + this.flInk(), pointerEvents: 'auto' }, F.ui);
       const paint = () => [...sw.children].forEach((b) => { const on = b.dataset.u === u; b.style.background = on ? this.flInk() : 'transparent'; b.style.color = on ? this.FC.bg : this.flInk(); b.setAttribute('aria-checked', String(on)); });
       ['kg', 'lb'].forEach((k) => {
-        const b = this.fh('button', { width: '68px', height: '38px', borderRadius: '19px', border: 0, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '17px', textTransform: 'uppercase', cursor: 'pointer' }, sw, k);
+        const b = this.fh('button', { width: '68px', height: '38px', borderRadius: '19px', border: 0, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, fontSize: '17px', textTransform: 'uppercase', cursor: 'pointer' }, sw, k);
         b.dataset.u = k; b.setAttribute('role', 'radio'); b.className = 'tap';
         b.onclick = () => { if (u === k) return; const cur = vals[D.idx]; const nu = k; const kept = conv(cur, u, nu); u = this.prUnit = nu; build(kept); paint(); this.flClick(0.9); this.buzz('selection'); };
       });
@@ -6486,7 +6488,7 @@ class Component extends DCLogic {
     const { c, tex } = g.userData, x = c.getContext('2d'), W = c.width, H = c.height, F = '"Permanent Marker", "Comic Sans MS", cursive';
     // the board in the light studio colour, with the same fine grid
     x.fillStyle = this.pal.boxLight; x.fillRect(0, 0, W, H);
-    x.strokeStyle = 'rgba(108,55,19,0.11)'; x.lineWidth = 2;
+    x.strokeStyle = this.flRgba(this.pal.boxDark, 0.11); x.lineWidth = 2;
     for (let i = 0; i <= W; i += 40) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
     for (let j = 0; j <= H; j += 40) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j); x.stroke(); }
     x.fillStyle = this.pal.boxDark; x.strokeStyle = this.pal.boxDark;
@@ -6568,7 +6570,7 @@ class Component extends DCLogic {
     items.forEach((it, i) => {
       const w = new T.Group(), m = it.make(); w.add(m); it.m = m; it.w = w; w.position.x = (i - pos) * SP; this.flAdd(w); this.popIn(w, 120 + i * 90);
       const sh = this.softShadow(0.7); sh.scale.set(1, 0.6, 1); w.add(sh);
-      const lab = this.fh('div', { position: 'absolute', left: 0, top: 0, transform: 'translate(-50%,-50%)', color: this.flInk(), fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '26px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, it.label);
+      const lab = this.fh('div', { position: 'absolute', left: 0, top: 0, transform: 'translate(-50%,-50%)', color: this.flInk(), fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 900, fontSize: '26px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, it.label);
       labels.push(lab);
     });
     const v = new T.Vector3();
@@ -6720,7 +6722,7 @@ class Component extends DCLogic {
       return B;
     };
     this.flAfter('What are the plates available?', () => {
-      [['YES', XY], ['NO', XN]].forEach(([l, x]) => { const h = this.fh('div', { position: 'absolute', left: x + 'px', top: (top - 16) + 'px', transform: 'translate(-50%,-50%)', color: ink, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '15px', letterSpacing: '0.08em', pointerEvents: 'none' }, F.ui, l); h.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, fill: 'backwards' }); });
+      [['YES', XY], ['NO', XN]].forEach(([l, x]) => { const h = this.fh('div', { position: 'absolute', left: x + 'px', top: (top - 16) + 'px', transform: 'translate(-50%,-50%)', color: ink, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 900, fontSize: '15px', letterSpacing: '0.08em', pointerEvents: 'none' }, F.ui, l); h.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, fill: 'backwards' }); });
       specs.forEach((s, i) => {
         const y = top + rowH * (i + 0.5), g = this.plate(s), w = new T.Group(); w.add(g); g.rotation.x = Math.PI / 2;
         const dia = rowH * 0.84 * k * (0.62 + 0.38 * Math.min(1, s.d / 0.45)), sc = dia / s.d; w.scale.setScalar(sc);
@@ -6730,7 +6732,7 @@ class Component extends DCLogic {
         // each plate drops into its row and settles
         w.visible = false;
         this.flLater(() => { w.visible = true; this.flAnim((u) => { const b = u < 0.6 ? (u / 0.6) ** 2 : 1 - 0.18 * Math.sin((u - 0.6) / 0.4 * Math.PI) * (1 - u); w.position.y = ty + (1 - Math.min(1, b)) * 4; }, 0.55, () => this.flClick(0.5)); }, i * 70);
-        const lab = this.fh('div', { position: 'absolute', left: '106px', top: y + 'px', transform: 'translateY(-50%)', color: ink, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: Math.round(Math.min(20, rowH * 0.36)) + 'px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, this.fmt(s.kg) + ' ' + this.d.unit);
+        const lab = this.fh('div', { position: 'absolute', left: '106px', top: y + 'px', transform: 'translateY(-50%)', color: ink, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, letterSpacing: '-0.02em', fontSize: Math.round(Math.min(21, rowH * 0.37)) + 'px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, this.fmt(s.kg) + ' ' + this.d.unit);
         lab.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: i * 70 + 300, fill: 'backwards' });
         r.yes = makeBox(r, 'yes', XY, y); r.no = makeBox(r, 'no', XN, y);
         rows.push(r);
@@ -6885,6 +6887,7 @@ class Component extends DCLogic {
       F.panBack = true;
     } else F.panBack = false;
     this.flPanBackBind();
+    this.flQShift(step);
     // arriving from a pan: the new scene starts one screen below and the camera settles onto it
     if (this.flPanIn) {
       const pin = this.flPanIn; this.flPanIn = false;
@@ -6936,7 +6939,7 @@ class Component extends DCLogic {
   flPlates() {
     const F = this.FL, T = this.THREE, specs = this.specs(), n = specs.length;
     this.flCam([0, 0, 8.2], [0, 0, 0], 35);
-    const k = 2 * 8.2 * Math.tan(17.5 * Math.PI / 180) / 844, top = 214, bot = 790, rowH = (bot - top) / n;
+    const k = 2 * 8.2 * Math.tan(17.5 * Math.PI / 180) / 844, top = 214 + ((this.flQTop || 150) - 92), bot = 800, rowH = (bot - top) / n;
     const wx = (px) => (px - 195) * k, wy = (py) => (422 - py) * k;
     const ink = this.flInk(), box = Math.round(Math.min(46, rowH * 0.74)), XY = 262, XN = 334, dpr = 2;
     const gray = new T.MeshBasicMaterial({ color: 0x9a9690, transparent: true, opacity: 0.3, depthWrite: false });
@@ -6984,7 +6987,7 @@ class Component extends DCLogic {
         this.flAnim((u) => { B.tick = u; B.draw(); }, 0.16);
       };
       B.draw();
-      cv.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 360, delay: r.i * 60 + (which === 'yes' ? 0 : 40), easing: 'cubic-bezier(.3,1.5,.5,1)', fill: 'backwards' });
+      cv.style.visibility = 'hidden';
       boxes.push(B); return B;
     };
     const decide = (B) => {
@@ -7037,23 +7040,24 @@ class Component extends DCLogic {
     const winUp = (e) => { if (!pad.isConnected) { window.removeEventListener('pointerup', winUp); window.removeEventListener('pointercancel', winUp); return; } up(e); };
     window.addEventListener('pointerup', winUp); window.addEventListener('pointercancel', winUp);
     this.flAfter('What are the plates available?', () => {
-      [['YES', XY], ['NO', XN]].forEach(([l, x]) => { const h = this.fh('div', { position: 'absolute', left: x + 'px', top: (top - 16) + 'px', transform: 'translate(-50%,-50%)', color: ink, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 800, fontSize: '13px', letterSpacing: '0.08em', pointerEvents: 'none' }, F.ui, l); h.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, fill: 'backwards' }); });
+      [['YES', XY], ['NO', XN]].forEach(([l, x]) => { const h = this.fh('div', { position: 'absolute', left: x + 'px', top: (top - 16) + 'px', transform: 'translate(-50%,-50%)', color: ink, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, fontSize: '12px', letterSpacing: '0.04em', pointerEvents: 'none' }, F.ui, l); });
       specs.forEach((s, i) => {
         const y = top + rowH * (i + 0.5), g = this.plate(s), w = new T.Group(); w.add(g); g.rotation.x = Math.PI / 2;
         const dia = rowH * 0.84 * k * (0.62 + 0.38 * Math.min(1, s.d / 0.45)), sc = dia / s.d; w.scale.setScalar(sc);
-        const ty = wy(y); w.position.set(wx(58), ty + 4, 0); this.flAdd(w);
+        const ty = wy(y); w.position.set(wx(58), ty, 0); this.flAdd(w);
         const meshes = []; g.traverse((m) => { if (m.isMesh) { m.userData.m0 = m.material; meshes.push(m); } });
         const r = { s, i, w, g, meshes, state: null };
         w.visible = false;
-        this.flLater(() => { w.visible = true; this.flAnim((u) => { const b = u < 0.6 ? (u / 0.6) ** 2 : 1 - 0.18 * Math.sin((u - 0.6) / 0.4 * Math.PI) * (1 - u); w.position.y = ty + (1 - Math.min(1, b)) * 4; }, 0.55, () => this.flClick(0.5)); }, i * 70);
-        const lab = this.fh('div', { position: 'absolute', left: '106px', top: y + 'px', transform: 'translateY(-50%)', color: ink, fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: Math.round(Math.min(20, rowH * 0.36)) + 'px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, this.fmt(s.kg) + ' ' + this.d.unit);
-        lab.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: i * 70 + 300, fill: 'backwards' });
+        const lab = this.fh('div', { position: 'absolute', left: '106px', top: y + 'px', transform: 'translateY(-50%)', color: ink, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, letterSpacing: '-0.02em', fontSize: Math.round(Math.min(21, rowH * 0.37)) + 'px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, this.fmt(s.kg) + ' ' + this.d.unit);
+        lab.style.visibility = 'hidden';
         r.yes = makeBox(r, 'yes', XY, y); r.no = makeBox(r, 'no', XN, y);
+        // each row just appears, plate, weight and boxes together — one after another
+        this.flLater(() => { w.visible = true; lab.style.visibility = 'visible'; r.yes.cv.style.visibility = 'visible'; r.no.cv.style.visibility = 'visible'; this.flClick(0.5); }, i * 90);
         rows.push(r);
       });
       pad.style.pointerEvents = 'auto'; ready = true; F.ui.appendChild(pad);
       // editing: what you said before is already ticked
-      if (editing) { const own = (this.d.own && this.d.own[this.d.unit]) || []; rows.forEach((r, i) => { r.state = own.indexOf(r.s.kg) >= 0 ? 'yes' : 'no'; paintPlate(r); this.flLater(() => (r.state === 'yes' ? r.yes : r.no).set(true), 380 + i * 60); }); }
+      if (editing) { const own = (this.d.own && this.d.own[this.d.unit]) || []; rows.forEach((r, i) => { r.state = own.indexOf(r.s.kg) >= 0 ? 'yes' : 'no'; paintPlate(r); this.flLater(() => (r.state === 'yes' ? r.yes : r.no).set(true), 140 + i * 90); }); }
     });
     F.tick = (dt, t) => { rows.forEach((r, i) => { r.g.rotation.y = Math.sin(t * 0.8 + i) * 0.12; }); this.flSpkTick(dt); };
   }
@@ -7062,8 +7066,7 @@ class Component extends DCLogic {
   flWod() {
     const F = this.FL, T = this.THREE, R = this.WB_REST;
     this.flCam(R.cam.P, R.cam.T, 35);
-    const fl = new T.Mesh(new T.PlaneGeometry(12, 12), new T.ShadowMaterial({ opacity: 0.18 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; this.flAdd(fl);
-    const wb = this.whiteboardModel(); wb.scale.setScalar(R.s); this.flAdd(wb);
+    const wb = this.whiteboardModel(); wb.scale.setScalar(R.s); this.flAdd(wb); this.flBoardShadow(wb);
     const instant = this.flFromKit || this.flFromMenu;
     let busy = false, hasPlan = false;
     if (instant) { wb.rotation.y = R.ry; if (this.plan) { this.flDrawBoard(wb, this.plan); hasPlan = true; } } else wb.visible = false;
@@ -7075,7 +7078,7 @@ class Component extends DCLogic {
     });
     const start = () => {
       busy = true; this.flCheckSound(); this.buzz('light');
-      const cam = F.cam, P0 = cam.position.clone(), T0 = new T.Vector3(...R.cam.T), cy = 1.45 * R.s, T1 = new T.Vector3(0, cy, 0), P1 = new T.Vector3(0.15, cy, 0.7), tgt = new T.Vector3();
+      const cam = F.cam, P0 = cam.position.clone(), T0 = this.flCamT ? this.flCamT.clone() : new T.Vector3(...R.cam.T), cy = 1.45 * R.s, T1 = new T.Vector3(0, cy, 0), P1 = new T.Vector3(0.15, cy, 0.7), tgt = new T.Vector3();
       this.flAnim((u) => { const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; cam.position.lerpVectors(P0, P1, e); tgt.lerpVectors(T0, T1, e); cam.lookAt(tgt); }, 1.0, () => { this.flGo('kit'); });
     };
     const ready = () => {
@@ -7106,9 +7109,14 @@ class Component extends DCLogic {
   flKitPreview() {
     const F = this.FL, T = this.THREE, R = this.WB_REST, c = F.cam;
     const WB = new T.Vector3(0, 0, -40);
-    const wb = this.whiteboardModel(); wb.scale.setScalar(R.s); wb.rotation.y = R.ry; wb.position.copy(WB); if (this.plan) this.flDrawBoard(wb, this.plan); wb.visible = false; this.flAdd(wb);
+    const wb = this.whiteboardModel(); this.flBoardShadow(wb); wb.scale.setScalar(R.s); wb.rotation.y = R.ry; wb.position.copy(WB); if (this.plan) this.flDrawBoard(wb, this.plan); wb.visible = false; this.flAdd(wb);
     const cy = 1.45 * R.s, Z = { P: WB.clone().add(new T.Vector3(0.15, cy, 0.7)), T: WB.clone().add(new T.Vector3(0, cy, 0)) };
     const Bv = { P: WB.clone().add(new T.Vector3(...R.cam.P)), T: WB.clone().add(new T.Vector3(...R.cam.T)) };
+    { // the board's resting view sits lower to clear the question: match it so the hand-off has no jump
+      const tc = new T.PerspectiveCamera(35, 1, 0.1, 100); tc.position.copy(Bv.P); tc.lookAt(Bv.T);
+      const up = new T.Vector3(0, 1, 0).applyQuaternion(tc.quaternion), H = F.L.clientHeight || 844, wpp = 2 * Bv.P.distanceTo(Bv.T) * Math.tan(17.5 * Math.PI / 180) / H, dq = ((this.flQTop || 150) - 92) * wpp;
+      Bv.P.addScaledVector(up, dq); Bv.T.addScaledVector(up, dq);
+    }
     const K = { P: c.position.clone(), Q: c.quaternion.clone(), T: c.position.clone().add(c.getWorldDirection(new T.Vector3()).multiplyScalar(6.5)), fov: this.flFov || 35 };
     // below the kit, one screen down, the bar waits exactly as the sets will show it
     const G0 = this.flPanGeo(), down = G0.up.clone().multiplyScalar(-G0.H * G0.wpp), KP = K.P.clone().add(down);
@@ -7261,7 +7269,7 @@ class Component extends DCLogic {
     items.forEach((it, i) => {
       const w = new T.Group(), m = it.make(); w.add(m); it.m = m; it.w = w; w.position.x = (i - pos) * SP; this.flAdd(w);
       const sh = this.softShadow(0.7); sh.scale.set(1, 0.6, 1); w.add(sh); it.sh = sh;
-      const lab = this.fh('div', { position: 'absolute', left: 0, top: 0, transform: 'translate(-50%,-50%)', color: this.flInk(), fontFamily: "'Space Grotesk', Arial, sans-serif", fontWeight: 900, fontSize: '22px', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, it.label);
+      const lab = this.fh('div', { position: 'absolute', left: 0, top: 0, transform: 'translate(-50%,-50%)', color: this.flInk(), fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500, fontSize: '21px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', pointerEvents: 'none' }, F.ui, it.label);
       labels.push(lab);
     });
     const tr = items[0], nbI = items[1], gy = items[2];
@@ -7354,7 +7362,7 @@ class Component extends DCLogic {
         const show = act === gy ? k * k * (3 - 2 * k) : 0;
         if (act !== gy) { gtgt = gcur; }
         if (!gdrag) gpos += (gtgt - gpos) * (1 - Math.exp(-dt * 9));
-        rooms.forEach((r, j) => { r.position.copy(RIGHT).multiplyScalar((j - gpos) * GSP); if (r !== gy.m) { r.scale.setScalar(Math.max(0.0001, show)); r.rotation.y = 0; } if (show > 0.5) r.userData.wave(t + j); });
+        rooms.forEach((r, j) => { r.position.copy(RIGHT).multiplyScalar((j - gpos) * GSP); if (r !== gy.m) { r.scale.setScalar(Math.max(0.0001, show * (r.userData.add ? 0.7 + 0.05 * Math.sin(t * 1.3) : 1))); r.rotation.y = r.userData.add ? 0.35 * Math.sin(t * 0.55) : 0; } if (show > 0.5) r.userData.wave(t + j); });
         if (!gdrag && Math.abs(gtgt - gpos) < 0.02) gymSettle();
         gy.sh.position.x = gy.m.position.x; gy.sh.position.z = gy.m.position.z; gy.sh.visible = Math.abs(gpos - gcur) < 0.5;
       }
@@ -7489,16 +7497,16 @@ class Component extends DCLogic {
   // ---------- sets: one card per set; dragging up or down slides the next card in under your finger ----------
   flSetCardEl(i) {
     const F = this.FL, P = this.plan, x = P.flat[i], grp = P.groups[x.gi], last = i >= P.flat.length - 1;
-    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: '#FFFFFF', color: this.pal.boxDark, fontFamily: "'Space Grotesk', Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
-    this.fh('div', { fontSize: '13px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: this.pal.boxDark, opacity: 0.6 }, c, x.group);
+    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: this.pal.card || '#FFFFFF', color: this.pal.boxDark, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
+    this.fh('div', { fontSize: '12px', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', color: this.pal.boxDark, opacity: 0.6 }, c, x.group);
     const row = this.fh('div', { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', margin: '2px 0 12px' }, c);
-    this.fh('div', { fontSize: '30px', fontWeight: 900, letterSpacing: '-0.02em' }, row, x.label + ' of ' + x.of);
-    this.fh('div', { fontSize: '17px', fontWeight: 800, whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
+    this.fh('div', { fontSize: '33px', fontWeight: 500, letterSpacing: '-0.035em', lineHeight: 1.02 }, row, x.label + ' of ' + x.of);
+    this.fh('div', { fontSize: '17px', fontWeight: 400, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
     const dots = this.fh('div', { display: 'flex', gap: '6px' }, c), base = P.flat.findIndex((q) => q.gi === x.gi);
-    c.paintDots = () => { dots.innerHTML = ''; grp.sets.forEach((q, k) => { const j = base + k; this.fh('span', { flex: 1, height: '7px', borderRadius: '4px', background: this.doneSets[j] ? this.pal.bgColor : j === i ? this.pal.boxDark : this.pal.boxDark + '22' }, dots); }); };
+    c.paintDots = () => { dots.innerHTML = ''; grp.sets.forEach((q, k) => { const j = base + k; this.fh('span', { flex: 1, height: '7px', borderRadius: '4px', background: this.doneSets[j] ? (this.pal.acc || this.pal.bgColor) : j === i ? this.pal.boxDark : this.pal.boxDark + '22' }, dots); }); };
     c.paintDots();
     if (last) {
-      const b = this.fh('button', { width: '100%', height: '56px', marginTop: '16px', border: 0, borderRadius: '16px', background: this.pal.boxDark, color: this.pal.boxLight, fontFamily: 'inherit', fontWeight: 900, fontSize: '19px', cursor: 'pointer' }, c, 'End session');
+      const b = this.fh('button', { width: '100%', height: '56px', marginTop: '16px', border: 0, borderRadius: '16px', background: this.pal.boxDark, color: this.pal.boxLight, fontFamily: 'inherit', fontWeight: 500, fontSize: '19px', letterSpacing: '-0.01em', cursor: 'pointer' }, c, 'End session');
       b.className = 'tap'; b.onclick = () => { this.flCheckSound(); this.buzz('success'); this.doneSets[this.setIdx] = true; this.flFinish(); };
     }
     return c;
@@ -7743,7 +7751,7 @@ class Component extends DCLogic {
   gymRoomModel(name, gym) {
     const T = this.THREE, g = new T.Group(), S = 1.15, th = 0.04, ink = this.pal.boxDark;
     gym = gym || { unit: this.d.unit, own: this.d.own };
-    const FONT = "'Space Grotesk', Arial, sans-serif";
+    const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
     const mat = () => { const m = this.toon(this.pal.boxLight); m.transparent = true; return m; };
     const edge = (mesh) => { const e = new T.LineSegments(new T.EdgesGeometry(mesh.geometry), new T.LineBasicMaterial({ color: ink, transparent: true })); mesh.add(e); return e; };
     const slab = (w, h, d) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat()); m.castShadow = true; m.receiveShadow = true; edge(m); return m; };
@@ -7752,7 +7760,7 @@ class Component extends DCLogic {
     const left = slab(th, S, S); left.position.set(-S / 2 + th / 2, S / 2, 0); g.add(left);
     // the parts that open: the lid lifts off, the front and the right side fall outward
     const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
-    x.fillStyle = this.pal.boxLight; x.fillRect(0, 0, 256, 256); x.fillStyle = ink; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '700 84px ' + FONT; x.fillText(name || '', 128, 134);
+    x.fillStyle = this.pal.boxLight; x.fillRect(0, 0, 256, 256); x.fillStyle = ink; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '500 84px ' + FONT; x.fillText(name || '', 128, 134);
     const tx = new T.CanvasTexture(c); tx.colorSpace = T.SRGBColorSpace;
     const fm = mat(), frontFace = this.toon('#FFFFFF'); frontFace.map = tx; frontFace.transparent = true;
     const frontPivot = new T.Group(); frontPivot.position.set(0, 0, S / 2); g.add(frontPivot);
@@ -7765,7 +7773,7 @@ class Component extends DCLogic {
     const hitBox = (grp, w, h, d, x, y, z) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), hitM); m.position.set(x, y, z); grp.add(m); };
     { // the flag, hung from a rod at the top of the back wall
       const fc = document.createElement('canvas'); fc.width = 320; fc.height = 200; const f = fc.getContext('2d');
-      f.fillStyle = ink; f.fillRect(0, 0, 320, 200); f.fillStyle = this.pal.boxLight; f.textAlign = 'center'; f.textBaseline = 'middle'; f.font = '700 74px ' + FONT; f.fillText(name || '', 160, 104);
+      f.fillStyle = ink; f.fillRect(0, 0, 320, 200); f.fillStyle = this.pal.boxLight; f.textAlign = 'center'; f.textBaseline = 'middle'; f.font = '500 74px ' + FONT; f.fillText(name || '', 160, 104);
       const ft = new T.CanvasTexture(fc); ft.colorSpace = T.SRGBColorSpace;
       const FW = 0.56, FH = 0.35, geo = new T.PlaneGeometry(FW, FH, 12, 8); geo.translate(0, -FH / 2, 0);
       const flag = new T.Mesh(geo, new T.MeshBasicMaterial({ map: ft, side: T.DoubleSide, transparent: true }));
@@ -7824,15 +7832,15 @@ class Component extends DCLogic {
   // the last slot in the gym row: an empty, dashed box with a plus — tap it to set up another gym
   gymAddModel() {
     const T = this.THREE, g = new T.Group(), S = 1.15, h = S / 2, mat = new T.MeshBasicMaterial({ color: this.pal.boxDark });
-    // twelve hand-drawn edges: each a slightly wobbly tube, drawn twice for a rough pen line
+    // twelve dashed edges, each dash a thin stroke
     const C = [[-h, 0, -h], [h, 0, -h], [h, 0, h], [-h, 0, h], [-h, S, -h], [h, S, -h], [h, S, h], [-h, S, h]].map((p) => new T.Vector3(...p));
     const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
-    let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
-    E.forEach(([i, j]) => [0.0055].forEach((r, pass) => {
-      const a = C[i].clone().addScalar(pass ? rnd() * 0.02 : 0), b = C[j].clone().addScalar(pass ? rnd() * 0.02 : 0), pts = [];
-      for (let k = 0; k <= 6; k++) { const p = a.clone().lerp(b, k / 6); if (k && k < 6) p.add(new T.Vector3(rnd(), rnd(), rnd()).multiplyScalar(0.022)); pts.push(p); }
-      g.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 24, r, 5, false), mat));
-    }));
+    const dash = 0.07, gap = 0.05, geo = new T.CylinderGeometry(0.007, 0.007, dash, 6), Y = new T.Vector3(0, 1, 0);
+    E.forEach(([i, j]) => {
+      const a = C[i], b = C[j], dir = b.clone().sub(a), L = dir.length(); dir.normalize();
+      const n = Math.floor((L + gap) / (dash + gap)), off = (L - (n * dash + (n - 1) * gap)) / 2, q = new T.Quaternion().setFromUnitVectors(Y, dir);
+      for (let k = 0; k < n; k++) { const m = new T.Mesh(geo, mat); m.quaternion.copy(q); m.position.copy(a).addScaledVector(dir, off + k * (dash + gap) + dash / 2); g.add(m); }
+    });
     const hit = new T.Mesh(new T.BoxGeometry(S, S, S), new T.MeshBasicMaterial({ visible: false })); hit.position.y = S / 2; g.add(hit);
     g.userData = { add: true, items: {}, open: () => {}, wave: () => {} };
     return g;
@@ -7864,5 +7872,129 @@ class Component extends DCLogic {
   flFinish() {
     const F = this.FL; F.ui.innerHTML = ''; F.swipe = false; F.onSwipe = null; F.onTap = null; F.sw.style.display = 'none'; F.sw.style.bottom = '34px';
     this.flLater(() => { this.flStep = 'done'; this.flApplyStyle(); this.showSessionOver(); }, 500);
+  }
+
+  // ===================== FLOW, round 12: Will's type and palettes =====================
+  get FLPALS() {
+    return [
+      { name: 'Swiss red', bg: '#E5321C', light: '#F4F1EA', dark: '#151515', card: '#FFFFFF', acc: '#E5321C' },
+      { name: 'Current', bg: '#FF6200', light: '#F0E2F3', dark: '#6C3713', card: '#FFFFFF', acc: '#FF6200' },
+      { name: 'Ink blue', bg: '#2A4BFF', light: '#EEF0F6', dark: '#0C1A4A', card: '#FFFFFF', acc: '#2A4BFF' },
+      { name: 'Chalk green', bg: '#1F6B49', light: '#EEE9DC', dark: '#16261D', card: '#FBF9F3', acc: '#E8B43A' },
+      { name: 'Mono', bg: '#141414', light: '#F2F2F0', dark: '#141414', card: '#FFFFFF', acc: '#FF6200' }
+    ];
+  }
+  flRgba(hex, a) { const n = parseInt(String(hex || '#6C3713').slice(1), 16); return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  // switch palette: everything on screen is rebuilt in the new colours
+  flPalSet(i, rebuild) {
+    const L = this.FLPALS; this.flPalIdx = ((i % L.length) + L.length) % L.length; const p = L[this.flPalIdx];
+    try { localStorage.setItem('pl8.flow.pal', String(this.flPalIdx)); } catch (e) {}
+    this.pal = { boxLight: p.light, boxDark: p.dark, bgColor: p.bg, card: p.card, acc: p.acc };
+    Object.assign(this.state, { boxLight: p.light, boxDark: p.dark, bgColor: p.bg });
+    window.__flPal = { boxLight: p.light, boxDark: p.dark, bgColor: p.bg };
+    if (this.FC) Object.assign(this.FC, { bg: p.bg, light: p.light, dark: p.dark });
+    if (this.phone) this.phone.style.background = p.bg;
+    // on the opening screen: redraw it in the new (inverted) colours
+    if (!this.FL && rebuild && this.openL && !this.openL.gone) {
+      const old = this.openL; this.openL = this.animLayer('open', { onTap: () => this.closeOpening() });
+      try { old.destroy(); } catch (e) {} old.el.remove();
+    }
+    if (!this.FL) return;
+    this.flApplyStyle();
+    if (rebuild && this.flStep && this.flStep !== 'done' && !this.flPanning) { const st = this.flStep; this.flGo(st === 'prDial' ? 'prDial' : st); }
+  }
+  // keys: W rough edges, C background. On the phone: tap the clock for the next palette,
+  // double-tap the Dynamic Island for rough edges, double-tap the battery for the background
+  frame() {
+    if (this.flKeyed) return; this.flKeyed = true;
+    let i0 = 0; try { i0 = parseInt(localStorage.getItem('pl8.flow.pal') || '0', 10) || 0; } catch (e) {}
+    this.flPalSet(i0, false);
+    try { const q = parseInt(localStorage.getItem('pl8.flow.qtop2') || '', 10); if (q > 0) this.flQTop = q; } catch (e) {}
+    try { const c = parseFloat(localStorage.getItem('pl8.flow.collage') || '0'); if (c > 0) this.flCol = Math.min(1, c); } catch (e) {}
+    this.onFlKey = (e) => { if (e.target && /input|textarea/i.test(e.target.tagName)) return; if (e.key === 'w' || e.key === 'W') this.flToggleRough(); if (e.key === 'c' || e.key === 'C') this.flToggleBg(); if (e.key === 'p' || e.key === 'P') this.flPalSet(this.flPalIdx + 1, true);
+      // ↑ / ↓ move the question (Shift: 10px steps), 0 puts it back
+      // Option/Alt + ↑ / ↓ move the question (Shift: 10px steps), 0 puts it back
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); this.flQMove((e.key === 'ArrowUp' ? -1 : 1) * (e.shiftKey ? 10 : 2)); return; }
+      if (e.key === '0') { e.preventDefault(); this.flQMove(null); return; }
+      // ↑ / ↓ make the question's letters more (or less) of a collage; Backspace clears it
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); this.flCollageSet((this.flCol || 0) + (e.key === 'ArrowUp' ? 0.1 : -0.1)); }
+      if (e.key === 'Backspace') { e.preventDefault(); this.flCollageSet(0); } };
+    window.addEventListener('keydown', this.onFlKey);
+    if (!this.phone) return;
+    const zone = (css, fn, dbl) => {
+      const z = document.createElement('div'); z.setAttribute('aria-hidden', 'true'); z.setAttribute('data-nopress', '');
+      Object.assign(z.style, Object.assign({ position: 'absolute', top: 0, height: '54px', zIndex: 60, touchAction: 'manipulation' }, css));
+      let last = 0;
+      z.addEventListener('pointerup', (e) => { e.stopPropagation(); const now = performance.now(); if (!dbl || now - last < 380) { last = 0; fn(); this.buzz('success'); try { this.flCheckSound(); } catch (er) {} } else last = now; });
+      z.addEventListener('pointerdown', (e) => e.stopPropagation());
+      z.addEventListener('click', (e) => e.stopPropagation());
+      this.phone.appendChild(z);
+    };
+    zone({ left: 0, width: '110px' }, () => this.flPalSet(this.flPalIdx + 1, true), false);
+    zone({ left: '50%', width: '140px', marginLeft: '-70px' }, () => this.flToggleRough(), true);
+    zone({ right: 0, width: '110px' }, () => this.flToggleBg(), true);
+  }
+  // the question's distance from the top of the screen, tweakable with the arrow keys; remembered in this browser
+  flQMove(d) {
+    const v = d == null ? 150 : Math.max(50, Math.min(400, (this.flQTop || 150) + d)); this.flQTop = v;
+    try { localStorage.setItem('pl8.flow.qtop2', String(v)); } catch (e) {}
+    if (this.FL) { this.FL.q.style.top = v + 'px'; if (this.flStep === 'plates') this.flGo('plates'); else this.flQShift(this.flStep); }
+    this.flTip('Question top: ' + this.flQTop + 'px' + (this.flQTop === 150 ? ' (default)' : ''));
+  }
+  // a small readout at the bottom of the phone, so the number can be copied into the iOS app
+  flTip(msg) {
+    if (!this.phone || msg == null) return;
+    let t = this.flQTip;
+    if (!t) { t = this.flQTip = document.createElement('div'); Object.assign(t.style, { position: 'absolute', left: '50%', bottom: '18px', transform: 'translateX(-50%)', zIndex: 70, padding: '6px 12px', borderRadius: '12px', background: 'rgba(0,0,0,0.72)', color: '#fff', font: "500 13px 'Helvetica Neue', Helvetica, Arial, sans-serif", fontVariantNumeric: 'tabular-nums', pointerEvents: 'none', transition: 'opacity .3s' }); t.setAttribute('aria-live', 'polite'); this.phone.appendChild(t); }
+    t.textContent = msg; t.style.opacity = '1';
+    clearTimeout(this.flQTipT); this.flQTipT = setTimeout(() => { if (this.flQTip) this.flQTip.style.opacity = '0'; }, 1400);
+  }
+  flQShift(step) {
+    const F = this.FL; if (!F) return;
+    const want = ['name', 'unit', 'bar', 'prs', 'prDial', 'wod'].indexOf(step) >= 0 ? (this.flQTop || 150) - 92 : 0;
+    const have = F.qStep === step ? (F.qShift || 0) : 0, d = want - have;
+    F.qStep = step; F.qShift = want; if (!d) return;
+    const G = this.flPanGeo(); F.cam.position.addScaledVector(G.up, d * G.wpp);
+    if (this.flCamT) this.flCamT.addScaledVector(G.up, d * G.wpp);
+  }
+  // the whiteboard's shadow: the same soft blob the menu uses (in the board's own units, so it follows it around)
+  flBoardShadow(wb) { const sh = this.softShadow(0.7 / 0.62); sh.scale.set(1, 0.6, 1); sh.position.y = 0.004; wb.add(sh); return sh; }
+  // the question, said: each word appears; every letter is its own piece so the words can turn into a collage
+  flSay(text, then) {
+    const F = this.FL, q = F.q; F.words.forEach(clearTimeout); F.words = [];
+    q.getAnimations().forEach((a) => a.cancel());
+    q.textContent = ''; q.setAttribute('aria-label', text); q.style.opacity = '1';
+    const ws = text.split(/\s+/).filter(Boolean); let t = 0, n = 0;
+    ws.forEach((w, i) => {
+      const s = document.createElement('span'); Object.assign(s.style, { visibility: 'hidden', display: 'inline-block', whiteSpace: 'nowrap' }); s.setAttribute('aria-hidden', 'true');
+      [...w].forEach((ch) => { const l = document.createElement('span'); l.textContent = ch; l.className = 'fl-ch'; l.dataset.k = String(n++); l.style.display = 'inline-block'; s.appendChild(l); });
+      q.appendChild(s);
+      if (i < ws.length - 1) q.appendChild(document.createTextNode(' '));
+      F.words.push(setTimeout(() => { if (!this.dead) s.style.visibility = 'visible'; }, t));
+      t += 95 + 18 * w.replace(/[^\w’']/g, '').length;
+      if (/[,;:]$/.test(w)) t += 230;
+      if (/[.?!…]$/.test(w)) t += 420;
+    });
+    this.flCollage();
+    const total = t + 120;
+    F.words.push(setTimeout(() => { if (!this.dead && then) then(); }, total));
+    return total;
+  }
+  // collage: 0 is clean type; up to 1, the letters spread apart, tilt, hop up and down and change size a little —
+  // always the same way for the same letter, so it looks cut and pasted, not jittery
+  flCollage() {
+    const F = this.FL; if (!F) return;
+    const k = this.flCol || 0, rnd = (i, s) => { const x = Math.sin((i + 1) * 12.9898 + s * 78.233) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; };
+    F.q.style.letterSpacing = k ? 'calc(-0.035em + ' + (k * 0.09).toFixed(3) + 'em)' : '';
+    F.q.querySelectorAll('.fl-ch').forEach((l) => {
+      const i = +l.dataset.k;
+      l.style.transform = k ? 'translateY(' + (rnd(i, 1) * 5 * k).toFixed(2) + 'px) rotate(' + (rnd(i, 2) * 14 * k).toFixed(2) + 'deg) scale(' + (1 + rnd(i, 3) * 0.12 * k).toFixed(3) + ')' : '';
+    });
+  }
+  flCollageSet(v) {
+    this.flCol = Math.round(Math.max(0, Math.min(1, v)) * 10) / 10;
+    try { localStorage.setItem('pl8.flow.collage', String(this.flCol)); } catch (e) {}
+    this.flCollage();
+    this.flTip('Collage: ' + Math.round(this.flCol * 100) + '%' + (this.flCol ? '' : ' (clean)'));
   }
 }

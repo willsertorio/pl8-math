@@ -111,15 +111,15 @@
   // the last slot in the gym row: an empty, dashed box with a plus — tap it to set up another gym
   gymAddModel() {
     const T = this.THREE, g = new T.Group(), S = 1.15, h = S / 2, mat = new T.MeshBasicMaterial({ color: this.pal.boxDark });
-    // twelve hand-drawn edges: each a slightly wobbly tube, drawn twice for a rough pen line
+    // twelve dashed edges, each dash a thin stroke
     const C = [[-h, 0, -h], [h, 0, -h], [h, 0, h], [-h, 0, h], [-h, S, -h], [h, S, -h], [h, S, h], [-h, S, h]].map((p) => new T.Vector3(...p));
     const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
-    let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
-    E.forEach(([i, j]) => [0.0055].forEach((r, pass) => {
-      const a = C[i].clone().addScalar(pass ? rnd() * 0.02 : 0), b = C[j].clone().addScalar(pass ? rnd() * 0.02 : 0), pts = [];
-      for (let k = 0; k <= 6; k++) { const p = a.clone().lerp(b, k / 6); if (k && k < 6) p.add(new T.Vector3(rnd(), rnd(), rnd()).multiplyScalar(0.022)); pts.push(p); }
-      g.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 24, r, 5, false), mat));
-    }));
+    const dash = 0.07, gap = 0.05, geo = new T.CylinderGeometry(0.007, 0.007, dash, 6), Y = new T.Vector3(0, 1, 0);
+    E.forEach(([i, j]) => {
+      const a = C[i], b = C[j], dir = b.clone().sub(a), L = dir.length(); dir.normalize();
+      const n = Math.floor((L + gap) / (dash + gap)), off = (L - (n * dash + (n - 1) * gap)) / 2, q = new T.Quaternion().setFromUnitVectors(Y, dir);
+      for (let k = 0; k < n; k++) { const m = new T.Mesh(geo, mat); m.quaternion.copy(q); m.position.copy(a).addScaledVector(dir, off + k * (dash + gap) + dash / 2); g.add(m); }
+    });
     const hit = new T.Mesh(new T.BoxGeometry(S, S, S), new T.MeshBasicMaterial({ visible: false })); hit.position.y = S / 2; g.add(hit);
     g.userData = { add: true, items: {}, open: () => {}, wave: () => {} };
     return g;

@@ -52,6 +52,7 @@
       F.panBack = true;
     } else F.panBack = false;
     this.flPanBackBind();
+    this.flQShift(step);
     // arriving from a pan: the new scene starts one screen below and the camera settles onto it
     if (this.flPanIn) {
       const pin = this.flPanIn; this.flPanIn = false;

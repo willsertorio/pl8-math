@@ -25,13 +25,13 @@
   // ---------- sets: one card per set; dragging up or down slides the next card in under your finger ----------
   flSetCardEl(i) {
     const F = this.FL, P = this.plan, x = P.flat[i], grp = P.groups[x.gi], last = i >= P.flat.length - 1;
-    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: '#FFFFFF', color: this.pal.boxDark, fontFamily: "'Space Grotesk', Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
+    const c = this.fh('div', { position: 'absolute', left: '12px', right: '12px', bottom: '24px', padding: '16px 18px 18px', borderRadius: '22px', background: this.pal.card || '#FFFFFF', color: this.pal.boxDark, fontFamily: "'Space Grotesk', Arial, sans-serif", pointerEvents: 'auto', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }, F.ui);
     this.fh('div', { fontSize: '13px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: this.pal.boxDark, opacity: 0.6 }, c, x.group);
     const row = this.fh('div', { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px', margin: '2px 0 12px' }, c);
     this.fh('div', { fontSize: '30px', fontWeight: 900, letterSpacing: '-0.02em' }, row, x.label + ' of ' + x.of);
     this.fh('div', { fontSize: '17px', fontWeight: 800, whiteSpace: 'nowrap' }, row, x.reps + ' reps · ' + this.fmt(x.total) + ' ' + P.unit);
     const dots = this.fh('div', { display: 'flex', gap: '6px' }, c), base = P.flat.findIndex((q) => q.gi === x.gi);
-    c.paintDots = () => { dots.innerHTML = ''; grp.sets.forEach((q, k) => { const j = base + k; this.fh('span', { flex: 1, height: '7px', borderRadius: '4px', background: this.doneSets[j] ? this.pal.bgColor : j === i ? this.pal.boxDark : this.pal.boxDark + '22' }, dots); }); };
+    c.paintDots = () => { dots.innerHTML = ''; grp.sets.forEach((q, k) => { const j = base + k; this.fh('span', { flex: 1, height: '7px', borderRadius: '4px', background: this.doneSets[j] ? (this.pal.acc || this.pal.bgColor) : j === i ? this.pal.boxDark : this.pal.boxDark + '22' }, dots); }); };
     c.paintDots();
     if (last) {
       const b = this.fh('button', { width: '100%', height: '56px', marginTop: '16px', border: 0, borderRadius: '16px', background: this.pal.boxDark, color: this.pal.boxLight, fontFamily: 'inherit', fontWeight: 900, fontSize: '19px', cursor: 'pointer' }, c, 'End session');

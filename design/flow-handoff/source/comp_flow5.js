@@ -39,7 +39,7 @@
     this.flBgAlt = alt;
     const bg = alt ? this.pal.boxLight : this.pal.bgColor, ink = alt ? this.pal.boxDark : this.pal.boxLight;
     this.FC.bg = bg; F.L.style.background = bg; F.q.style.color = ink; F.sw.style.color = ink;
-    const g = 'rgba(108,55,19,0.09)';
+    const g = this.flRgba(this.pal.boxDark, 0.09);
     F.L.style.backgroundImage = alt ? 'radial-gradient(ellipse at 50% 55%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%), linear-gradient(' + g + ' 1px, transparent 1px), linear-gradient(90deg, ' + g + ' 1px, transparent 1px)' : 'none';
     F.L.style.backgroundSize = alt ? '100% 100%, 26px 26px, 26px 26px' : '';
     F.L.style.backgroundPosition = alt ? 'center, center ' + (this.flGridY || 0) + 'px, center ' + (this.flGridY || 0) + 'px' : '';
@@ -532,7 +532,7 @@
     const { c, tex } = g.userData, x = c.getContext('2d'), W = c.width, H = c.height, F = '"Permanent Marker", "Comic Sans MS", cursive';
     // the board in the light studio colour, with the same fine grid
     x.fillStyle = this.pal.boxLight; x.fillRect(0, 0, W, H);
-    x.strokeStyle = 'rgba(108,55,19,0.11)'; x.lineWidth = 2;
+    x.strokeStyle = this.flRgba(this.pal.boxDark, 0.11); x.lineWidth = 2;
     for (let i = 0; i <= W; i += 40) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
     for (let j = 0; j <= H; j += 40) { x.beginPath(); x.moveTo(0, j); x.lineTo(W, j); x.stroke(); }
     x.fillStyle = this.pal.boxDark; x.strokeStyle = this.pal.boxDark;

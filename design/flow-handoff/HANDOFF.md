@@ -1,5 +1,7 @@
 # Plate Math: Flow prototype → iOS handoff
 
+**v2:** read `CHANGES-v2.md` for what changed since the first handoff; this file is updated to match.
+
 This folder is the design reference for the new app experience, called "the Flow": one question at a time, one 3D object per question, and a menu after the first session. Your job is to bring the iOS app in line with it.
 
 - `prototype/` is the running reference. Open `prototype/index.html` in Chrome or Safari; it needs internet for Google Fonts. Tap the opening screen to start.
@@ -17,25 +19,26 @@ This folder is the design reference for the new app experience, called "the Flow
 ### Look
 | Token | Value | Used for |
 |---|---|---|
-| `bg` | `#FF6200` | Orange background on question screens, the menu and the scale |
-| `light` | `#F0E2F3` | Light background (kit and sets), whiteboard surface, gym room walls, ink on orange |
-| `dark` | `#6C3713` | Ink on light screens: text, card text, chips, buttons, notebook cover, board frame, empty-gym lines |
+| `bg` | `#E5321C` | Red background on question screens, the menu, the scale and the opening |
+| `light` | `#F4F1EA` | Light background (kit and sets), whiteboard surface, gym room walls, ink on red |
+| `dark` | `#151515` | Ink on light screens: text, card text, chips, buttons, notebook cover, board frame, empty-gym lines |
 | card | `#FFFFFF` | Kit chips card and set card (white, 22px radius, soft shadow) |
-| done | `#FF6200` | Finished-set progress dots |
+| accent | `#E5321C` | Finished-set progress dots |
 
-**Type:** Space Grotesk, four sizes only:
-- **30px / 900:** questions and set titles.
-- **22px / 900:** labels under 3D objects (menu items, bar weights, plate rows).
-- **~17px / 800:** body text and chips.
-- **13px / 800, uppercase, letter-spacing 0.08em:** small labels (YES / NO, the set card's group line).
+**Type:** Helvetica Neue, five roles. The full table is in `CHANGES-v2.md` §1.
+- **Display (questions, set titles):** 500 / 33pt, tracking −0.035em.
+- **Labels under objects:** 500 / 21pt.
+- **Body (cards, chips, buttons):** 400 / 17pt.
+- **Small caps:** 500 / 12pt, all caps, +0.04em.
+- **Numbers:** 500 / 32pt, tabular.
 
-Handwriting on surfaces (whiteboard, notebook page and cover) uses Permanent Marker. Printed things (gym box, flag) use Space Grotesk.
+Handwriting on surfaces (whiteboard, notebook page and cover) uses Permanent Marker.
 
 **Edges:** a post-process "sketch" pass gives rough hand-drawn outlines, plus duotone and posterize; see `source/glfx.js`.
-- **Defaults:** question screens, the menu and the end-of-session scale are rough on orange. The kit and the sets are smooth on the light grid background (26px grid lines at `rgba(108,55,19,0.09)`).
+- **Defaults:** question screens, the menu and the end-of-session scale are rough on orange. The kit and the sets are smooth on the light grid background (26px grid lines in `dark` at 9%).
 - **Toggles:** the user can flip either default (the W / C keys in the prototype).
 
-**Text:** centred at the top of the screen. Don't add helper or hint text anywhere; the objects explain themselves.
+**Text:** centred, with the top of the question **150pt** from the top of the screen. The object below moves down to match (`CHANGES-v2.md` §3). Don't add helper or hint text anywhere; the objects explain themselves.
 
 ### Text reveal
 Questions appear word by word with no fade (each word just becomes visible). Spoken timing:
@@ -84,6 +87,7 @@ Every navigation swipe is interactive: the screen follows the finger, commits pa
    - **Choosing:** drop a bell on the platform to choose that unit. The other bell is abducted: a light beam and a glowing pool, and it lifts, spins and shrinks into the light.
 3. **Plates: "What are the plates available?"**
    - **Layout:** a checklist, with the plates in a left column, top to bottom, weight beside each, and hand-drawn YES / NO boxes.
+   - **Entrance:** rows appear one by one every 90ms (plate, weight and boxes together), with no fall, fade or easing.
    - **Ticking:** draw on the screen. One long stroke can tick a whole column, because every box the line passes through gets a check mark that draws itself in. The trail fades on release.
    - **Other inputs:** tapping a box also ticks it; ticking one box clears the other in that row.
    - **States:** a NO plate turns grey and see-through.
@@ -96,7 +100,7 @@ Every navigation swipe is interactive: the screen follows the finger, commits pa
    - **Pencil:** tap it to type PRs on a number dial, one lift at a time, with a KG/LB switch; swipe up confirms each lift.
    - **Notebook:** tap it to upload a photo through the system picker. The page fills, the notebook closes and shines, then pan.
 6. **Workout: "You're strong! What are we doing today?"**
-   - **Entrance:** a whiteboard on wheels rolls in from the right, turning, and slows to a stop with no wobble. It rests slightly angled.
+   - **Entrance:** a whiteboard on wheels rolls in from the right, turning, and slows to a stop with no wobble. It rests slightly angled, with the same soft blob shadow as the menu's Train board.
    - **Upload:** tap the board to upload (system picker), and the workout is written on the board.
    - **Wipe:** scrub the board with a finger to wipe it clean. Once about 45% is wiped, it clears fully and a tap uploads again.
    - **Start:** tapping a board with a workout zooms into it and goes to the kit.
@@ -132,7 +136,7 @@ Every navigation swipe is interactive: the screen follows the finger, commits pa
   - **Front corner by the bar wall:** a small kettlebell with the unit.
   - **Editing:** tap any of them (generous tap areas) to edit just that one thing (flag → name, bars → bar, plates → checklist, kettlebell → units). It returns straight to the open room.
   - **Edits start pre-filled:** the dials are on the current name, the plates are already ticked, and the bar is centred. Only the kettlebell choice starts fresh. In the plates checklist, changes save as you go, and it returns once you stop drawing for about 2 seconds.
-  - **Several gyms:** swipe sideways in the room to move between gyms; the one you settle on becomes current. The last slot is an empty cube (thin, wobbly, solid lines in the dark ink colour, no fill, no shadow, no plus); tap it to set up a new gym through name → units → plates → bar.
+  - **Several gyms:** swipe sideways in the room to move between gyms; the one you settle on becomes current. The last slot is an empty cube at about 70% size, drawn with dashed `dark` edges and no fill, shadow or plus. It slowly grows and shrinks and turns gently from side to side; tap it to set up a new gym through name → units → plates → bar.
   - **Delete:** press and hold a room for about 0.6s to get the native iOS alert "Delete {name}?" with Cancel and Delete. You can't delete the last gym; that shows an alert with only "OK".
 
 ---
@@ -166,3 +170,5 @@ The prototype is one big class built from fragments. **Later files override earl
 | End scale | `flFinish`, `showSessionOver` | comp_flow11.js, comp_b.js |
 | Physics config | `get PHYS` | comp_flow3.js |
 | Rough-edge pass | `GLFX` | glfx.js |
+| v2: palettes, question position, letter collage, board shadow | `FLPALS`, `flPalSet`, `flQShift`, `flSay`, `flCollage`, `flBoardShadow` | comp_flow12.js |
+| v2: Helvetica type roles | applied at build time (Flow only) | `build.py` notes in CHANGES-v2.md §1 |
