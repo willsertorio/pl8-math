@@ -118,6 +118,8 @@ final class Flow {
     @ObservationIgnored var lastPlan: FlowPlan?
     /// For the CI's pictures: time stands still.
     @ObservationIgnored var frozen = false
+    /// Made under the opening and not started yet: the stage is ready, the sketch pass rests.
+    @ObservationIgnored var waiting = false
     /// For the CI: where the time goes.
     @ObservationIgnored var perf: FlowPerf?
     @ObservationIgnored var relightTime = 0.0
@@ -135,6 +137,8 @@ final class Flow {
     @ObservationIgnored var hitSizes: [ObjectIdentifier: SIMD3<Float>] = [:]
     @ObservationIgnored var shaded: [FlowShadedModel] = []
     @ObservationIgnored var meshCache: [Int: MeshResource] = [:]
+    /// Where the next frame's re-lighting starts, so every model gets its turn.
+    @ObservationIgnored var reshadeCursor = 0
     /// Palette colours waiting to go to the GPU this frame.
     @ObservationIgnored var paletteUploads: [ObjectIdentifier: (texture: LowLevelTexture, bytes: [UInt8], width: Int, height: Int)] = [:]
     @ObservationIgnored var textures: [FlowPicture: TextureResource] = [:]
@@ -220,7 +224,7 @@ final class Flow {
         camera.transform = Transform(matrix: c.matrix)
         camera.camera.fieldOfViewInDegrees = c.fov * (1 - kick)
         sketch.pointsWide = Float(max(1, viewSize.width))
-        sketch.on = rough
+        sketch.on = rough && !waiting
     }
 
     func setCamera(_ position: SIMD3<Float>, _ target: SIMD3<Float>, fov: Float = 35) {

@@ -316,15 +316,16 @@ struct OpeningTitle: View {
     var body: some View {
         ZStack {
             Theme.background
+            // Behind the plates, like the prototype's (its text layer sits under the 3D): they fly past in front.
+            Text("pl8(math)")
+                .font(Theme.display(39))
+                .tracking(4.3)
+                .foregroundStyle(cream)
             GeometryReader { geometry in
                 // Drawn like the prototype's layer: through the sketch pass, which outlines each plate.
                 SketchStageView { stage.build(aspect: Float(geometry.size.width / max(1, geometry.size.height)), sketched: true) }
                     .task { await stage.run(tilting: motionEffects && !reduceMotion) }
             }
-            Text("pl8(math)")
-                .font(Theme.display(39))
-                .tracking(4.3)
-                .foregroundStyle(cream)
         }
         .ignoresSafeArea()
         .accessibilityElement()

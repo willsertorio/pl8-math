@@ -253,6 +253,7 @@ extension Flow {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = false
+        format.preferredRange = .standard        // sRGB like the textures read it, not the phone's Display P3
         let mask = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
             let g = context.cgContext
             g.setFillColor(UIColor(white: 0, alpha: CGFloat(opacity)).cgColor)

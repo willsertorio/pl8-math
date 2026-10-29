@@ -61,6 +61,7 @@ struct ScreenshotHost: View {
     static func flowStart(_ shot: String) -> Flow.Step {
         let name = String(shot.dropFirst(5)).components(separatedBy: "-").first ?? ""
         if name == "prDial" { return .prDial }
+        if name == "reading" { return .wod }
         if name.hasPrefix("menu") { return .menu }
         if name.hasPrefix("sets") { return .sets }
         if name.hasPrefix("plates") { return .plates }
@@ -151,6 +152,9 @@ struct ScreenshotHost: View {
         case "flow-menu-back":
             drag({ flow.screen(195, 600) }, by: CGPoint(x: 0, y: -160 * flow.layoutScale), at: 2.0, duration: 0.5, release: false)
             at(2.7) { flow.frozen = true }
+        case "flow-reading":
+            // The loader over the board, as after picking a workout's screenshot.
+            at(2.0) { flow.readingText = "Reading your workout…" }
         case "flow-menu-delete":
             at(2.0) { flow.pointerDown(project([0, 0.5, 0])) }
         default:

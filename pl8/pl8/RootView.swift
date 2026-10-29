@@ -11,13 +11,13 @@ struct RootView: View {
     @State private var opened = false
 
     var body: some View {
-        Group {
-            if opened {
-                FlowRoot(start: FlowRoot.startStep(context))
-                    .transition(.opacity)
-            } else {
+        ZStack {
+            // Made at launch, under the opening, so its 3D stage is ready when you tap (making it then was a wait).
+            FlowRoot(start: FlowRoot.startStep(context), started: opened)
+            if !opened {
                 // The opening plays on every launch for now (SPEC open decision 2). Tap → the Flow.
                 FlowOpening { withAnimation(.easeInOut(duration: 0.35)) { opened = true } }
+                    .transition(.opacity)
             }
         }
         .task {
@@ -54,9 +54,13 @@ struct FlowOpening: View {
 /// Holds the Flow for the app's lifetime and starts it at the right question.
 struct FlowRoot: View {
     let start: Flow.Step
+    /// False while the opening is still up: the Flow is made and waits, its first question starts on the tap.
+    var started = true
     var configure: (Flow) -> Void = { _ in }
     @Environment(\.modelContext) private var context
     @State private var flow: Flow?
+    @State private var ready = false
+    @State private var begun = false
 
     var body: some View {
         ZStack {
@@ -66,14 +70,24 @@ struct FlowRoot: View {
         .task {
             guard flow == nil else { return }
             let made = Flow(data: FlowData(context: context))
+            made.waiting = !started
             flow = made
             // The stage needs its size before the first question frames its camera.
             try? await Task.sleep(for: .milliseconds(50))
             made.mode = start == .menu ? .menu : .firstRun
             made.again = start == .menu || UserDefaults.standard.bool(forKey: Flow.liftedKey)
             configure(made)
-            made.go(start)
+            ready = true
+            begin()
         }
+        .onChange(of: started) { begin() }
+    }
+
+    private func begin() {
+        guard started, ready, !begun, let flow else { return }
+        begun = true
+        flow.waiting = false
+        flow.go(start)
     }
 
     /// Where a launch starts: the menu once a session has been lifted (here or with the screens before the Flow),

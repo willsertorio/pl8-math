@@ -30,7 +30,7 @@ struct FlowView: View {
                     .opacity(flow.uiOpacity)
                     .allowsHitTesting(flow.uiInteractive)
                 styleToggles
-                if let text = flow.readingText { FlowReading(text: text) }
+                if let text = flow.readingText { FlowReading(text: text, unit: flow.data.unit) }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .contentShape(Rectangle())
@@ -244,23 +244,57 @@ struct FlowLabels: View {
 /// "Reading your workout…": a white veil and a spinning plate; the words are for VoiceOver.
 struct FlowReading: View {
     let text: String
-    @State private var turn = false
+    let unit: WeightUnit
+    @State private var stage = ReadingPlateStage()
 
     var body: some View {
         ZStack {
             Color.white.opacity(0.8)
-            Image(uiImage: PictureArt.plateFace(Plate.find(25, .kg)!))
-                .resizable()
-                .frame(width: 64, height: 64)
-                .clipShape(Circle())
-                .overlay(Circle().fill(Color(white: 0.85)).frame(width: 12, height: 12))
-                .rotation3DEffect(.degrees(turn ? 360 : 0), axis: (x: 0.2, y: 1, z: 0))
-                .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: turn)
+            SketchStageView { stage.build(unit: unit) }
+                .frame(width: 168, height: 168)
+                .task { await stage.run() }
         }
         .ignoresSafeArea()
-        .onAppear { turn = true }
         .accessibilityElement()
         .accessibilityLabel(text)
+    }
+}
+
+/// The loader (the prototype's spinPlate): the heaviest bumper, two-tone and sketched like the title's plates,
+/// spinning like a coin, tipped toward you and wobbling a little.
+@MainActor
+final class ReadingPlateStage {
+    private let spin = Entity()
+    private let tip = Entity()
+
+    func build(unit: WeightUnit) -> [Entity] {
+        guard let plate = Plate.catalog(unit).first else { return [] }
+        let parts = SessionScene.parts(.init(plate: plate, centre: .zero, axis: .y, turn: 0))
+        let still = RoomLayout.Placement(position: .zero, rotationDegrees: 0)
+        for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows, light: .animation),
+                                      duotone: true) {
+            tip.addChild(child)
+        }
+        spin.addChild(tip)
+        pose(0)
+        // The prototype's camera: 30°, 1.12 m back.
+        let camera = PerspectiveCamera()
+        camera.camera.fieldOfViewInDegrees = 30
+        camera.position = [0, 0, 1.12]
+        return [spin, camera]
+    }
+
+    func run() async {
+        let start = ContinuousClock.now
+        while !Task.isCancelled {
+            pose(Float((ContinuousClock.now - start) / .seconds(1)))
+            try? await Task.sleep(for: .milliseconds(16))
+        }
+    }
+
+    private func pose(_ t: Float) {
+        spin.orientation = simd_quatf(angle: t * 5.2, axis: [0, 1, 0])
+        tip.orientation = simd_quatf(angle: .pi / 2 + 0.38 + sin(t * 2.6) * 0.1, axis: [1, 0, 0])
     }
 }
 

@@ -148,8 +148,14 @@ extension Flow {
     /// to the GPU in one go. New models always; others up to a budget per frame: a falling plate's colours
     /// lagging a frame can't be seen.
     func reshade() {
-        var budget = 64
-        for item in shaded {
+        // 16 a frame, taking turns: a rigid thing turning (the gym room swaying in the menu, ~250 parts) crosses
+        // the threshold all at once, and re-lighting it in one go stuttered. Spread out, its light lags a few
+        // frames, which doesn't show.
+        var budget = 16
+        let count = shaded.count
+        for k in 0..<count {
+            let index = (reshadeCursor + k) % count
+            let item = shaded[index]
             guard item.model.scene != nil else { continue }
             guard let baked = item.bakedOrientation, let bakedState = item.bakedState else { bake(item); continue }
             if bakedState.opacity != item.state.opacity && bakedState.sameColours(as: item.state) && !item.dirty {
@@ -163,6 +169,7 @@ extension Flow {
             if item.dirty || abs(simd_dot(baked.vector, orientation.vector)) < 0.99953 || !bakedState.sameColours(as: item.state) {
                 bake(item)
                 budget -= 1
+                if budget == 0 { reshadeCursor = index + 1 }
             }
         }
         uploadPalettes()
@@ -450,6 +457,9 @@ enum FlowArt {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = opaque
+        // sRGB, 8 bits: on a wide-colour iPhone the default draws in Display P3, which the textures read as sRGB
+        // (the notebook's page came out in the wrong colours; the Simulator draws sRGB, so its pictures were right).
+        format.preferredRange = .standard
         return UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
             body(context.cgContext)
         }

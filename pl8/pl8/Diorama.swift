@@ -282,6 +282,7 @@ enum PictureArt {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = true
+        format.preferredRange = .standard        // sRGB like the textures read it, not the phone's Display P3
         return UIGraphicsImageRenderer(size: size, format: format).image { body($0.cgContext) }
     }
 

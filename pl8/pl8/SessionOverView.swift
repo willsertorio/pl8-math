@@ -206,7 +206,9 @@ final class ScaleStage {
         let size = CGSize(width: 512, height: 224)
         // Box dark, like everything dark in the prototype's two-tone scale (no third colour).
         let dark = Diorama.uiColor(Look.boxDark), cream = Diorama.uiColor(Look.boxLight)
-        return UIGraphicsImageRenderer(size: size).image { _ in
+        let format = UIGraphicsImageRendererFormat()
+        format.preferredRange = .standard        // sRGB like the texture reads it, not the phone's Display P3
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
             dark.setFill()
             UIRectFill(CGRect(origin: .zero, size: size))
             let number = NSAttributedString(string: WeightUnit.trimmed(value), attributes: [

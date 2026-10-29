@@ -98,7 +98,7 @@ jobs:
           xcrun simctl bootstatus "$DEVICE" -b
           xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/pl8.app
           mkdir -p screens perf
-          for shot in opening-title flow-name flow-unit flow-plates flow-plates-ticked flow-bar flow-prs flow-prDial flow-wod flow-kit flow-sets flow-sets-last flow-done flow-menu flow-menu-train flow-menu-prs flow-menu-gym flow-name-locked flow-unit-abduct flow-plates-stroke flow-plates-done flow-kit-down flow-kit-up flow-sets-drag flow-menu-back flow-menu-delete; do
+          for shot in opening-title flow-name flow-unit flow-plates flow-plates-ticked flow-bar flow-prs flow-prDial flow-wod flow-kit flow-sets flow-sets-last flow-done flow-menu flow-menu-train flow-menu-prs flow-menu-gym flow-name-locked flow-unit-abduct flow-plates-stroke flow-plates-done flow-kit-down flow-kit-up flow-sets-drag flow-menu-back flow-menu-delete flow-reading; do
             xcrun simctl launch --terminate-running-process "$DEVICE" com.williansertorio.pl8 -pl8Shot "$shot"
             sleep 20
             xcrun simctl io "$DEVICE" screenshot "screens/$shot.png"
@@ -118,7 +118,7 @@ jobs:
           grep -q "BUILD SUCCEEDED" build-release.log
           DEVICE=$(cat device.txt)
           xcrun simctl install "$DEVICE" build-release/Build/Products/Release-iphonesimulator/pl8.app
-          for shot in flow-name-locked flow-plates-done flow-bar flow-kit flow-menu-gym; do
+          for shot in flow-name-locked flow-plates-done flow-bar flow-kit flow-menu flow-menu-gym; do
             xcrun simctl launch --terminate-running-process "$DEVICE" com.williansertorio.pl8 -pl8Shot "$shot"
             sleep 20
             DATA=$(xcrun simctl get_app_container "$DEVICE" com.williansertorio.pl8 data 2>/dev/null || true)
