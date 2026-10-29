@@ -172,7 +172,7 @@ struct FlowQuestion: View {
         VStack(spacing: 0) {
             QuestionLabel(words: flow.question, shown: flow.shown, colour: flow.ink.uiColor)
                 .padding(.horizontal, 28)
-                .padding(.top, 92 * k)
+                .padding(.top, 150 * k)            // v2: 150 points down (CHANGES-v2 §3), was 92
             Spacer()
         }
         .accessibilityElement()
@@ -180,7 +180,7 @@ struct FlowQuestion: View {
     }
 }
 
-/// UILabel with the prototype's exact line height (1.1) and tracking (−0.01 em).
+/// UILabel with the prototype's exact line height (1.02) and tracking (−0.035 em).
 struct QuestionLabel: UIViewRepresentable {
     let words: [String]
     let shown: Int

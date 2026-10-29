@@ -311,6 +311,22 @@ final class Flow {
     // MARK: - The pan between questions (flPanTo, flGo)
 
     /// How far one point on screen is in the world, at the depth the camera looks at, and the camera's up.
+    /// The questions whose object sits under the question (CHANGES-v2 §3).
+    static let loweredSteps: Set<Step> = [.name, .unit, .bar, .prs, .prDial, .wod]
+    /// How much lower the question sits than in the first handoff, in the prototype's points.
+    static let questionDrop: Float = 150 - 92
+
+    /// `view` seen 58 points lower on screen: the camera and its target moved up along the camera's own up by
+    /// the world distance that 58 points cover at the target's depth (CHANGES-v2 §3).
+    func lowered(_ view: FlowCam) -> FlowCam {
+        let distance = simd_length(view.position - view.target)
+        let shift = view.basis.up * (Self.questionDrop * 2 * distance * tan(view.fov * .pi / 360) / 844)
+        var moved = view
+        moved.position += shift
+        moved.target += shift
+        return moved
+    }
+
     func panGeometry() -> (up: SIMD3<Float>, height: CGFloat, worldPerPoint: Float) {
         let basis = cam.basis
         let distance = simd_length(cam.position - cam.target)
@@ -368,6 +384,8 @@ final class Flow {
         case .done: stepDone()
         case .menu: stepMenu()
         }
+        // v2: the question sits lower (150 points, was 92), so its object moves down by the same 58 (flQShift).
+        if Self.loweredSteps.contains(next) { cam = lowered(cam) }
         fromMenu = false; fromKit = false
         panBack = (mode == .menu || mode == .gym) && [.wod, .prs, .name, .unit, .plates, .bar].contains(next)
         if let grid0 = panIn {

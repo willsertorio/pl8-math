@@ -167,7 +167,9 @@ extension Flow {
         add(board.entity)
         let cy = 1.45 * Self.boardScale
         let zoom = (position: far + SIMD3(0.15, cy, 0.7), target: far + SIMD3(0, cy, 0))
-        let rest = (position: far + Self.boardCamera.position, target: far + Self.boardCamera.target)
+        // The board's resting view, lowered like the question's (v2), so the hand-off doesn't jump.
+        let boardView = lowered(FlowCam(position: far + Self.boardCamera.position, target: far + Self.boardCamera.target, fov: 35))
+        let rest = (position: boardView.position, target: boardView.target)
         let kit = cam
         let geo = panGeometry()
         let down = geo.up * (-Float(geo.height) * geo.worldPerPoint)

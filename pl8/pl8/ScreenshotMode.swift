@@ -137,8 +137,9 @@ struct ScreenshotHost: View {
             }
             at(7.0) { flow.frozen = true }
         case "flow-plates-stroke", "flow-plates-done":
-            let from = { flow.screen(262, 214 + 576 / 10 * 0.5) }
-            drag(from, by: CGPoint(x: 0, y: 576 * 0.9 * flow.layoutScale), at: 3.5, duration: 1.0, release: shot == "flow-plates-done")
+            // Down the YES column from the first row's middle (the rows run 272–800 since v2).
+            let from = { flow.screen(262, 272 + 528 / 10 * 0.5) }
+            drag(from, by: CGPoint(x: 0, y: 528 * 0.9 * flow.layoutScale), at: 3.5, duration: 1.0, release: shot == "flow-plates-done")
             if shot == "flow-plates-stroke" { at(4.6) { flow.frozen = true } }
         case "flow-kit-down", "flow-kit-up":
             // As far as the prototype's 07c / 07d: 200 points down, 260 up.

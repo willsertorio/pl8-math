@@ -29,6 +29,8 @@ final class PlatesUI {
     var rows: [Row] = []
     var boxes: [Box] = []
     var headersAt: Double?
+    /// Where the rows start, in the prototype's points (the headers sit 16 above).
+    var top: CGFloat = 272
     var fontSize: CGFloat = 20
     var trail: [CGPoint] = []
     var trailOpacity: Double = 1
@@ -41,11 +43,14 @@ extension Flow {
     func stepPlates() {
         let unit = data.unit, plates = Plate.catalog(unit), n = plates.count
         setCamera([0, 0, 8.2], [0, 0, 0])
-        let k = 2 * 8.2 * tan(17.5 * Float.pi / 180) / 844, top: CGFloat = 214, bottom: CGFloat = 790, rowH = (bottom - top) / CGFloat(n)
+        // v2: the rows start 58 points lower with the question, at 272, and end at 800 (CHANGES-v2 §3).
+        let k = 2 * 8.2 * tan(17.5 * Float.pi / 180) / 844, top: CGFloat = 214 + CGFloat(Self.questionDrop), bottom: CGFloat = 800
+        let rowH = (bottom - top) / CGFloat(n)
         let wx = { (px: CGFloat) in Float(px - 195) * k }, wy = { (py: CGFloat) in Float(422 - py) * k }
         let box = (min(46, rowH * 0.74)).rounded(), xYes: CGFloat = 262, xNo: CGFloat = 334
         let ui = PlatesUI()
-        ui.fontSize = (min(20, rowH * 0.36)).rounded()
+        ui.fontSize = (min(21, rowH * 0.37)).rounded()
+        ui.top = top
         platesUI = ui
         var models: [(wrapper: Entity, plate: Entity, ghost: Entity)] = []
         var done = false, ready = false
@@ -115,20 +120,18 @@ extension Flow {
                 ghost.isEnabled = false
                 wrapper.addChild(ghost)
                 wrapper.scale = SIMD3(repeating: scale)
-                let ty = wy(y)
-                wrapper.position = [wx(58), ty + 4, 0]
+                wrapper.position = [wx(58), wy(y), 0]
                 wrapper.isEnabled = false
                 self.add(wrapper)
                 models.append((wrapper, model, ghost))
-                self.later(Double(i) * 0.07) { [weak self] in
+                // v2: each row just appears, plate, weight and boxes together, one every 90 ms; a soft click.
+                let at = Double(i) * 0.09
+                self.later(at) { [weak self] in
                     wrapper.isEnabled = true
-                    self?.anim(0.55, { u in
-                        let b = u < 0.6 ? pow(u / 0.6, 2) : 1 - 0.18 * sin((u - 0.6) / 0.4 * .pi) * (1 - u)
-                        wrapper.position.y = ty + Float(1 - min(1, b)) * 4
-                    }, done: { [weak self] in self?.click(0.5) })
+                    self?.click(0.5)
                 }
                 ui.rows.append(PlatesUI.Row(label: "\(WeightUnit.trimmed(plate.size)) \(unit.rawValue)", y: y, index: i,
-                                            shownAt: self.t + Double(i) * 0.07 + 0.3, state: nil))
+                                            shownAt: self.t + at, state: nil))
                 for (yes, x) in [(true, xYes), (false, xNo)] {
                     let p: CGFloat = 12, c0 = p + box / 2
                     let anchors = [CGPoint(x: c0 - box * 0.3, y: c0 + box * 0.02), CGPoint(x: c0 - box * 0.08, y: c0 + box * 0.26),
@@ -143,7 +146,7 @@ extension Flow {
                     }
                     ui.boxes.append(PlatesUI.Box(row: i, yes: yes, centre: CGPoint(x: x, y: y), size: box,
                                                  jitter: (0..<24).map { _ in .random(in: -1.1...1.1) }, tickPoints: tickPoints,
-                                                 bornAt: self.t + Double(i) * 0.06 + (yes ? 0 : 0.04)))
+                                                 bornAt: self.t + Double(i) * 0.09))
                 }
             }
             ready = true
@@ -154,7 +157,7 @@ extension Flow {
                     ui.rows[i].state = had.contains(plates[i].size)
                     paint(i)
                     let target = ui.boxes.firstIndex { $0.row == i && $0.yes == ui.rows[i].state }
-                    self.later(0.38 + Double(i) * 0.06) { [weak self] in if let target { self?.tickBox(target, on: true) } }
+                    self.later(0.14 + Double(i) * 0.09) { [weak self] in if let target { self?.tickBox(target, on: true) } }
                 }
             }
         }
@@ -225,8 +228,7 @@ extension Flow {
                 model.ghost.orientation = turn
             }
             for b in ui.boxes.indices {
-                let u = (t - ui.boxes[b].bornAt) / 0.36
-                let scale = u <= 0 ? 0 : u >= 1 ? 1 : Ease.outBack(u, 2.2)
+                let scale: Double = t >= ui.boxes[b].bornAt ? 1 : 0
                 if ui.boxes[b].scale != scale { ui.boxes[b].scale = scale }
             }
         }
@@ -253,20 +255,14 @@ struct PlatesOverlay: View {
             context.translateBy(x: size.width / 2 - 195 * s, y: 0)
             context.scaleBy(x: s, y: s)
             let ink = flow.inkColor
-            if let at = ui.headersAt {
-                let alpha = min(1, max(0, (ui.now - at) / 0.2))
+            if ui.headersAt != nil {
                 for (text, x) in [("YES", CGFloat(262)), ("NO", 334)] {
                     let label = Text(text).font(FlowType.smallCaps).tracking(FlowType.smallCapsTracking).foregroundColor(ink)
-                    var c = context
-                    c.opacity = alpha
-                    c.draw(label, at: CGPoint(x: x, y: 214 - 16))
+                    context.draw(label, at: CGPoint(x: x, y: ui.top - 16))
                 }
             }
-            for row in ui.rows {
-                let alpha = min(1, max(0, (ui.now - row.shownAt) / 0.2))
-                guard alpha > 0 else { continue }
-                var c = context
-                c.opacity = alpha
+            for row in ui.rows where ui.now >= row.shownAt {
+                let c = context
                 let label = Text(row.label).font(FlowType.label(ui.fontSize)).tracking(FlowType.labelTracking(ui.fontSize)).monospacedDigit()
                     .foregroundColor(ink)
                 c.draw(label, at: CGPoint(x: 106, y: row.y), anchor: .leading)
