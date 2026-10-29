@@ -131,6 +131,7 @@ extension Flow {
     }
 
     func bake(_ item: FlowShadedModel) {
+        perf?.bakes += 1
         let orientation = item.model.orientation(relativeTo: nil)
         item.bakedOrientation = orientation
         item.bakedState = item.state

@@ -118,6 +118,9 @@ final class Flow {
     @ObservationIgnored var lastPlan: FlowPlan?
     /// For the CI's pictures: time stands still.
     @ObservationIgnored var frozen = false
+    /// For the CI: where the time goes.
+    @ObservationIgnored var perf: FlowPerf?
+    @ObservationIgnored var relightTime = 0.0
     /// For the CI's pictures: ticks a checklist box as if drawn.
     @ObservationIgnored var debugDecide: ((Int) -> Void)?
     /// The menu: where the carousel is, which item is awake.
@@ -169,6 +172,7 @@ final class Flow {
     private func frame(_ delta: Float) {
         // For the CI's pictures of a moment mid-animation: everything stops, the picture stays.
         if frozen { return }
+        let began = perf == nil ? 0 : CACurrentMediaTime()
         let dt = min(0.05, max(0, delta))
         t += Double(dt)
         tick?(dt, t)
@@ -178,8 +182,11 @@ final class Flow {
         sparkleTick(dt)
         squashTick(dt)
         physics?.step(dt, flow: self)
+        let relit = perf == nil ? 0 : CACurrentMediaTime()
         reshade()
+        if perf != nil { relightTime = CACurrentMediaTime() - relit }
         applyCamera(dt)
+        perf?.frame(interval: Double(delta), work: CACurrentMediaTime() - began, relight: relightTime, step: step.rawValue)
     }
 
     /// Where the camera is now, with the pan (not the shake): what labels and rays use.
@@ -339,6 +346,8 @@ final class Flow {
         uiPan = 0
         uiInteractive = true
         applyStyle()
+        let building = CACurrentMediaTime()
+        defer { perf?.event("build \(next.rawValue)", ms: (CACurrentMediaTime() - building) * 1000) }
         switch next {
         case .name: stepName()
         case .unit: stepUnit()

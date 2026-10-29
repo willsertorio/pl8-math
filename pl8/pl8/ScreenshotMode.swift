@@ -68,6 +68,7 @@ struct ScreenshotHost: View {
     }
 
     static func configure(_ flow: Flow, shot: String) {
+        flow.perf = FlowPerf()
         if [.kit, .sets, .done].contains(flowStart(shot)) {
             flow.plan = flow.data.startSession()
             flow.lastPlan = flow.plan
