@@ -78,7 +78,7 @@ struct ScreenshotHost: View {
             flow.setIndex = plan.sets.count - 1
             flow.doneSets = Set(0..<(plan.sets.count - 1))
         }
-        if shot.hasPrefix("flow-menu-") { flow.menuActive = ["back": "prs", "delete": "gym"][String(shot.dropFirst(10))] ?? String(shot.dropFirst(10)) }
+        if shot.hasPrefix("flow-menu-") { flow.menuActive = ["back": "prs", "delete": "gym", "add": "gym"][String(shot.dropFirst(10))] ?? String(shot.dropFirst(10)) }
         script(flow, shot: shot)
         if shot == "flow-plates-ticked" {
             Task { @MainActor in
@@ -153,6 +153,9 @@ struct ScreenshotHost: View {
         case "flow-menu-back":
             drag({ flow.screen(195, 600) }, by: CGPoint(x: 0, y: -160 * flow.layoutScale), at: 2.0, duration: 0.5, release: false)
             at(2.7) { flow.frozen = true }
+        case "flow-menu-add":
+            // Swiped along the row of gyms to its last slot, the empty one to tap for a new gym.
+            drag({ project([0, 0.5, 0]) }, by: CGPoint(x: -220 * flow.layoutScale, y: 0), at: 2.5, duration: 0.4, release: true)
         case "flow-reading":
             // The loader over the board, as after picking a workout's screenshot.
             at(2.0) { flow.readingText = "Reading your workout…" }
