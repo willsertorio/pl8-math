@@ -26,6 +26,8 @@ struct ScreenshotHost: View {
         Group {
             if !seeded {
                 Theme.background.ignoresSafeArea()
+            } else if shot.hasPrefix("flow-") {
+                FlowRoot(start: Self.flowStart(shot), configure: { Self.configure($0, shot: shot) })
             } else if shot.hasPrefix("room-"), let station = RoomLayout.Station(rawValue: String(shot.dropFirst(5))) {
                 NavigationStack { Room3DView(station: station) }
             } else if shot == "opening-title" {
@@ -51,6 +53,34 @@ struct ScreenshotHost: View {
         .task {
             seed()
             seeded = true
+        }
+    }
+
+    /// The Flow's screens (SPEC 2.0): `flow-<step>`, plus states — `flow-plates-ticked`, `flow-sets-last`,
+    /// `flow-menu-<train|prs|gym>` (that item awake).
+    static func flowStart(_ shot: String) -> Flow.Step {
+        let name = String(shot.dropFirst(5))
+        if name.hasPrefix("menu") { return .menu }
+        if name.hasPrefix("sets") { return .sets }
+        if name.hasPrefix("plates") { return .plates }
+        return Flow.Step(rawValue: name) ?? .name
+    }
+
+    static func configure(_ flow: Flow, shot: String) {
+        if [.kit, .sets, .done].contains(flowStart(shot)) {
+            flow.plan = flow.data.startSession()
+            flow.lastPlan = flow.plan
+        }
+        if shot == "flow-sets-last", let plan = flow.plan {
+            flow.setIndex = plan.sets.count - 1
+            flow.doneSets = Set(0..<(plan.sets.count - 1))
+        }
+        if shot.hasPrefix("flow-menu-") { flow.menuActive = String(shot.dropFirst(10)) }
+        if shot == "flow-plates-ticked" {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(5))
+                for (row, yes) in [true, true, false, true, true, false, true].enumerated() { flow.debugDecide?(row * 2 + (yes ? 0 : 1)) }
+            }
         }
     }
 

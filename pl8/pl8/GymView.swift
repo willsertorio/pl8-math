@@ -17,7 +17,7 @@ struct GymDrawerContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             GymLabel(text: "Gyms")
-            Flow {
+            WrapFlow {
                 ForEach(gyms) { gym in
                     Chip(isOn: gym.id == current?.id, action: { switchTo(gym) }) {
                         Text(gym.name.isEmpty ? "New gym" : gym.name)
@@ -134,7 +134,7 @@ struct PlateChips: View {
     @Bindable var gym: Gym
 
     var body: some View {
-        Flow {
+        WrapFlow {
             ForEach(Plate.catalog(gym.unit), id: \.size) { plate in
                 let isOn = gym.plateSizes.contains(plate.size)
                 Chip(isOn: isOn, action: { gym.setPlate(plate.size, isOn: !isOn) }) {
@@ -154,7 +154,7 @@ struct BarChips: View {
     @Bindable var gym: Gym
 
     var body: some View {
-        Flow {
+        WrapFlow {
             ForEach(Bar.weights(gym.unit), id: \.self) { weight in
                 Chip(isOn: gym.barWeight == weight, action: { gym.barWeight = weight }) {
                     Text(label(weight))

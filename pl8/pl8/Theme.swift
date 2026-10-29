@@ -238,7 +238,7 @@ struct PlateDot: View {
 }
 
 /// Chips wrapping onto as many lines as they need, 8 pt apart (prototype chipWrap).
-struct Flow<Content: View>: View {
+struct WrapFlow<Content: View>: View {
     var spacing: CGFloat = 8
     @ViewBuilder let content: () -> Content
 
@@ -247,7 +247,7 @@ struct Flow<Content: View>: View {
     }
 }
 
-/// The layout behind `Flow`.
+/// The layout behind `WrapFlow`.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
 

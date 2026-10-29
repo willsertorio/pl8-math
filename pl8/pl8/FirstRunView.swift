@@ -307,7 +307,7 @@ struct OpeningScreen: View {
 
 /// The opening's title (prototype AnimLayer 'open'): "pl8(math)" in cream over the orange, with real plates in the
 /// prototype's two tones and rough outline drifting up on both sides, slowly tumbling. Tap anywhere to go on.
-private struct OpeningTitle: View {
+struct OpeningTitle: View {
     @State private var stage = TitleStage()
     @AppStorage(MotionSource.settingKey) private var motionEffects = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

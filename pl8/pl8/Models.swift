@@ -14,6 +14,14 @@ final class Gym {
     var barWeight: Double
     var isCurrent: Bool
     var placeID: String?
+    /// What the gym has in each unit, kept when you switch (the Flow: a gym is { name, unit, plates[unit], bar[unit] }).
+    /// Nil until that unit has been set up.
+    var kgPlates: [Double]?
+    var lbPlates: [Double]?
+    var kgBar: Double?
+    var lbBar: Double?
+    /// Its place in the row of gyms.
+    var sortIndex: Int = 0
 
     init(name: String, unit: WeightUnit, isCurrent: Bool = true) {
         let defaults = GymSetup(unit: unit)
@@ -29,19 +37,29 @@ final class Gym {
         GymSetup(unit: unit, plateSizes: plateSizes, barWeight: barWeight)
     }
 
-    /// A new unit brings that unit's plates and bar.
+    /// A new unit brings what the gym had in that unit before, or that unit's plates and bar.
     func switchUnit(to newUnit: WeightUnit) {
         guard newUnit != unit else { return }
+        remember()
         let defaults = GymSetup(unit: newUnit)
         unit = newUnit
-        plateSizes = defaults.plateSizes
-        barWeight = defaults.barWeight
+        plateSizes = (newUnit == .kg ? kgPlates : lbPlates) ?? defaults.plateSizes
+        barWeight = (newUnit == .kg ? kgBar : lbBar) ?? defaults.barWeight
     }
 
     func setPlate(_ size: Double, isOn: Bool) {
         var sizes = plateSizes.filter { $0 != size }
         if isOn { sizes.append(size) }
         plateSizes = sizes.sorted(by: >)
+        remember()
+    }
+
+    /// Keeps this unit's plates and bar for when the gym switches back.
+    func remember() {
+        switch unit {
+        case .kg: kgPlates = plateSizes; kgBar = barWeight
+        case .lb: lbPlates = plateSizes; lbBar = barWeight
+        }
     }
 }
 

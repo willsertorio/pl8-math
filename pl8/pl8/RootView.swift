@@ -2,50 +2,85 @@ import SwiftData
 import SwiftUI
 import PlateKit
 
-/// Home: Train · PRs · Gym · History (SPEC 2.4).
+/// The app (SPEC 2.0): the opening on every launch, then the Flow — the first run's questions, or the menu once
+/// you've lifted.
 struct RootView: View {
     @Environment(\.modelContext) private var context
-    @Query private var gyms: [Gym]
     /// Default data is created once, so deleting it doesn't bring it back.
     @AppStorage("didSeedDefaults") private var didSeedDefaults = false
-    @AppStorage("hasFinishedFirstRun") private var hasFinishedFirstRun = false
-    @State private var openedThisLaunch = false
+    @State private var opened = false
 
     var body: some View {
         Group {
-            if hasFinishedFirstRun {
-                if openedThisLaunch {
-                    HomeView()
-                } else {
-                    // The opening plays on every launch for now (SPEC open decision 2).
-                    OpeningScreen { withAnimation(.easeInOut(duration: 0.4)) { openedThisLaunch = true } }
-                }
+            if opened {
+                FlowRoot(start: FlowRoot.startStep())
+                    .transition(.opacity)
             } else {
-                FirstRunView {
-                    openedThisLaunch = true            // it just played the opening
-                    hasFinishedFirstRun = true
-                }
+                // The opening plays on every launch for now (SPEC open decision 2). Tap → the Flow.
+                FlowOpening { withAnimation(.easeInOut(duration: 0.35)) { opened = true } }
             }
         }
-        .onChange(of: hasFinishedFirstRun) { seedIfNeeded() }
         .task {
-            RoomTemplate.warmUp()                     // the room's bake starts at launch, before the first stage needs it
             seedIfNeeded()
             DataCleanup.mergeDuplicatePRs(in: context)
         }
     }
 
-    /// One unnamed gym with every plate (named in the first run) and the default PR list with no values (SPEC Part 4).
+    /// The default PR list with no values (SPEC Part 4). The gym is made by the Flow.
     private func seedIfNeeded() {
         guard !didSeedDefaults else { return }
-        if gyms.isEmpty {
-            context.insert(Gym(name: "", unit: .lb))
-        }
         let existing = (try? context.fetch(FetchDescriptor<PersonalRecord>())) ?? []
         for lift in LiftNames.defaultPRLifts where Planner.record(for: lift, in: existing) == nil {
             context.insert(PersonalRecord(lift: lift))
         }
         try? context.save()
         didSeedDefaults = true
+    }
+}
+
+/// The Flow's opening (prototype closeOpening): the title over the orange; a tap starts the questions.
+struct FlowOpening: View {
+    var onDone: () -> Void
+
+    var body: some View {
+        OpeningTitle()
+            .contentShape(Rectangle())
+            .onTapGesture { onDone() }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("pl8(math). Tap to start")
+    }
+}
+
+/// Holds the Flow for the app's lifetime and starts it at the right question.
+struct FlowRoot: View {
+    let start: Flow.Step
+    var configure: (Flow) -> Void = { _ in }
+    @Environment(\.modelContext) private var context
+    @State private var flow: Flow?
+
+    var body: some View {
+        ZStack {
+            Color(rgb: FlowLook.orange).ignoresSafeArea()
+            if let flow { FlowView(flow: flow) }
+        }
+        .task {
+            guard flow == nil else { return }
+            let made = Flow(data: FlowData(context: context))
+            flow = made
+            // The stage needs its size before the first question frames its camera.
+            try? await Task.sleep(for: .milliseconds(50))
+            made.mode = start == .menu ? .menu : .firstRun
+            made.again = UserDefaults.standard.bool(forKey: Flow.liftedKey)
+            configure(made)
+            made.go(start)
+        }
+    }
+
+    /// Where a launch starts: the menu once a session has been lifted, the workout once the gym is set up,
+    /// otherwise the first question.
+    static func startStep() -> Flow.Step {
+        if UserDefaults.standard.bool(forKey: Flow.liftedKey) { return .menu }
+        if UserDefaults.standard.bool(forKey: Flow.setUpKey) { return .wod }
+        return .name
     }
 }

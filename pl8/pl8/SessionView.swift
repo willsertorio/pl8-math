@@ -158,7 +158,7 @@ struct SessionView: View {
                 if kit.plates.isEmpty {
                     Text("Just the bar").font(Theme.text(15)).frame(maxWidth: .infinity).padding(.vertical, 4)
                 } else {
-                    Flow {
+                    WrapFlow {
                         ForEach(kit.plates, id: \.size) { item in
                             let isOn = collected.contains(item.size)
                             Chip(isOn: isOn, action: { toggle(item.size) }) {
