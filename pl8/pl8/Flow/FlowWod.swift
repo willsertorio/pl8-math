@@ -123,13 +123,19 @@ extension Flow {
             }, done: { restShadow() })
         }
         let start = { [weak self] in
-            guard let self, let plan = self.data.startSession() else { return }
+            guard let self else { return }
+            // Back from the kit to the same board: the same session, chips as they were.
+            let same = self.plan != nil && self.data.session?.endedAt == nil && self.data.session?.workout === self.data.workout
+            guard let plan = same ? self.plan : self.data.startSession() else { return }
             busy = true
             self.checkSound()
             self.buzz(.light)
-            self.plan = plan
-            self.setIndex = 0
-            self.collected = []
+            if !same {
+                self.plan = plan
+                self.setIndex = 0
+                self.doneSets = []
+                self.collected = []
+            }
             let p0 = self.cam.position, t0 = self.cam.target, cy = 1.45 * Self.boardScale
             let p1 = SIMD3<Float>(0.15, cy, 0.7), t1 = SIMD3<Float>(0, cy, 0)
             self.anim(1.0, { u in

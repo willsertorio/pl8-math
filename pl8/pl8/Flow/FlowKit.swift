@@ -167,7 +167,7 @@ extension Flow {
                 proxy.isEnabled = false
                 // Back: first the plates fold away, then the camera pulls back out of the board.
                 let a1 = min(1, a / 0.28), a2 = max(0, (a - 0.28) / 0.72), e2 = Float(Ease.inOutCubic(Double(a2)))
-                for item in self.kitItems { item.entity.scale = SIMD3(repeating: max(0.0001, 1 - a1 * a1)) }
+                for item in self.kitItems { item.model.scale = SIMD3(repeating: max(0.0001, 1 - a1 * a1)) }
                 if a2 <= 0 {
                     board.entity.isEnabled = false
                     self.cam = kit
@@ -182,7 +182,7 @@ extension Flow {
                 // Next: a pan straight down; the bar comes up from below.
                 let e = Float(Ease.inOutQuad(Double(a)))
                 board.entity.isEnabled = false
-                for item in self.kitItems { item.entity.scale = [1, 1, 1] }
+                for item in self.kitItems { item.model.scale = [1, 1, 1] }
                 self.cam = FlowCam(position: kit.position + down * e, target: kit.target + down * e, fov: kit.fov + (40 - kit.fov) * e)
                 proxy.isEnabled = e > 0.002
                 if proxy.isEnabled { self.place(proxy, as: sets, up: setsUp, worldPerPoint: setsWpp, offset: geo.height * CGFloat(1 - e)) }

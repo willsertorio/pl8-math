@@ -1,3 +1,4 @@
+import QuartzCore
 import RealityKit
 import SwiftUI
 import PlateKit
@@ -12,7 +13,10 @@ final class SetsUI {
     var currentOpacity: Double = 1
     var peekOffset: CGFloat = 0
     var peekOpacity: Double = 0
+    /// The card's height in points.
     var cardHeight: CGFloat = 150
+    /// A swipe's cards are still sliding into place.
+    var settling = false
     var done: Set<Int> = []
     var visible = true
     /// Bumped when a card is changed by a tap (it slides in from below) rather than by a drag.
@@ -117,13 +121,14 @@ extension Flow {
         // a tap moves on.
         hit = { [weak self] point in
             guard let self else { return nil }
-            var last = point, lastTime = self.t, velocity: CGFloat = 0
+            var last = point, lastTime = CACurrentMediaTime(), velocity: CGFloat = 0
             var mode: String?
             var inner: FlowDrag?
             return FlowDrag(move: { [weak self] p in
                 guard let self else { return }
-                let dx = p.x - point.x, dy = p.y - point.y, now = self.t
-                velocity = (p.y - last.y) / max(1, CGFloat((now - lastTime) * 1000))
+                // Speed in points per ms from the touches' own times (the frame clock can't tell two touches apart).
+                let dx = p.x - point.x, dy = p.y - point.y, now = CACurrentMediaTime()
+                velocity = (p.y - last.y) / max(4, CGFloat((now - lastTime) * 1000))
                 lastTime = now
                 if mode == nil {
                     if hypot(dx, dy) < 10 { last = p; return }
@@ -215,9 +220,9 @@ extension Flow {
 
     /// The card follows the finger and the next one slides in; the plates follow too (flCardDrag, flPlateSwap).
     func cardDrag() -> FlowDrag? {
-        guard let plan, let ui = setsUI else { return nil }
+        guard let plan, let ui = setsUI, !ui.settling else { return nil }
         let n = plan.sets.count, i0 = setIndex
-        let off = ui.cardHeight + 40
+        let off = ui.cardHeight + 40 * layoutScale
         var direction = 0, dy: CGFloat = 0
         var swap: FlowPlateSwap?
         let place = { () -> Bool in
@@ -255,6 +260,15 @@ extension Flow {
             let o0 = ui.currentOpacity, po0 = ui.peekOffset, pe0 = ui.peekOpacity
             let pEnd: CGFloat = go ? 0 : (direction > 0 ? off : -off)
             let s = swap, a0 = s?.a ?? 0
+            // Committed on release (flCardDrag): the set changes now; the cards finish sliding after.
+            let next = ui.peek
+            if go, next != nil {
+                if direction > 0 { self.doneSets.insert(i0); self.buzz(.success) } else { self.doneSets.remove(i0 - 1); self.buzz(.light) }
+                self.checkSound()
+                self.setIndex = i0 + direction
+                ui.done = self.doneSets
+            }
+            ui.settling = true
             self.anim(0.24, { u in
                 let e = CGFloat(Ease.card(u))
                 ui.currentOffset = d0 + (d1 - d0) * e
@@ -262,24 +276,13 @@ extension Flow {
                 ui.peekOffset = po0 + (pEnd - po0) * e
                 ui.peekOpacity = pe0 + ((go ? 1 : 0) - pe0) * Double(e)
                 s?.at(a0 + ((go ? 1 : 0) - a0) * Float(Ease.outCubic(u)))
-            }, done: { [weak self] in
-                guard let self else { return }
+            }, done: {
                 if go { s?.commit() } else { s?.cancel() }
-                guard go, let next = ui.peek else {
-                    ui.peek = nil
-                    ui.currentOffset = 0
-                    ui.currentOpacity = 1
-                    return
-                }
-                // Committed: the set changes and the bar is loaded for it.
-                if direction > 0 { self.doneSets.insert(i0); self.buzz(.success) } else { self.doneSets.remove(i0 - 1); self.buzz(.light) }
-                self.checkSound()
-                self.setIndex = i0 + direction
-                ui.done = self.doneSets
-                ui.current = next
+                if go, let next { ui.current = next }
                 ui.peek = nil
                 ui.currentOffset = 0
                 ui.currentOpacity = 1
+                ui.settling = false
             })
         })
     }
@@ -361,7 +364,7 @@ extension Flow {
             guard let self else { return }
             self.setsPan = (up, wpp, px)
             self.cam.fov = 40 - 5 * Float(min(1, px / height))
-            self.pan = -px
+            self.uiPan = -px
             self.gridY = px
         }
         var px: CGFloat = 0
@@ -376,7 +379,7 @@ extension Flow {
                 self.anim(0.3, { u in set(p0 + (height - p0) * CGFloat(1 - pow(1 - u, 2))) }, done: { [weak self] in
                     guard let self else { return }
                     self.setsPan = nil
-                    self.pan = 0
+                    self.uiPan = 0
                     self.gridY = 0
                     self.checkSound()
                     self.buzz(.light)
@@ -386,7 +389,7 @@ extension Flow {
             } else {
                 self.anim(0.28, { u in set(p0 * CGFloat(pow(1 - u, 3))) }, done: { [weak self] in
                     self?.setsPan = nil
-                    self?.pan = 0
+                    self?.uiPan = 0
                     self?.gridY = 0
                 })
             }
@@ -452,7 +455,7 @@ struct SetsOverlay: View {
                     .id(ui.current)
                     .offset(y: ui.currentOffset)
                     .opacity(ui.currentOpacity)
-                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { ui.cardHeight = $0 / max(0.5, flow.layoutScale) }
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { ui.cardHeight = $0 }
                     .transition(.asymmetric(insertion: .offset(y: 70).combined(with: .opacity), removal: .offset(y: -60).combined(with: .opacity)))
             }
             .animation(.timingCurve(0.2, 0.9, 0.25, 1, duration: 0.32), value: ui.swaps)

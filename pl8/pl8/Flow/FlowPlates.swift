@@ -169,13 +169,17 @@ extension Flow {
         let inBox = { (b: PlatesUI.Box, q: CGPoint, pad: CGFloat) in
             abs(q.x - b.centre.x) <= b.size / 2 + pad && abs(q.y - b.centre.y) <= b.size / 2 + pad
         }
+        var strokes = 0
         let fadeTrail = { [weak self] in
-            self?.anim(0.38, { u in ui.trailOpacity = 1 - Ease.outCubic(u) }, done: { ui.trail = []; ui.trailOpacity = 1 })
+            let stroke = strokes
+            self?.anim(0.38, { u in if strokes == stroke { ui.trailOpacity = 1 - Ease.outCubic(u) } },
+                       done: { if strokes == stroke { ui.trail = []; ui.trailOpacity = 1 } })
         }
         hit = { [weak self] point in
             guard let self, !done, ready else { return nil }
             self.cancelTimer(idle)
             let start = local(point)
+            strokes += 1
             var last = start, length: CGFloat = 0, hitBox = false, moves = 0
             var amount = [CGFloat](repeating: 0, count: ui.boxes.count)
             ui.trail = [start]

@@ -84,6 +84,10 @@ final class FlowPhysicsWorld {
         let length = simd_length(force)
         if length > FlowPhysics.grabMaxForce { force *= FlowPhysics.grabMaxForce / length }
         motion.linearVelocity += force * dt
+        // Pulled at the grabbed point, not the middle: a turn too (a disc tilting about its rim, I ≈ m r²/4).
+        let arm = point - entity.position(relativeTo: nil)
+        let r = max(0.05, grab.body.radius)
+        motion.angularVelocity += simd_cross(arm, force) * (4 / (r * r)) * dt * 0.5
         motion.angularVelocity *= pow(1 - FlowPhysics.grabAngularDamping, dt)
         entity.components.set(motion)
     }

@@ -73,6 +73,8 @@ extension Flow {
                 beam.position = [other.position.x, 3.5, other.position.z]
                 let pool = self.add(self.build(light.pool))
                 pool.position = [other.position.x, 0.01, other.position.z]
+                self.setOpacity(0, under: beam)
+                self.setOpacity(0, under: pool)
                 other.beam = beam
                 other.pool = pool
             }
@@ -106,9 +108,12 @@ extension Flow {
             }
         }
 
-        /// Where the floor is under a point: the pad inside the square, else the floor.
+        /// Where the floor is under a point: the pad inside the square, else the floor (level with the pad until it
+        /// sinks). A bell touches the pad as soon as any of it is over it.
         let ground = { (p: SIMD3<Float>) -> (height: Float, pad: Bool) in
-            abs(p.x - square.x) < inner / 2 && abs(p.z - square.z) < inner / 2 ? (padY + 0.1, true) : (0, false)
+            let over = abs(p.x - square.x) < inner / 2 && abs(p.z - square.z) < inner / 2
+            let touching = abs(p.x - square.x) < inner / 2 + FlowBell.radius && abs(p.z - square.z) < inner / 2 + FlowBell.radius
+            return (over ? padY + 0.1 : 0, touching)
         }
         let landed = { [weak self] (bell: FlowBell, speed: Float, pad: Bool) in
             guard let self else { return }

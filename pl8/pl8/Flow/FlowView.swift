@@ -10,6 +10,8 @@ import PlateKit
 struct FlowView: View {
     @State var flow: Flow
     @State private var photoItem: PhotosPickerItem?
+    /// Resets when the touch ends or is cancelled: a cancel (no onEnded) still lets go of what was held.
+    @GestureState private var touching = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -18,14 +20,15 @@ struct FlowView: View {
                 FlowStageView(flow: flow)
                     .allowsHitTesting(false)
                 FlowQuestion(flow: flow)
-                    .offset(y: -flow.pan)
+                    .offset(y: -flow.pan - flow.uiPan)
                     .allowsHitTesting(false)
                 FlowLabels(flow: flow)
-                    .offset(y: -flow.pan)
+                    .offset(y: -flow.pan - flow.uiPan)
                     .allowsHitTesting(false)
                 stepUI
-                    .offset(y: -flow.pan)
+                    .offset(y: -flow.pan - flow.uiPan)
                     .opacity(flow.uiOpacity)
+                    .allowsHitTesting(flow.uiInteractive)
                 styleToggles
                 if let text = flow.readingText { FlowReading(text: text) }
             }
@@ -33,6 +36,7 @@ struct FlowView: View {
             .contentShape(Rectangle())
             .coordinateSpace(.named("flow"))
             .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("flow"))
+                .updating($touching) { _, state, _ in state = true }
                 .onChanged { value in
                     if flow.down == nil { flow.pointerDown(value.startLocation) }
                     if value.location != value.startLocation { flow.pointerMove(value.location) }
@@ -41,6 +45,7 @@ struct FlowView: View {
                     if flow.down == nil { flow.pointerDown(value.startLocation) }
                     flow.pointerUp(value.location)
                 })
+            .onChange(of: touching) { _, now in if !now { flow.pointerCancel() } }
             .onAppear { flow.viewSize = geometry.size }
             .onChange(of: geometry.size) { _, size in flow.viewSize = size }
         }
@@ -273,14 +278,15 @@ extension Flow {
         photoRequest = FlowPhotoRequest(kind: kind) { [weak self] image in
             guard let self else { return }
             self.readingText = text
-            let started = self.t
+            let started = self.t, question = self.clearings
             Task { @MainActor in
                 let ok = await read(image)
                 let wait = max(0, 3 - (self.t - started))
                 try? await Task.sleep(for: .seconds(wait))
                 self.readingText = nil
                 if ok { self.buzz(.success) } else { self.buzz(.warning) }
-                then(ok)
+                // Only if the same question is still on screen.
+                if self.clearings == question { then(ok) }
             }
         }
     }

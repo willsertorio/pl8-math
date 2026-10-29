@@ -26,6 +26,10 @@ final class Flow {
     var shown = 0
     /// The world has moved up by this many points (flPanSet): the question and the screen's UI move with it.
     var pan: CGFloat = 0
+    /// The screen's UI alone moves this much more, the 3D doesn't (the sets' drag back toward the kit).
+    var uiPan: CGFloat = 0
+    /// The step's own UI takes touches (not while a pan takes it away).
+    var uiInteractive = true
     /// The light grid background (the kit and sets), else orange.
     var alt = false
     /// The rough edges are on.
@@ -236,7 +240,8 @@ final class Flow {
         if tweenMark == mark { tweens = keep + tweens }
     }
     @ObservationIgnored private var tweenMark = UUID()
-    @ObservationIgnored private var clearings = 0
+    /// Bumped each time a question is cleared: work that finishes later (a photo read) checks it's still wanted.
+    @ObservationIgnored private(set) var clearings = 0
 
     @discardableResult
     func later(_ seconds: Double, _ fn: @escaping () -> Void) -> Int {
@@ -310,6 +315,7 @@ final class Flow {
         panning = true
         hit = nil; onTap = nil; onSwipe = nil; onSwipeDown = nil; drag = nil
         physics?.grab = nil
+        uiInteractive = false
         let height = panGeometry().height, grid0 = gridY
         anim(FlowPan.outDuration, { [weak self] u in
             guard let self else { return }
@@ -330,6 +336,8 @@ final class Flow {
         panning = false
         step = next
         pan = 0
+        uiPan = 0
+        uiInteractive = true
         applyStyle()
         switch next {
         case .name: stepName()
@@ -382,6 +390,10 @@ final class Flow {
     // MARK: - The finger (flBindPointer, flPanBackBind)
 
     func pointerDown(_ point: CGPoint) {
+        lastPoint = point
+        // Nothing to touch while a photo is being read.
+        if readingText != nil || photoRequest != nil { down = nil; drag = nil; panBackDrag = nil; return }
+        touchID += 1
         down = (point, t)
         drag = nil
         if !panning, let hit, let found = hit(point) { drag = found }
@@ -393,6 +405,8 @@ final class Flow {
     }
 
     func pointerMove(_ point: CGPoint) {
+        lastPoint = point
+        guard down != nil else { return }
         drag?.move?(point)
         if var back = panBackDrag, panBack {
             let dy = point.y - back.start.y, dx = point.x - back.start.x
@@ -427,6 +441,34 @@ final class Flow {
         if let onSwipeDown, dy > 55 && abs(dx) < abs(dy) { lightTicks += 1; onSwipeDown(); return }
         if tap, let onTap { onTap(point) }
     }
+
+    /// The system took the touch away (a call, Control Centre): finish it like a lift-off that isn't a tap.
+    func pointerCancel() {
+        // Asked when SwiftUI's touch state resets, which also happens at a normal lift-off: wait a turn, and only
+        // finish a touch that onEnded didn't.
+        let touch = touchID
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.touchID == touch, self.down != nil else { return }
+            self.finishCancelled()
+        }
+    }
+
+    private func finishCancelled() {
+        let point = lastPoint
+        if let back = panBackDrag, back.on {
+            let p0 = back.px
+            anim(FlowPan.springBackDuration, { [weak self] u in
+                var b = back; b.px = FlowPan.springBack(from: p0, at: u); self?.panLive(b)
+            })
+        }
+        panBackDrag = nil
+        let current = drag
+        drag = nil
+        down = nil
+        current?.up?(point, false)
+    }
+    @ObservationIgnored var lastPoint = CGPoint.zero
+    @ObservationIgnored var touchID = 0
 
     func panLive(_ back: PanDrag) {
         pan = back.px

@@ -134,11 +134,11 @@ public enum FlowProps {
         return (frame, platform, occluder)
     }
 
-    /// The abduction (flUnit): a light beam and a glowing pool on the floor.
+    /// The abduction (flUnit): a light beam and a glowing pool on the floor (start them faded out).
     public static func beam() -> (beam: FlowNode, pool: FlowNode) {
         let beam = FlowNode.part(FlowPart("beam", mesh: Geo.cylinder(top: 0.22, bottom: 0.62, height: 7, segments: 28, openEnded: true),
-                                          paint: .colour(RGB(1, 1, 1)), shade: .flat, opacity: 0, twoSided: true))
-        let pool = FlowNode.part(FlowPart("pool", mesh: Geo.circle(radius: 0.62, segments: 28), paint: .colour(RGB(1, 1, 1)), shade: .flat, opacity: 0),
+                                          paint: .colour(RGB(1, 1, 1)), shade: .flat, twoSided: true))
+        let pool = FlowNode.part(FlowPart("pool", mesh: Geo.circle(radius: 0.62, segments: 28), paint: .colour(RGB(1, 1, 1)), shade: .flat),
                                  rotation: [-.pi / 2, 0, 0])
         return (beam, pool)
     }

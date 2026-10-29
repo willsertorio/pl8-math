@@ -12,7 +12,7 @@ extension Flow {
         let preset = editOne ? list.firstIndex(of: data.bar) : nil
         var position = Float(preset ?? 1), velocity: Float = 0, index = Int(position), dragging = false, done = false, ready = false
         var arrived: Double?
-        var labelsOn = false
+        var labelsAt: Double?
 
         say("What bar do you use?") { [weak self] in
             guard let self else { return }
@@ -34,7 +34,7 @@ extension Flow {
             }
             // They slide in from the left, one after another, each braking into its place.
             arrived = self.t
-            self.later(0.95) { ready = true; labelsOn = true }
+            self.later(0.95) { [weak self] in ready = true; labelsAt = self?.t }
         }
 
         let pick = { [weak self] in
@@ -77,7 +77,8 @@ extension Flow {
                 item.bar.orientation = simd_quatf(angle: Float(t) * 0.6 + Float(i), axis: [0, 1, 0])
                 if !(done && i == index) { item.tilt.orientation = simd_quatf(angle: -0.24 + (1 - e) * 0.5, axis: [0, 0, 1]) }
                 if let point = self.project([item.wrap.position.x, -1.85, 0]) {
-                    labels.append(FlowLabel(id: i, text: "\(WeightUnit.trimmed(list[i])) \(unit.rawValue)", point: point, opacity: labelsOn ? 1 : 0))
+                    let opacity = labelsAt.map { min(1, max(0, (t - $0) / 0.3)) } ?? 0
+                    labels.append(FlowLabel(id: i, text: "\(WeightUnit.trimmed(list[i])) \(unit.rawValue)", point: point, opacity: opacity))
                 }
             }
             self.labels = labels
