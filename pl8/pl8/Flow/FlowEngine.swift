@@ -45,9 +45,13 @@ final class Flow {
     /// Asking the photo library for a picture (the system picker).
     var photoRequest: FlowPhotoRequest?
     // Haptics, as counters SwiftUI's .sensoryFeedback watches.
-    var selectionTicks = 0, lightTicks = 0, successTicks = 0, warningTicks = 0
+    var selectionTicks = 0
+    var lightTicks = 0
+    var successTicks = 0
+    var warningTicks = 0
     /// The user flipped the step's default look (the W and C keys in the prototype).
-    var userRough = false, userBackground = false
+    var userRough = false
+    var userBackground = false
 
     // MARK: - The stage
 
@@ -86,7 +90,8 @@ final class Flow {
     @ObservationIgnored var direct = false
     /// The model says what the question is answering (an edit from the gym room goes back to the menu).
     @ObservationIgnored var editOne = false
-    @ObservationIgnored var fromMenu = false, fromKit = false
+    @ObservationIgnored var fromMenu = false
+    @ObservationIgnored var fromKit = false
     /// Where the PR dial goes when it's done (flPrRet).
     @ObservationIgnored var prReturn: Step?
     /// The workout has been read again after the first session ("What are we doing today?").
@@ -113,7 +118,8 @@ final class Flow {
     @ObservationIgnored var menuPosition: Float = 0
     @ObservationIgnored var menuActive: String?
     /// Effects.
-    @ObservationIgnored var trauma: Float = 0, fovKick: Float = 0
+    @ObservationIgnored var trauma: Float = 0
+    @ObservationIgnored var fovKick: Float = 0
     @ObservationIgnored var dust: [FlowDust] = []
     @ObservationIgnored var sparkles: [FlowSparkle] = []
     @ObservationIgnored var squashes: [ObjectIdentifier: FlowSquash] = [:]
