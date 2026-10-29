@@ -164,9 +164,11 @@ extension Flow {
                 continue
             }
             guard budget > 0 else { continue }
-            // Turned more than 3.5° (the light comes in steps; finer re-lighting doesn't show), or new colours.
-            let orientation = item.model.orientation(relativeTo: nil)
-            if item.dirty || abs(simd_dot(baked.vector, orientation.vector)) < 0.99953 || !bakedState.sameColours(as: item.state) {
+            // Turned more than 3.5° (the light comes in steps; finer re-lighting doesn't show), or new colours. In
+            // the menu 30°: its things only sway (±14°), and the gym room's ~250 parts re-lit as one stuttered;
+            // its walls folding open still re-light.
+            let orientation = item.model.orientation(relativeTo: nil), turn: Float = step == .menu ? 0.96593 : 0.99953
+            if item.dirty || abs(simd_dot(baked.vector, orientation.vector)) < turn || !bakedState.sameColours(as: item.state) {
                 bake(item)
                 budget -= 1
                 if budget == 0 { reshadeCursor = index + 1 }

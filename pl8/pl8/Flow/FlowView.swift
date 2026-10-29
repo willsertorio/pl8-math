@@ -250,9 +250,12 @@ struct FlowReading: View {
     var body: some View {
         ZStack {
             Color.white.opacity(0.8)
-            SketchStageView { stage.build(unit: unit) }
-                .frame(width: 168, height: 168)
-                .task { await stage.run() }
+            // Full screen like the other sketch stages (a small one came out full size anyway); the camera stands
+            // back so the plate is as big as in the prototype's 168-point square.
+            GeometryReader { geometry in
+                SketchStageView { stage.build(unit: unit, screenHeight: Float(geometry.size.height)) }
+                    .task { await stage.run() }
+            }
         }
         .ignoresSafeArea()
         .accessibilityElement()
@@ -267,7 +270,7 @@ final class ReadingPlateStage {
     private let spin = Entity()
     private let tip = Entity()
 
-    func build(unit: WeightUnit) -> [Entity] {
+    func build(unit: WeightUnit, screenHeight: Float) -> [Entity] {
         guard let plate = Plate.catalog(unit).first else { return [] }
         let parts = SessionScene.parts(.init(plate: plate, centre: .zero, axis: .y, turn: 0))
         let still = RoomLayout.Placement(position: .zero, rotationDegrees: 0)
@@ -277,10 +280,10 @@ final class ReadingPlateStage {
         }
         spin.addChild(tip)
         pose(0)
-        // The prototype's camera: 30°, 1.12 m back.
+        // The prototype's camera: 30°, 1.12 m back from a 168-point view; here the view is the screen.
         let camera = PerspectiveCamera()
         camera.camera.fieldOfViewInDegrees = 30
-        camera.position = [0, 0, 1.12]
+        camera.position = [0, 0, 1.12 * max(168, screenHeight) / 168]
         return [spin, camera]
     }
 
