@@ -112,6 +112,8 @@ final class Flow {
     @ObservationIgnored var setsProxy: (entity: Entity, kit: FlowCam, up: SIMD3<Float>, worldPerPoint: Float, height: CGFloat)?
     /// The session the scale weighs.
     @ObservationIgnored var lastPlan: FlowPlan?
+    /// For the CI's pictures: time stands still.
+    @ObservationIgnored var frozen = false
     /// For the CI's pictures: ticks a checklist box as if drawn.
     @ObservationIgnored var debugDecide: ((Int) -> Void)?
     /// The menu: where the carousel is, which item is awake.
@@ -156,6 +158,8 @@ final class Flow {
     // MARK: - The frame
 
     private func frame(_ delta: Float) {
+        // For the CI's pictures of a moment mid-animation: everything stops, the picture stays.
+        if frozen { return }
         let dt = min(0.05, max(0, delta))
         t += Double(dt)
         tick?(dt, t)

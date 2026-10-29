@@ -47,17 +47,13 @@ public enum FlowLight {
         return finish(base.linear * irradiance / Float.pi, shine: shine)
     }
 
-    /// A standard (physically based) face: Lambert diffuse for what isn't metal, and the sun's highlight
-    /// spread over the face for what is (no environment map, like the prototype, so metal stays dark away
-    /// from the sun).
+    /// A standard (physically based) face: Lambert diffuse for what isn't metal. The prototype has no environment
+    /// map, so metal reflects next to nothing: a chrome hub reads black, a steel bar dark grey (its 10 % diffuse).
     public static func standard(_ base: RGB, normal: SIMD3<Float>, roughness: Float, metalness: Float, shine: Float = 0) -> RGB {
         let n = normal.normalized
         let lit = max(0, n.dot(sun))
         let diffuse = base.linear * (1 - metalness) * (hemisphereIrradiance(n) + SIMD3(repeating: sunIntensity * lit)) / Float.pi
-        // The metal's reflection of the sky, which three.js gets from the hemisphere when it's rough enough.
-        let f0 = SIMD3<Float>(repeating: 0.04) + (base.linear - SIMD3(repeating: 0.04)) * metalness
-        let sheen = f0 * (0.35 * hemisphereIrradiance(n) / Float.pi + SIMD3(repeating: sunIntensity * lit * (1 - roughness) * 0.6))
-        return finish(diffuse + sheen, shine: shine)
+        return finish(diffuse, shine: shine)
     }
 
     /// The tint for a printed face: the light on a white surface, as a colour (clamped to 1).

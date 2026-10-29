@@ -59,7 +59,8 @@ struct ScreenshotHost: View {
     /// The Flow's screens (SPEC 2.0): `flow-<step>`, plus states — `flow-plates-ticked`, `flow-sets-last`,
     /// `flow-menu-<train|prs|gym>` (that item awake).
     static func flowStart(_ shot: String) -> Flow.Step {
-        let name = String(shot.dropFirst(5))
+        let name = String(shot.dropFirst(5)).components(separatedBy: "-").first ?? ""
+        if name == "prDial" { return .prDial }
         if name.hasPrefix("menu") { return .menu }
         if name.hasPrefix("sets") { return .sets }
         if name.hasPrefix("plates") { return .plates }
@@ -75,12 +76,78 @@ struct ScreenshotHost: View {
             flow.setIndex = plan.sets.count - 1
             flow.doneSets = Set(0..<(plan.sets.count - 1))
         }
-        if shot.hasPrefix("flow-menu-") { flow.menuActive = String(shot.dropFirst(10)) }
+        if shot.hasPrefix("flow-menu-") { flow.menuActive = ["back": "prs", "delete": "gym"][String(shot.dropFirst(10))] ?? String(shot.dropFirst(10)) }
+        script(flow, shot: shot)
         if shot == "flow-plates-ticked" {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(5))
                 for (row, yes) in [true, true, false, true, true, false, true].enumerated() { flow.debugDecide?(row * 2 + (yes ? 0 : 1)) }
             }
+        }
+    }
+
+    /// Gestures replayed by a script, so the CI sees the interactions work: `flow-name-locked` (both dials tapped →
+    /// the units question), `flow-unit-abduct` (KG dropped on the scale, frozen mid-abduction), `flow-plates-stroke`
+    /// (a stroke down the YES column, held), `flow-plates-done` (released → the bar question),
+    /// `flow-kit-down` / `flow-kit-up` (drag previews, held), `flow-sets-drag` (the card half-way to the next set),
+    /// `flow-menu-back` (an awake item pulled half-way back), `flow-menu-delete` (holding the gym → the alert).
+    static func script(_ flow: Flow, shot: String) {
+        func at(_ seconds: Double, _ action: @escaping @MainActor () -> Void) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(seconds))
+                action()
+            }
+        }
+        /// A finger drag from a to b over `duration`, released or held.
+        func drag(_ a: @escaping @MainActor () -> CGPoint, by delta: CGPoint, at start: Double, duration: Double = 0.6, release: Bool) {
+            at(start) {
+                let from = a()
+                flow.pointerDown(from)
+                let steps = 20
+                for i in 1...steps {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(duration * Double(i) / Double(steps)))
+                        let p = CGPoint(x: from.x + delta.x * CGFloat(i) / CGFloat(steps), y: from.y + delta.y * CGFloat(i) / CGFloat(steps))
+                        flow.pointerMove(p)
+                        if i == steps && release { flow.pointerUp(p) }
+                    }
+                }
+            }
+        }
+        func tap(_ p: @escaping @MainActor () -> CGPoint, at time: Double) {
+            at(time) { let q = p(); flow.pointerDown(q); flow.pointerUp(q) }
+        }
+        let project = { (p: SIMD3<Float>) in flow.project(p) ?? .zero }
+        switch shot {
+        case "flow-name-locked":
+            tap({ project([-0.62, -0.45, 0.95]) }, at: 4.5)
+            tap({ project([0.62, -0.45, 0.95]) }, at: 5.2)
+        case "flow-unit-abduct":
+            // KG picked up and carried over the scale (the finger aims at the carrying height), let go, then
+            // frozen a moment into the abduction.
+            at(7) {
+                let from = project([-0.95, 0.39, -0.55]), to = project([0, 0.94, 1.55])
+                drag({ from }, by: CGPoint(x: to.x - from.x, y: to.y - from.y), at: 0, duration: 0.6, release: true)
+            }
+            at(9.3) { flow.frozen = true }
+        case "flow-plates-stroke", "flow-plates-done":
+            let from = { flow.screen(262, 214 + 576 / 10 * 0.5) }
+            drag(from, by: CGPoint(x: 0, y: 576 * 0.9 * flow.layoutScale), at: 5, duration: 1.0, release: shot == "flow-plates-done")
+            if shot == "flow-plates-stroke" { at(6.1) { flow.frozen = true } }
+        case "flow-kit-down", "flow-kit-up":
+            let dy: CGFloat = shot == "flow-kit-down" ? 170 : -170
+            drag({ flow.screen(195, 150) }, by: CGPoint(x: 0, y: dy * flow.layoutScale), at: 7, duration: 0.5, release: false)
+            at(7.8) { flow.frozen = true }
+        case "flow-sets-drag":
+            drag({ flow.screen(195, 300) }, by: CGPoint(x: 0, y: -90 * flow.layoutScale), at: 5, duration: 0.5, release: false)
+            at(5.8) { flow.frozen = true }
+        case "flow-menu-back":
+            drag({ flow.screen(195, 600) }, by: CGPoint(x: 0, y: -160 * flow.layoutScale), at: 5, duration: 0.5, release: false)
+            at(5.8) { flow.frozen = true }
+        case "flow-menu-delete":
+            at(5) { flow.pointerDown(project([0, 0.5, 0])) }
+        default:
+            break
         }
     }
 

@@ -32,12 +32,7 @@ struct SessionOverView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                Text("Heaviest set")
-                    .font(Theme.display(14))
-                    .tracking(2.2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(cream)
-                    .padding(.top, 24)
+                // The Flow's scale shows no label (the prototype passes "Heaviest set" but hides it).
                 Spacer()
                 // Each word simply appears, one after another (the prototype's dMsgIn "words", 260 ms apart).
                 HStack(spacing: 0) {
@@ -50,7 +45,7 @@ struct SessionOverView: View {
                 .foregroundStyle(cream)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
-                .padding(.bottom, 140)
+                .padding(.bottom, 200)
                 .accessibilityElement(children: .combine)
             }
         }

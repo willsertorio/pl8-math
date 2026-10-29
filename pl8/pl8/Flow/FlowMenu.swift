@@ -90,6 +90,8 @@ extension Flow {
         menuUI = ui
         let keys = ["train", "prs", "gym"], titles = ["Train", "My PRs", "Gym"]
         var wrappers: [Entity] = [], models: [Entity] = [], shadows: [Entity] = []
+        // Back from an edit, the awake item is already in the middle.
+        if let back = menuActive.flatMap({ keys.firstIndex(of: $0) }) { menuPosition = Float(back) }
         var position = menuPosition, velocity: Float = 0, index = Int(position.rounded()), dragging = false
         var active: Int?, k: Float = 0, busy = false
 
