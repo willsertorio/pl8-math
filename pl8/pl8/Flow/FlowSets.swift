@@ -494,7 +494,7 @@ struct SetCard: View {
             HStack(spacing: 6) {
                 ForEach(group, id: \.self) { j in
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(done.contains(j) ? Color(rgb: FlowLook.orange) : j == index ? dark : dark.opacity(0x22 / 255))
+                        .fill(done.contains(j) ? Color(rgb: FlowLook.orange) : j == index ? dark : dark.opacity(Double(0x22) / 255))
                         .frame(height: 7)
                 }
             }

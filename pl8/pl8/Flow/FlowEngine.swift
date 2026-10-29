@@ -227,6 +227,7 @@ final class Flow {
         if tweenMark == mark { tweens = keep + tweens }
     }
     @ObservationIgnored private var tweenMark = UUID()
+    @ObservationIgnored private var clearings = 0
 
     @discardableResult
     func later(_ seconds: Double, _ fn: @escaping () -> Void) -> Int {
@@ -244,7 +245,9 @@ final class Flow {
         guard timers.contains(where: { $0.at <= t }) else { return }
         let due = timers.filter { $0.at <= t }.sorted { $0.at < $1.at }
         timers.removeAll { $0.at <= t }
-        for timer in due { timer.fn() }
+        let generation = clearings
+        // A timer that changes the question clears the rest of the old question's timers.
+        for timer in due where clearings == generation { timer.fn() }
     }
 
     // MARK: - The question (flSay)
@@ -266,6 +269,8 @@ final class Flow {
         for child in Array(scene.children) { child.removeFromParent() }
         tick = nil; drag = nil; hit = nil; onSwipe = nil; onTap = nil; onSwipeDown = nil
         tweens = []; timers = []
+        tweenMark = UUID()
+        clearings += 1
         question = []; shown = 0
         labels = []
         dust = []; sparkles = []; squashes = [:]; hitSizes = [:]

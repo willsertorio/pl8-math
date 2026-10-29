@@ -44,11 +44,15 @@ extension Flow {
         let world = FlowPhysicsWorld(parent: scene)
         physics = world
         world.floor()
-        world.fences([(0, -3.1, 3.2, 0.2), (0, 1.3, 3.2, 0.2), (-1.65, -0.9, 0.2, 2.6), (1.65, -0.9, 0.2, 2.6)])
+        let spots = FlowKitLayout.spots(kit: plan.kit, unit: plan.unit)
+        // Fences just out of view; the near one stays clear of the last row (the prototype's could catch the
+        // smallest plates on top of it).
+        let near = max(1.3, (spots.map { $0.z + Float($0.plate.diameter) / 2 }.max() ?? 0) + 0.45)
+        world.fences([(0, -3.1, 3.2, 0.2), (0, near, 3.2, 0.2), (-1.65, -0.9, 0.2, 2.6), (1.65, -0.9, 0.2, 2.6)])
         let placed = kitPlaced
         kitPlaced = false
         var items: [FlowKitPlate] = []
-        for (order, spot) in FlowKitLayout.spots(kit: plan.kit, unit: plan.unit).enumerated() {
+        for (order, spot) in spots.enumerated() {
             let plate = spot.plate, radius = Float(plate.diameter) / 2, thickness = Float(plate.thickness)
             let model = build(FlowProps.plate(plate))
             let entity = Entity()
