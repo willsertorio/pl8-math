@@ -260,7 +260,7 @@ extension Flow {
         guard let image, let texture = try? TextureResource(image: image, options: .init(semantic: .color)) else { return nil }
         var material = UnlitMaterial(applyPostProcessToneMap: false)
         material.color = .init(tint: .white, texture: .init(texture))
-        material.blending = .transparent(opacity: 1)
+        material.blending = .transparent(opacity: .init(floatLiteral: 1))
         let plane = ModelEntity(mesh: (try? Flow.meshResource(Geo.plane(size.x, size.y), palette: false)) ?? .generatePlane(width: size.x, depth: size.y),
                                 materials: [material])
         // Laid flat facing up (like softShadow): the picture's top row, the far side (smallest z), goes to −Z.
