@@ -40,4 +40,4 @@ SPEC.md  CLAUDE.md  DECISIONS.md
 - `reference/plate-math-web-prototype.html` — the earlier prototype whose plate rules were tested at the box; the golden values come from it.
 
 ## Current milestone
-M7 — the Flow (design/flow-handoff), started 2026-10-29, built 2026-10-29 (checked against the prototype in CI pictures; waiting on Will’s check on his iPhone). M6 built 2026-10-17. M0–M2 done 2026-10-13, M3 done 2026-10-14, M5 done 2026-10-15, M4 done 2026-10-16 (used in a real class; session page reworked from that). (Update this line as milestones finish.)
+M7 — the Flow (design/flow-handoff, now v2: Helvetica Neue, Swiss red, the question lower), started 2026-10-29, built 2026-10-29, v2 applied the same night (checked against the v2 prototype in CI pictures; waiting on Will’s check on his iPhone). M6 built 2026-10-17. M0–M2 done 2026-10-13, M3 done 2026-10-14, M5 done 2026-10-15, M4 done 2026-10-16 (used in a real class; session page reworked from that). (Update this line as milestones finish.)
