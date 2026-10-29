@@ -47,14 +47,17 @@ extension Flow {
         let ui = PlatesUI()
         ui.fontSize = (min(20, rowH * 0.36)).rounded()
         platesUI = ui
-        var models: [(wrapper: Entity, plate: Entity)] = []
+        var models: [(wrapper: Entity, plate: Entity, ghost: Entity)] = []
         var done = false, ready = false
         let editing = editOne
         var idle: Int?
 
-        let paint = { [weak self] (row: Int) in
-            guard let self, models.indices.contains(row) else { return }
-            self.setGrey(ui.rows[row].state == false, under: models[row].wrapper)
+        // A NO plate turns grey and see-through: its flat grey twin shows instead.
+        let paint = { (row: Int) in
+            guard models.indices.contains(row) else { return }
+            let no = ui.rows[row].state == false
+            models[row].plate.isEnabled = !no
+            models[row].ghost.isEnabled = no
         }
         let owned = { ui.rows.filter { $0.state == true }.map { plates[$0.index].size } }
         let finish = { [weak self] in
@@ -107,12 +110,16 @@ extension Flow {
                 let model = self.build(FlowProps.plate(plate))
                 model.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
                 wrapper.addChild(model)
+                let ghost = self.build(FlowProps.ghost(plate))
+                ghost.orientation = model.orientation
+                ghost.isEnabled = false
+                wrapper.addChild(ghost)
                 wrapper.scale = SIMD3(repeating: scale)
                 let ty = wy(y)
                 wrapper.position = [wx(58), ty + 4, 0]
                 wrapper.isEnabled = false
                 self.add(wrapper)
-                models.append((wrapper, model))
+                models.append((wrapper, model, ghost))
                 self.later(Double(i) * 0.07) { [weak self] in
                     wrapper.isEnabled = true
                     self?.anim(0.55, { u in
@@ -209,7 +216,9 @@ extension Flow {
             guard let self else { return }
             ui.now = t
             for (i, model) in models.enumerated() {
-                model.plate.orientation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) * simd_quatf(angle: sin(Float(t) * 0.8 + Float(i)) * 0.12, axis: [0, 1, 0])
+                let turn = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) * simd_quatf(angle: sin(Float(t) * 0.8 + Float(i)) * 0.12, axis: [0, 1, 0])
+                model.plate.orientation = turn
+                model.ghost.orientation = turn
             }
             for b in ui.boxes.indices {
                 let u = (t - ui.boxes[b].bornAt) / 0.36

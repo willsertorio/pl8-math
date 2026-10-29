@@ -26,10 +26,9 @@ struct SessionOverView: View {
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
-            RealityView { content in
-                for entity in stage.build(perSide: perSide, unit: unit, barWeight: barWeight) { content.add(entity) }
-            }
-            .ignoresSafeArea()
+            // Drawn like the prototype's 'done' layer: through the sketch pass, rough on the orange.
+            SketchStageView { stage.build(perSide: perSide, unit: unit, barWeight: barWeight, sketched: true) }
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // The Flow's scale shows no label (the prototype passes "Heaviest set" but hides it).
@@ -82,21 +81,23 @@ final class ScaleStage {
     private var rest = Transform()
     var onLanding: () -> Void = {}
 
-    func build(perSide: [Double], unit: WeightUnit, barWeight: Double) -> [Entity] {
+    /// - Parameter sketched: drawn through the sketch pass (no orange sky box, no outline strokes of its own).
+    func build(perSide: [Double], unit: WeightUnit, barWeight: Double, sketched: Bool = false) -> [Entity] {
         self.unit = unit
         self.barWeight = barWeight
         let world = Entity()
         let still = RoomLayout.Placement(position: .zero, rotationDegrees: 0)
+        let ink = { (parts: [PropPart]) in sketched ? parts.filter { $0.tone != .flat(Look.ink) } : parts }
         // The orange all round, then the scale, lit like the room.
-        if let sky = try? ModelEntity(mesh: Diorama.meshResource(LowPolyMesh.box(size: [200, 200, 200]).insideOut()),
+        if !sketched, let sky = try? ModelEntity(mesh: Diorama.meshResource(LowPolyMesh.box(size: [200, 200, 200]).insideOut()),
                                       materials: [Diorama.flat(Diorama.background)]) {
             world.addChild(sky)
         }
         let parts = ScaleScene.parts()
-        for child in Diorama.entities(for: SceneBake.bake(parts.base, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
+        for child in Diorama.entities(for: SceneBake.bake(ink(parts.base), placement: still, wall: nil, content: .withoutShadows), duotone: true) {
             world.addChild(child)
         }
-        for child in Diorama.entities(for: SceneBake.bake(parts.platform, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
+        for child in Diorama.entities(for: SceneBake.bake(ink(parts.platform), placement: still, wall: nil, content: .withoutShadows), duotone: true) {
             platform.addChild(child)
         }
         world.addChild(platform)
@@ -113,9 +114,11 @@ final class ScaleStage {
         dropEntities = drops.map { drop in
             var parts = drop.plate.map { SessionScene.parts(.init(plate: $0, centre: .zero, axis: .y, turn: drop.turn)) }
                 ?? PropModels.barbellParts()
-            // The prototype's rough sketch line round it.
-            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(drop.at * 100)),
-                                  tone: .flat(Look.ink), inked: false, casts: false))
+            // The prototype's rough sketch line round it (the sketch pass draws it when there is one).
+            if !sketched {
+                parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(drop.at * 100)),
+                                      tone: .flat(Look.ink), inked: false, casts: false))
+            }
             let entity = Entity()
             for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
                 entity.addChild(child)
@@ -199,12 +202,13 @@ final class ScaleStage {
 
     private static func readout(_ value: Double, unit: WeightUnit) -> UIImage {
         let size = CGSize(width: 512, height: 224)
-        let dark = Diorama.uiColor(RGB(hex: "#2B1E16")), cream = Diorama.uiColor(Look.boxLight)
+        // Box dark, like everything dark in the prototype's two-tone scale (no third colour).
+        let dark = Diorama.uiColor(Look.boxDark), cream = Diorama.uiColor(Look.boxLight)
         return UIGraphicsImageRenderer(size: size).image { _ in
             dark.setFill()
             UIRectFill(CGRect(origin: .zero, size: size))
             let number = NSAttributedString(string: WeightUnit.trimmed(value), attributes: [
-                .font: UIFont.monospacedSystemFont(ofSize: 120, weight: .bold), .foregroundColor: cream])
+                .font: UIFont.monospacedSystemFont(ofSize: 120, weight: .regular), .foregroundColor: cream])
             let label = NSAttributedString(string: unit.rawValue, attributes: [
                 .font: UIFont.monospacedSystemFont(ofSize: 54, weight: .bold), .foregroundColor: cream])
             let n = number.size(), l = label.size()

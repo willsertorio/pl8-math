@@ -100,7 +100,7 @@ jobs:
           mkdir -p screens
           for shot in opening-title flow-name flow-unit flow-plates flow-plates-ticked flow-bar flow-prs flow-prDial flow-wod flow-kit flow-sets flow-sets-last flow-done flow-menu flow-menu-train flow-menu-prs flow-menu-gym flow-name-locked flow-unit-abduct flow-plates-stroke flow-plates-done flow-kit-down flow-kit-up flow-sets-drag flow-menu-back flow-menu-delete; do
             xcrun simctl launch --terminate-running-process "$DEVICE" com.williansertorio.pl8 -pl8Shot "$shot"
-            sleep 15
+            sleep 20
             xcrun simctl io "$DEVICE" screenshot "screens/$shot.png"
           done
 

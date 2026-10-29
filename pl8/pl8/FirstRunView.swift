@@ -317,10 +317,9 @@ struct OpeningTitle: View {
         ZStack {
             Theme.background
             GeometryReader { geometry in
-                RealityView { content in
-                    for entity in stage.build(aspect: Float(geometry.size.width / max(1, geometry.size.height))) { content.add(entity) }
-                }
-                .task { await stage.run(tilting: motionEffects && !reduceMotion) }
+                // Drawn like the prototype's layer: through the sketch pass, which outlines each plate.
+                SketchStageView { stage.build(aspect: Float(geometry.size.width / max(1, geometry.size.height)), sketched: true) }
+                    .task { await stage.run(tilting: motionEffects && !reduceMotion) }
             }
             Text("pl8(math)")
                 .font(Theme.display(39))
@@ -343,10 +342,11 @@ final class TitleStage {
     private var aspect: Float = 390.0 / 844.0
     private var built = false
 
-    func build(aspect: Float) -> [Entity] {
+    /// - Parameter sketched: drawn through the sketch pass (no orange sky box, no outline strokes of its own).
+    func build(aspect: Float, sketched: Bool = false) -> [Entity] {
         self.aspect = aspect
         let root = Entity()
-        if let sky = try? ModelEntity(mesh: Diorama.meshResource(LowPolyMesh.box(size: [200, 200, 200]).insideOut()),
+        if !sketched, let sky = try? ModelEntity(mesh: Diorama.meshResource(LowPolyMesh.box(size: [200, 200, 200]).insideOut()),
                                       materials: [Diorama.flat(Diorama.background)]) {
             root.addChild(sky)
         }
@@ -358,7 +358,9 @@ final class TitleStage {
             let item = field.plates[i]
             let scale = item.radius / (TitleStage.halfHeight * 2 * 0.9) / (Float(plate.diameter) / 2)
             let width = 2.5 * item.z / (scale * TitleStage.halfHeight * 2 * 0.9)
-            parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17, width: width, justTheRim: true), tone: .flat(Look.ink), inked: false, casts: false))
+            if !sketched {
+                parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17, width: width, justTheRim: true), tone: .flat(Look.ink), inked: false, casts: false))
+            }
             let entity = Entity()
             for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
                 entity.addChild(child)

@@ -123,8 +123,12 @@ struct FlowBackground: View {
                 colour
             } else if flow.alt {
                 Color(rgb: FlowLook.light)
+                // CSS radial-gradient(ellipse at 50% 55%, white .55, transparent 70%): farthest-corner, so the
+                // ellipse reaches 0 at 0.7 × √2 × (half the width, 55 % of the height).
+                let size = flow.viewSize, rx = 0.7 * 2.squareRoot() * size.width / 2, ry = 0.7 * 2.squareRoot() * size.height * 0.55
                 RadialGradient(colors: [Color.white.opacity(0.55), Color.white.opacity(0)], center: UnitPoint(x: 0.5, y: 0.55),
-                               startRadius: 0, endRadius: 0.7 * max(flow.viewSize.width, flow.viewSize.height))
+                               startRadius: 0, endRadius: rx)
+                    .scaleEffect(x: 1, y: ry / max(1, rx), anchor: UnitPoint(x: 0.5, y: 0.55))
                 FlowGrid(offset: flow.gridY)
             } else {
                 Color(rgb: FlowLook.orange)
@@ -142,7 +146,8 @@ struct FlowGrid: View {
         Canvas { context, size in
             let step: CGFloat = 26, colour = Color(red: 108 / 255, green: 55 / 255, blue: 19 / 255).opacity(0.09)
             let dy = (offset.truncatingRemainder(dividingBy: step) + step).truncatingRemainder(dividingBy: step)
-            let x0 = (size.width / 2).truncatingRemainder(dividingBy: step), y0 = (size.height / 2).truncatingRemainder(dividingBy: step) + dy
+            // The prototype's tile is centred across and offset by the pan down: lines at x = (w − 26)/2 + 26k.
+            let x0 = ((size.width - step) / 2).truncatingRemainder(dividingBy: step), y0 = dy
             var path = Path()
             var x = x0 - step
             while x < size.width + step { path.addRect(CGRect(x: x, y: 0, width: 1, height: size.height)); x += step }

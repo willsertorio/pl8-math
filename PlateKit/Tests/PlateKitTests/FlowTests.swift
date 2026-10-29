@@ -136,3 +136,29 @@ struct FlowGeometryTests {
         for name in ["flag", "bars", "plates", "bell", "frontPivot", "rightPivot", "lid"] { #expect(room.find(name) != nil) }
     }
 }
+
+@Suite("Flow details")
+struct FlowDetailTests {
+    @Test("Lift names read in sentence case in the Flow (the prototype's \"Back squat?\")")
+    func sentenceCase() {
+        #expect(LiftNames.sentenceCase("Back Squat") == "Back squat")
+        #expect(LiftNames.sentenceCase("Clean & Jerk") == "Clean & jerk")
+        #expect(LiftNames.sentenceCase("Snatch") == "Snatch")
+    }
+
+    @Test("A plate's printed faces are two parts, one per side, so each is lit for its own side")
+    func plateFaces() {
+        let plate = FlowProps.plate(Plate.find(20, .kg)!)
+        let faces = plate.parts.filter { $0.name == "face" }
+        #expect(faces.count == 2)
+        let up = { (part: FlowPart) in (0..<part.mesh.triangleCount).allSatisfy { part.mesh.faceNormal($0).y > 0.9 } }
+        let down = { (part: FlowPart) in (0..<part.mesh.triangleCount).allSatisfy { part.mesh.faceNormal($0).y < -0.9 } }
+        #expect(faces.contains(where: up) && faces.contains(where: down))
+    }
+
+    @Test("A missing plate's ghost is flat grey at 30 %")
+    func ghost() {
+        let ghost = FlowProps.ghost(Plate.find(5, .kg)!)
+        #expect(ghost.parts.allSatisfy { $0.shade == .flat && $0.opacity == 0.3 })
+    }
+}

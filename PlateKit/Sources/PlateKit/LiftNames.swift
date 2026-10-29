@@ -26,6 +26,12 @@ public enum LiftNames {
 
     /// "  back   squat " → "Back Squat", "BS" → "Back Squat", "backsquat" → "Back Squat" (spaces, dashes and
     /// case don't make a new lift). Unknown lifts are tidied the same way every time: "pull ups" → "Pull Ups".
+    /// "Back Squat" → "Back squat": how the Flow's questions and the PR notebook write a lift.
+    public static func sentenceCase(_ name: String) -> String {
+        guard let first = name.first else { return name }
+        return String(first).uppercased() + name.dropFirst().lowercased()
+    }
+
     public static func canonical(_ name: String) -> String {
         let tidy = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         if let known = lookup[tidy.lowercased()] ?? compactLookup[key(tidy)] { return known }

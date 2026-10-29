@@ -131,7 +131,7 @@ extension Flow {
             made.set(max(0, min(values.count - 1, Int((start / step).rounded()))))
             dial = made
         }
-        say("\(record.lift)?") { [weak self] in
+        say("\(LiftNames.sentenceCase(record.lift))?") { [weak self] in
             guard let self else { return }
             buildDial(nil)
             if let root = dial?.root { self.popIn(root) }

@@ -106,7 +106,7 @@ final class FlowData {
     var prRows: [String] {
         records.compactMap { record in
             guard let value = record.value, value > 0 else { return nil }
-            return "\(record.lift)  \(WeightUnit.trimmed(value)) \(record.unit.rawValue)"
+            return "\(LiftNames.sentenceCase(record.lift))  \(WeightUnit.trimmed(value)) \(record.unit.rawValue)"
         }
     }
 

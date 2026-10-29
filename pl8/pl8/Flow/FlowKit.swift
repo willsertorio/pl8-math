@@ -24,6 +24,8 @@ final class FlowKitPlate {
     let plate: Plate
     var body: FlowBody?
     var clicked = false
+    /// When it first touched the floor: for a moment after, it doesn't skid (cannon's plates stay on their spot).
+    var landedAt: Double?
 
     init(entity: Entity, model: Entity, plate: Plate) {
         self.entity = entity
@@ -85,6 +87,7 @@ extension Flow {
                             if !item.clicked && v > 1.5 { item.clicked = true; self.click(0.4) }
                             return
                         }
+                        if item.landedAt == nil { item.landedAt = self.t }
                         let axis = entity.orientation(relativeTo: nil).act([0, 1, 0])
                         let flat = abs(axis.y) > 0.7
                         let at = flat ? entity.position(relativeTo: nil) : event.position
@@ -101,6 +104,18 @@ extension Flow {
         ui.shownAt = t
         kitUI = ui
 
+        world.onStep = { [weak self] dt in
+            guard let self else { return }
+            for item in items {
+                guard let landed = item.landedAt, self.t - landed < 0.8, world.grab?.body !== item.body,
+                      var motion = item.entity.components[PhysicsMotionComponent.self] else { continue }
+                let k = exp(-14 * dt)
+                motion.linearVelocity.x *= k
+                motion.linearVelocity.z *= k
+                motion.angularVelocity.y *= k
+                item.entity.components.set(motion)
+            }
+        }
         let preview = kitPreview()
         hit = { [weak self] point in
             guard let self else { return nil }

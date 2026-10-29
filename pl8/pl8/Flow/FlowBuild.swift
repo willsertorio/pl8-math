@@ -300,7 +300,7 @@ enum FlowArt {
                 guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colours as CFArray,
                                                 locations: [0, 0.55, 1]) else { return }
                 g.drawRadialGradient(gradient, startCenter: CGPoint(x: 64, y: 64), startRadius: 4, endCenter: CGPoint(x: 64, y: 64),
-                                     endRadius: 62, options: [])
+                                     endRadius: 62, options: [.drawsBeforeStartLocation])
             }
         case .star:
             return draw(64, 64, opaque: false) { g in

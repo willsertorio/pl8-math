@@ -12,21 +12,32 @@ public enum FlowProps {
         // PropModels' plate is along X with its picture's top at +Y; turn X → Y and the picture's top → −Z.
         let toY: (SIMD3<Float>) -> SIMD3<Float> = { SIMD3(-$0.z, $0.x, -$0.y) }
         let bumper = plate.kind == .bumper
-        let parts: [FlowPart] = PropModels.plateParts(plate, sides: sides).enumerated().map { index, part in
+        let parts: [FlowPart] = PropModels.plateParts(plate, sides: sides).enumerated().flatMap { index, part -> [FlowPart] in
             let mesh = part.mesh.mapped(toY)
             switch part.tone {
             case .picture(.plateFace(let p)):
-                return FlowPart("face", mesh: mesh, paint: .picture(.plateFace(p), tint: RGB(1, 1, 1)),
-                                shade: .standard(roughness: bumper ? 0.8 : 0.38, metalness: bumper ? 0 : 0.2))
+                // Each side its own part: a printed face is lit as one flat surface.
+                return [mesh.keepingFaces { $0.y > 0 }, mesh.keepingFaces { $0.y < 0 }].map { side in
+                    FlowPart("face", mesh: side, paint: .picture(.plateFace(p), tint: RGB(1, 1, 1)),
+                             shade: .standard(roughness: bumper ? 0.8 : 0.38, metalness: bumper ? 0 : 0.2))
+                }
             case .paint(let colour):
-                return FlowPart("rim", mesh: mesh, paint: .colour(colour), shade: .standard(roughness: bumper ? 0.85 : 0.4, metalness: bumper ? 0 : 0.2))
+                return [FlowPart("rim", mesh: mesh, paint: .colour(colour), shade: .standard(roughness: bumper ? 0.85 : 0.4, metalness: bumper ? 0 : 0.2))]
             case .metal(let colour):
-                return FlowPart(index == 2 ? "hub" : "hole", mesh: mesh, paint: .colour(colour), shade: .standard(roughness: 0.2, metalness: 1))
+                return [FlowPart(index == 2 ? "hub" : "hole", mesh: mesh, paint: .colour(colour), shade: .standard(roughness: 0.2, metalness: 1))]
             default:
-                return FlowPart("part", mesh: mesh, paint: .colour(dark), shade: .toon)
+                return [FlowPart("part", mesh: mesh, paint: .colour(dark), shade: .toon)]
             }
         }
         return FlowNode("plate", parts: parts)
+    }
+
+    /// A plate you don't have (flPlates' grey): every part flat grey at 30 %.
+    public static func ghost(_ plate: Plate) -> FlowNode {
+        var node = Self.plate(plate)
+        node.name = "ghost"
+        node.parts = node.parts.map { FlowPart($0.name, mesh: $0.mesh, paint: .colour(FlowLook.missing), shade: .flat, opacity: 0.3) }
+        return node
     }
 
     /// The sets' bar (flBarGroup): shaft, collars, sleeves and end caps along X, standing at 0.9 m.

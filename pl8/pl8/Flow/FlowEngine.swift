@@ -134,16 +134,7 @@ final class Flow {
     init(data: FlowData) {
         self.data = data
         arView = ARView(frame: CGRect(x: 0, y: 0, width: 393, height: 852), cameraMode: .nonAR, automaticallyConfigureSession: false)
-        arView.environment.background = .color(.clear)
-        arView.backgroundColor = .clear
-        arView.isOpaque = false
-        arView.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableCameraGrain, .disableGroundingShadows,
-                                .disableAREnvironmentLighting, .disableHDR]
-        arView.isMultipleTouchEnabled = false
-        arView.isUserInteractionEnabled = false
-        let callbacks = SketchPass.callbacks(sketch)
-        arView.renderCallbacks.prepareWithDevice = callbacks.prepare
-        arView.renderCallbacks.postProcess = callbacks.post
+        Self.configure(arView, pass: sketch)
         arView.scene.addAnchor(anchor)
         anchor.addChild(scene)
         camera.camera.fieldOfViewInDegrees = 35
@@ -153,6 +144,20 @@ final class Flow {
         subscriptions.append(arView.scene.subscribe(to: SceneEvents.Update.self) { [weak self] event in
             self?.frame(Float(event.deltaTime))
         })
+    }
+
+    /// No AR, a clear background (the SwiftUI one shows through), no effects of its own, the sketch pass after.
+    static func configure(_ view: ARView, pass: SketchPass) {
+        view.environment.background = .color(.clear)
+        view.backgroundColor = .clear
+        view.isOpaque = false
+        view.renderOptions = [.disableMotionBlur, .disableDepthOfField, .disableCameraGrain, .disableGroundingShadows,
+                              .disableAREnvironmentLighting, .disableHDR]
+        view.isMultipleTouchEnabled = false
+        view.isUserInteractionEnabled = false
+        let callbacks = SketchPass.callbacks(pass)
+        view.renderCallbacks.prepareWithDevice = callbacks.prepare
+        view.renderCallbacks.postProcess = callbacks.post
     }
 
     // MARK: - The frame
