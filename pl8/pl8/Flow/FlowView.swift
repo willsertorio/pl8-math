@@ -136,20 +136,20 @@ struct FlowBackground: View {
                     .scaleEffect(x: 1, y: ry / max(1, rx), anchor: UnitPoint(x: 0.5, y: 0.55))
                 FlowGrid(offset: flow.gridY)
             } else {
-                Color(rgb: FlowLook.orange)
+                Color(rgb: FlowLook.bg)
             }
         }
         .ignoresSafeArea()
     }
 }
 
-/// 26 pt grid lines at rgba(108, 55, 19, 0.09), moving with the pan.
+/// 26 pt grid lines in the theme's dark at 9 %, moving with the pan.
 struct FlowGrid: View {
     let offset: CGFloat
 
     var body: some View {
         Canvas { context, size in
-            let step: CGFloat = 26, colour = Color(red: 108 / 255, green: 55 / 255, blue: 19 / 255).opacity(0.09)
+            let step: CGFloat = 26, colour = Color(rgb: FlowLook.dark).opacity(Double(FlowLook.gridOpacity))
             let dy = (offset.truncatingRemainder(dividingBy: step) + step).truncatingRemainder(dividingBy: step)
             // The prototype's tile is centred across and offset by the pan down: lines at x = (w − 26)/2 + 26k.
             let x0 = ((size.width - step) / 2).truncatingRemainder(dividingBy: step), y0 = dy

@@ -8,7 +8,7 @@ import PlateKit
 /// tone mapping off, so the phone shows exactly the colours PlateKit worked out from the prototype's light.
 @MainActor
 enum Diorama {
-    static let background = uiColor(Look.background)
+    static let background = uiColor(FlowLook.bg)
 
     static func uiColor(_ colour: RGB) -> UIColor {
         UIColor(red: CGFloat(colour.r), green: CGFloat(colour.g), blue: CGFloat(colour.b), alpha: 1)
@@ -268,7 +268,7 @@ enum PictureArt {
         guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: space, bitmapInfo: info) else { return image }
         context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let dark = Look.boxDark, light = Look.boxLight
+        let dark = Look.duotoneDark, light = Look.duotoneLight
         for i in stride(from: 0, to: pixels.count, by: 4) {
             let colour = RGB(Float(pixels[i]) / 255 * tint.r, Float(pixels[i + 1]) / 255 * tint.g, Float(pixels[i + 2]) / 255 * tint.b)
             let out = Look.duotone(colour) == light ? light : dark

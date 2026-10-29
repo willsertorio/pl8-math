@@ -311,7 +311,7 @@ struct OpeningTitle: View {
     @State private var stage = TitleStage()
     @AppStorage(MotionSource.settingKey) private var motionEffects = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let cream = Color(Diorama.uiColor(Look.boxLight))
+    private let cream = Color(rgb: FlowLook.light)
 
     var body: some View {
         ZStack {

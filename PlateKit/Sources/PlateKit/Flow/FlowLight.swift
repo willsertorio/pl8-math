@@ -1,13 +1,37 @@
 import Foundation
 
-/// The Flow's colours (HANDOFF 1, "Look").
+/// The Flow's colours as one theme (CHANGES-v2 §2): every material, picture, card and dot reads them here.
+public struct FlowPalette: Equatable, Sendable {
+    /// Question screens, the menu, the scale and the opening.
+    public let bg: RGB
+    /// The kit and sets background, the whiteboard, the gym room's walls, ink on `bg`.
+    public let light: RGB
+    /// Ink on light: text, frames, the notebook cover, chips, buttons, the empty gym's lines.
+    public let dark: RGB
+    /// The kit's and the sets' cards.
+    public let card: RGB
+    /// Finished sets' progress dots.
+    public let accent: RGB
+
+    /// Will's palette (v2), the one the app ships.
+    public static let swissRed = FlowPalette(bg: RGB(hex: "#E5321C"), light: RGB(hex: "#F4F1EA"), dark: RGB(hex: "#151515"),
+                                             card: RGB(hex: "#FFFFFF"), accent: RGB(hex: "#E5321C"))
+    /// The first handoff's orange, kept on record (no palette switcher ships).
+    public static let orange = FlowPalette(bg: RGB(hex: "#FF6200"), light: RGB(hex: "#F0E2F3"), dark: RGB(hex: "#6C3713"),
+                                           card: RGB(hex: "#FFFFFF"), accent: RGB(hex: "#FF6200"))
+}
+
+/// The Flow's colours (HANDOFF 1, "Look"), from the theme.
 public enum FlowLook {
-    /// Question screens, the menu and the scale.
-    public static let orange = RGB(hex: "#FF6200")
-    /// The kit and sets background, the whiteboard, the gym room's walls, ink on orange.
-    public static let light = RGB(hex: "#F0E2F3")
-    /// Ink on light: text, cards, chips, buttons, the notebook cover, the board frame.
-    public static let dark = RGB(hex: "#6C3713")
+    public static let palette = FlowPalette.swissRed
+    public static var bg: RGB { palette.bg }
+    public static var light: RGB { palette.light }
+    public static var dark: RGB { palette.dark }
+    public static var card: RGB { palette.card }
+    public static var accent: RGB { palette.accent }
+    /// Grid lines in `dark`: on the light screens and on the whiteboard.
+    public static let gridOpacity: Float = 0.09
+    public static let boardGridOpacity: Float = 0.11
     /// Dust from impacts.
     public static let dust = RGB(hex: "#E9E2D6")
     /// A plate you don't have: grey and see-through. The prototype's grey at 30 % comes out #B85C22 over the

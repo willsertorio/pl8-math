@@ -137,6 +137,23 @@ struct FlowGeometryTests {
     }
 }
 
+@Suite("Flow theme (CHANGES-v2 §2)")
+struct FlowThemeTests {
+    @Test("Swiss red is the palette, read everywhere through FlowLook")
+    func swissRed() {
+        let p = FlowLook.palette
+        #expect(p == FlowPalette.swissRed)
+        #expect(p.bg.hex == "#E5321C" && p.light.hex == "#F4F1EA" && p.dark.hex == "#151515")
+        #expect(p.card.hex == "#FFFFFF" && p.accent.hex == "#E5321C")
+        #expect(FlowLook.bg == p.bg && FlowLook.light == p.light && FlowLook.dark == p.dark)
+        #expect(FlowLook.card == p.card && FlowLook.accent == p.accent)
+        // Grid lines: dark at 9 % on the light screens, 11 % on the whiteboard.
+        #expect(FlowLook.gridOpacity == 0.09 && FlowLook.boardGridOpacity == 0.11)
+        // The first handoff's orange stays on record.
+        #expect(FlowPalette.orange.bg.hex == "#FF6200" && FlowPalette.orange.dark.hex == "#6C3713")
+    }
+}
+
 @Suite("Flow details")
 struct FlowDetailTests {
     @Test("Lift names read in sentence case in the Flow (the prototype's \"Back squat?\")")
@@ -161,7 +178,7 @@ struct FlowDetailTests {
         let beam = FlowProps.beam().beam
         guard case .colour(let colour) = beam.parts.first?.paint else { Issue.record("the beam has no colour"); return }
         // Seen through both walls of the open cylinder, at full strength: about (212, 107, 42) in the prototype's 02c.
-        var seen = FlowLook.orange
+        var seen = FlowPalette.orange.bg      // measured on the first handoff's orange
         for _ in 0..<2 {
             let a = FlowLook.beamOpacity
             seen = RGB(seen.r + (colour.r - seen.r) * a, seen.g + (colour.g - seen.g) * a, seen.b + (colour.b - seen.b) * a)
@@ -175,7 +192,7 @@ struct FlowDetailTests {
     func ghost() {
         let ghost = FlowProps.ghost(Plate.find(5, .kg)!)
         #expect(ghost.parts.allSatisfy { $0.shade == .flat && $0.opacity == FlowLook.missingOpacity })
-        let o = FlowLook.orange, g = FlowLook.missing, a = FlowLook.missingOpacity
+        let o = FlowPalette.orange.bg, g = FlowLook.missing, a = FlowLook.missingOpacity      // measured on the orange
         let seen = RGB(o.r + (g.r - o.r) * a, o.g + (g.g - o.g) * a, o.b + (g.b - o.b) * a)
         #expect(abs(seen.r * 255 - 184) < 8 && abs(seen.g * 255 - 92) < 8 && abs(seen.b * 255 - 34) < 8)
         #expect(g.r == g.g && g.g == g.b)

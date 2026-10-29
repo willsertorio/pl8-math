@@ -64,7 +64,7 @@ struct FlowRoot: View {
 
     var body: some View {
         ZStack {
-            Color(rgb: FlowLook.orange).ignoresSafeArea()
+            Color(rgb: FlowLook.bg).ignoresSafeArea()
             if let flow { FlowView(flow: flow) }
         }
         .task {

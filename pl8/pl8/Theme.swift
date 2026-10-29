@@ -8,7 +8,8 @@ import PlateKit
 /// drawers and buttons with a rough edge, pill chips, frosted cards over the room.
 enum Theme {
     /// Flat orange behind the room (#FF6200).
-    static let background = Color(red: 1, green: 0x62 / 255, blue: 0)
+    /// The Flow theme's background (CHANGES-v2 §2), for the opening and the scale too.
+    static let background = Color(rgb: FlowLook.bg)
     static let ink = Color.black
     static let paper = Color.white
     /// The prototype's --c-ink2 (values, small labels), --c-ink3 (chevrons, hints), --c-soft (chips and secondary

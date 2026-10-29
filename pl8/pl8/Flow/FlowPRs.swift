@@ -181,7 +181,7 @@ struct PRDialOverlay: View {
 
     var body: some View {
         if let ui = flow.prDialUI, ui.shown {
-            let ink = flow.inkColor, background = Color(rgb: flow.alt ? FlowLook.light : FlowLook.orange)
+            let ink = flow.inkColor, background = Color(rgb: flow.alt ? FlowLook.light : FlowLook.bg)
             HStack(spacing: 0) {
                 ForEach([WeightUnit.kg, .lb], id: \.self) { unit in
                     let on = ui.unit == unit

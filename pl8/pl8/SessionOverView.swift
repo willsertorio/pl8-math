@@ -21,7 +21,7 @@ struct SessionOverView: View {
 
     private var total: Double { ScaleScene.total(perSide: perSide, barWeight: barWeight) }
     private var message: [String] { Animals.message(for: total, unit: unit).split(separator: " ").map(String.init) }
-    private var cream: Color { Color(Diorama.uiColor(Look.boxLight)) }
+    private var cream: Color { Color(rgb: FlowLook.light) }
 
     var body: some View {
         ZStack {
@@ -205,7 +205,7 @@ final class ScaleStage {
     private static func readout(_ value: Double, unit: WeightUnit) -> UIImage {
         let size = CGSize(width: 512, height: 224)
         // Box dark, like everything dark in the prototype's two-tone scale (no third colour).
-        let dark = Diorama.uiColor(Look.boxDark), cream = Diorama.uiColor(Look.boxLight)
+        let dark = FlowLook.dark.uiColor, cream = FlowLook.light.uiColor
         let format = UIGraphicsImageRendererFormat()
         format.preferredRange = .standard        // sRGB like the texture reads it, not the phone's Display P3
         return UIGraphicsImageRenderer(size: size, format: format).image { _ in

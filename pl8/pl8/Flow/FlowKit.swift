@@ -177,8 +177,8 @@ extension Flow {
         proxy.addChild(build(FlowProps.barbell()))
         proxy.isEnabled = false
         add(proxy)
-        let kitBackground = alt ? FlowLook.light : FlowLook.orange
-        let boardBackground = userBackground ? FlowLook.light : FlowLook.orange
+        let kitBackground = alt ? FlowLook.light : FlowLook.bg
+        let boardBackground = userBackground ? FlowLook.light : FlowLook.bg
         var v: Float = 0
         let pose = { [weak self] (value: Float) in
             guard let self else { return }
@@ -310,7 +310,7 @@ struct KitOverlay: View {
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 22).fill(Color.white).shadow(color: .black.opacity(0.18), radius: 15, y: 10))
+                .background(RoundedRectangle(cornerRadius: 22).fill(Color(rgb: FlowLook.card)).shadow(color: .black.opacity(0.18), radius: 15, y: 10))
                 .padding(.horizontal, 12)
                 .padding(.bottom, 24)
                 .modifier(CardEntrance(shownAt: ui.shownAt, flow: flow))

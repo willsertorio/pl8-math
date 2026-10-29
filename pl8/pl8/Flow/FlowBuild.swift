@@ -432,7 +432,7 @@ enum FlowArt {
         let w: CGFloat = 1024, h: CGFloat = 662
         g.setFillColor(FlowLook.light.uiColor.cgColor)
         g.fill(CGRect(x: 0, y: 0, width: w, height: h))
-        g.setStrokeColor(UIColor(red: 108 / 255, green: 55 / 255, blue: 19 / 255, alpha: 0.11).cgColor)
+        g.setStrokeColor(FlowLook.dark.uiColor.withAlphaComponent(CGFloat(FlowLook.boardGridOpacity)).cgColor)
         g.setLineWidth(2)
         for x in stride(from: 0, through: w, by: 40) { g.strokeLineSegments(between: [CGPoint(x: x, y: 0), CGPoint(x: x, y: h)]) }
         for y in stride(from: 0, through: h, by: 40) { g.strokeLineSegments(between: [CGPoint(x: 0, y: y), CGPoint(x: w, y: y)]) }

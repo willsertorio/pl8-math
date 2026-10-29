@@ -47,9 +47,9 @@ struct SessionOverTests {
                 return (colour, (0..<mesh.triangleCount).map { mesh.faceNormal($0).y }.max() ?? 0)
             }
             if shaft {
-                #expect(pieces.allSatisfy { Look.duotone($0.0) == Look.boxDark })
+                #expect(pieces.allSatisfy { Look.duotone($0.0) == Look.duotoneDark })
             } else if let top = pieces.max(by: { $0.1 < $1.1 }) {
-                #expect(Look.duotone(top.0) == Look.boxLight)
+                #expect(Look.duotone(top.0) == Look.duotoneLight)
             }
         }
     }
@@ -67,7 +67,7 @@ struct SessionOverTests {
             else { return nil }
             return Look.duotone(colour)
         }
-        #expect(tones.contains(Look.boxLight) && tones.contains(Look.boxDark))
+        #expect(tones.contains(Look.duotoneLight) && tones.contains(Look.duotoneDark))
     }
 
     @Test func aFallTakesTheTimeToDropThreeMetres() {
@@ -146,17 +146,19 @@ struct OpeningTests {
 
 @Suite("The animation scenes' two-tone look (prototype AnimLayer: posterize 2, duotone)")
 struct DuotoneTests {
-    @Test func everyColourBecomesBrownOrCream() {
-        #expect(Look.duotone(Look.boxLight) == Look.boxLight)
-        #expect(Look.duotone(Look.boxDark) == Look.boxDark)
-        #expect(Look.duotone(RGB(hex: "#D3262E")) == Look.boxDark)        // red 25: dark, its print light
-        #expect(Look.duotone(RGB(hex: "#1E5BC6")) == Look.boxDark)
-        #expect(Look.duotone(RGB(hex: "#F2F2EE")) == Look.boxLight)       // white change plate
+    @Test func everyColourBecomesTheThemesDarkOrLight() {
+        // The two tones are the Flow's theme (CHANGES-v2 §2, §8): the opening and the scale in its dark and light.
+        #expect(Look.duotoneDark == FlowLook.dark && Look.duotoneLight == FlowLook.light)
+        #expect(Look.duotone(Look.boxLight) == Look.duotoneLight)
+        #expect(Look.duotone(Look.boxDark) == Look.duotoneDark)
+        #expect(Look.duotone(RGB(hex: "#D3262E")) == Look.duotoneDark)        // red 25: dark, its print light
+        #expect(Look.duotone(RGB(hex: "#1E5BC6")) == Look.duotoneDark)
+        #expect(Look.duotone(RGB(hex: "#F2F2EE")) == Look.duotoneLight)       // white change plate
         // The prototype grades first (contrast 0.71, then brightness 0.68) and splits at half after that: only
-        // what's brighter than about 0.83 comes out cream.
-        #expect(Look.duotone(RGB(0.84, 0.84, 0.84)) == Look.boxLight)
-        #expect(Look.duotone(RGB(0.82, 0.82, 0.82)) == Look.boxDark)
-        #expect(Look.duotone(RGB(hex: "#7F7F7F")) == Look.boxDark)
+        // what's brighter than about 0.83 comes out light.
+        #expect(Look.duotone(RGB(0.84, 0.84, 0.84)) == Look.duotoneLight)
+        #expect(Look.duotone(RGB(0.82, 0.82, 0.82)) == Look.duotoneDark)
+        #expect(Look.duotone(RGB(hex: "#7F7F7F")) == Look.duotoneDark)
     }
 
     @Test func aTitlePlateKeepsALightHubUnderTheAnimationLight() {
@@ -167,11 +169,11 @@ struct DuotoneTests {
             guard case .colour(let colour) = paint, abs(mesh.faceNormal(0).x) > 0.9 else { return nil }
             return Look.duotone(colour)
         }
-        #expect(!hubFaces.isEmpty && hubFaces.allSatisfy { $0 == Look.boxLight })
+        #expect(!hubFaces.isEmpty && hubFaces.allSatisfy { $0 == Look.duotoneLight })
         let rim = SceneBake.shaded(parts[1], light: .animation).compactMap { paint, _ -> RGB? in
             if case .colour(let colour) = paint { return Look.duotone(colour) } else { return nil }
         }
-        #expect(rim.allSatisfy { $0 == Look.boxDark })
+        #expect(rim.allSatisfy { $0 == Look.duotoneDark })
     }
 }
 

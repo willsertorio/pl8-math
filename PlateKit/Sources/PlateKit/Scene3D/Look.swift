@@ -80,13 +80,16 @@ public enum Look {
     /// The ink lines (the prototype's LineBasicMaterial and sketch line), unlit.
     public static let ink = boxDark
 
-    /// The prototype's animation scenes (the title and the session-over scale) are two-tone: everything posterized
-    /// to box dark or box light by its brightness, after its grade (contrast 0.71, then brightness 0.68), so only
-    /// what's brighter than about 0.83 comes out light.
+    /// The prototype's animation scenes (the title, the session-over scale, the loader) are two-tone: everything
+    /// posterized to the theme's dark or light by its brightness, after its grade (contrast 0.71, then brightness
+    /// 0.68), so only what's brighter than about 0.83 comes out light.
     public static func duotone(_ colour: RGB) -> RGB {
         let brightness = 0.299 * colour.r + 0.587 * colour.g + 0.114 * colour.b
-        return ((brightness - 0.5) * 0.71 + 0.5) * 0.68 >= 0.5 ? boxLight : boxDark
+        return ((brightness - 0.5) * 0.71 + 0.5) * 0.68 >= 0.5 ? duotoneLight : duotoneDark
     }
+
+    public static var duotoneLight: RGB { FlowLook.light }
+    public static var duotoneDark: RGB { FlowLook.dark }
 
     /// The animation scenes' light (the prototype's AnimLayer): a white hemisphere of 2.7 and a 1.5 sun from
     /// (2, 6.46, 3) (sunA 60°), on toon materials whose ramp has three steps (70, 160, 255). How much light a face
