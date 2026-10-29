@@ -38,6 +38,14 @@ A learning project: shipping a native iOS app with AI (Claude Code), test-first,
 
 ## Part 2 — Experience
 
+### 2.0 The Flow (2026-10-29, replaces the screens of 2.2–2.4)
+The design reference is now **the Flow**: `design/flow-handoff/HANDOFF.md` (the spec, every number) and `design/flow-handoff/prototype/index.html` (the running prototype; `source/` is its readable code, the highest-numbered `comp_flow*.js` wins). One question at a time, one 3D object per question, a menu after the first session. Where the handoff and the sections below disagree, the handoff wins for screens and look; Part 3 (the math) and Part 4 (data) still decide loads and storage.
+- **Whole screens are replaced** (Will, 2026-10-29): first run, home with its tabs and drawers, and the session page become the Flow's screens. The room diorama leaves the main path.
+- **Order:** opening → gym name (two letter dials, so names are **2 characters**) → kilos or pounds (kettlebells dropped on a scale) → plates (a checklist you tick by drawing) → bar (carousel) → PRs (notebook, pencil, number dial with a KG/LB switch, or a photo) → workout (whiteboard: upload, wipe, start) → plate kit → sets → the scale → the **menu** (carousel: Train · My PRs · Gym). After the first session the app opens on the menu.
+- **Kept out for now** (Will, 2026-10-29): History, the missing-PR and missing-% prompts, typing / editing / scanning a workout with the camera, the Replay and Move-with-the-phone switches. They come back later.
+- **Look:** orange `#FF6200`, light `#F0E2F3`, dark `#6C3713`; white cards with 22 pt corners; Space Grotesk 30 / 22 / 17 / 13 (900 renders as Bold); Permanent Marker on surfaces. Rough edges are the prototype's screen-space sketch pass, copied as a Metal post-process (rough on orange screens, smooth on the light grid of the kit and sets).
+- **Gyms:** several gyms, each remembering its plates and bar per unit; one is current. The Gym item in the menu opens the box into a room where each thing edits one setting.
+
 The prototype (web, Three.js) is the reference for flow, look and feel:
 `reference/prototype-app-logic.js` (all screens and the 3D scene) and `reference/scene-layout-and-look.json` (room layout, camera shots, colours, fonts).
 The prototype fakes scanning and keeps no data; the rules in Part 3 replace its simplified math.
@@ -190,7 +198,7 @@ Box apps put the weight on the right of the lift (`Back Squat (Barbell)` … `18
 
 ## Part 4 — Data (SwiftData)
 
-- `Gym`: id, name (≤ 8 chars), unit (kg|lb), plateSizes [Double], barWeight, isCurrent, placeID? (later).
+- `Gym`: id, name (≤ 8 chars; the Flow's dials make 2), unit (kg|lb), plateSizes [Double], barWeight, isCurrent, placeID? (later), and since the Flow: what it has in the other unit (kgPlates/lbPlates, kgBar/lbBar, optional, filled as you switch) and its place in the row of gyms (sortIndex).
 - `PersonalRecord`: id, lift (canonical name), value, unit, updatedAt. Keep previous values as `PRHistory` entries.
 - `Workout`: id, date, sourceText, blocks (Codable `StrengthBlock` array).
 - `Session`: id, workout, liftNames, prLifts and prUnits (by block index, so history reads well if the workout is deleted, the new-PR check knows which PR a lift uses, and totals show in each PR's unit), gym snapshot (name, unit, bar, plates), startedAt?, endedAt?, setLogs.
@@ -223,7 +231,8 @@ Each milestone ends with tests green and something Will can try on his iPhone.
 | M4 | **The app in plain 2D** | Full flow from 2.2–2.4 with SwiftUI sheets over a flat background; used in a real class |
 | M5 | 3D spike | One plate + bar in a `RealityView` with the target look; decision logged |
 | M6 | The 3D box | Stations, camera flights, shelf piles, flag, PR board, whiteboard, rack loading, kit drop, bell, opening, session-over scale |
-| M7 | Polish | Haptics and sound pass, accessibility, History screen, PR screenshot import |
+| M7 | The Flow | Every screen of `design/flow-handoff` built and checked against the prototype's pictures |
+| M8 | Polish | Haptics and sound pass, accessibility, History screen, PR screenshot import |
 | Later | | Gym search with Google Places, shared gym setups, AI fallback parsing, TestFlight |
 
 ---

@@ -19,6 +19,7 @@ pl8/                 the app: pl8.xcodeproj + pl8/ sources (SwiftUI views, Swift
 PlateKit/            Swift package: Sources/PlateKit, Tests/PlateKitTests
 Fixtures/            real screenshots, OCR text and expected results (see Fixtures/README.md)
 reference/           the web prototypes and the art/layout values; read-only, never ship
+design/flow-handoff/ the Flow design handoff (M7); read-only, never ship
 SPEC.md  CLAUDE.md  DECISIONS.md
 ```
 
@@ -35,7 +36,8 @@ SPEC.md  CLAUDE.md  DECISIONS.md
 ## Reference material
 - `reference/prototype-app-logic.js` — the whole web prototype (screens, flow, 3D scene). Use it to understand intent, timings and look. Don't port its math; the spec's rules replace it.
 - `reference/scene-layout-and-look.json` — room layout, camera shots, palette, fonts, UI style values. Use these numbers.
+- `design/flow-handoff/` — the Flow (M7): HANDOFF.md is the spec for the screens, prototype/ runs it, source/ is its readable code. Read-only, never ship.
 - `reference/plate-math-web-prototype.html` — the earlier prototype whose plate rules were tested at the box; the golden values come from it.
 
 ## Current milestone
-M6 — the 3D box, built 2026-10-17, waiting for Will's review. M0–M2 done 2026-10-13, M3 done 2026-10-14, M5 done 2026-10-15, M4 done 2026-10-16 (used in a real class; session page reworked from that). (Update this line as milestones finish.)
+M7 — the Flow (design/flow-handoff), started 2026-10-29. M6 built 2026-10-17. M0–M2 done 2026-10-13, M3 done 2026-10-14, M5 done 2026-10-15, M4 done 2026-10-16 (used in a real class; session page reworked from that). (Update this line as milestones finish.)
