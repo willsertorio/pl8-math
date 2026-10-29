@@ -36,9 +36,11 @@ public enum FlowLight {
     /// The toon ramp: a 3-texel gradient map (90, 175, 255), nearest-sampled at dot × 0.5 + 0.5.
     public static func rampStep(dot: Float) -> Float {
         let coordinate = dot * 0.5 + 0.5
-        let texel = min(2, max(0, Int((coordinate * 3).rounded(.down))))
-        let steps: [Float] = [90.0 / 255, 175.0 / 255, 1]
-        return steps[texel]
+        switch min(2, max(0, Int((coordinate * 3).rounded(.down)))) {
+        case 0: return 90.0 / 255
+        case 1: return 175.0 / 255
+        default: return 1
+        }
     }
 
     /// The light falling on a face facing `normal` (world space), for a white surface: what three.js multiplies

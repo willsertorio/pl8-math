@@ -1,4 +1,5 @@
 import CoreGraphics
+import Metal
 import RealityKit
 import SwiftUI
 import UIKit
@@ -12,7 +13,11 @@ final class FlowShadedModel {
     var part: FlowPart
     /// Each triangle's normal in the model's own space.
     let normals: [SIMD3<Float>]
+    /// The palette lives on the GPU; new colours are copied into it, the material stays.
     var palette: TextureResource?
+    var paletteTexture: LowLevelTexture?
+    /// The opacity of the palette material last given to the model (nil: give it one).
+    var paletteOpacity: Float?
     var bakedOrientation: simd_quatf?
     var bakedState: State?
     var state = State()
@@ -62,22 +67,39 @@ extension Flow {
         let model: ModelEntity
         switch (part.shade, part.paint) {
         case (.toon, .colour), (.standard, .colour):
-            let resource = (try? Self.meshResource(mesh, palette: true)) ?? MeshResource.generateBox(size: 0.001)
+            let resource = cachedMesh(mesh, palette: true) ?? MeshResource.generateBox(size: 0.001)
             model = ModelEntity(mesh: resource, materials: [UnlitMaterial(applyPostProcessToneMap: false)])
         case (.occluder, _):
-            let resource = (try? Self.meshResource(mesh, palette: false)) ?? MeshResource.generateBox(size: 0.001)
+            let resource = cachedMesh(mesh, palette: false) ?? MeshResource.generateBox(size: 0.001)
             model = ModelEntity(mesh: resource, materials: [OcclusionMaterial()])
             model.name = part.name
             return model
         default:
-            let resource = (try? Self.meshResource(mesh, palette: false)) ?? MeshResource.generateBox(size: 0.001)
+            let resource = cachedMesh(mesh, palette: false) ?? MeshResource.generateBox(size: 0.001)
             model = ModelEntity(mesh: resource, materials: [UnlitMaterial(applyPostProcessToneMap: false)])
         }
         model.name = part.name
-        let shadedModel = FlowShadedModel(model: model, part: lit)
-        shaded.append(shadedModel)
-        bake(shadedModel)
+        // Lit on its first frame in the scene (reshade), where it really faces: lighting it here, before it's
+        // placed, meant lighting it twice.
+        shaded.append(FlowShadedModel(model: model, part: lit))
         return model
+    }
+
+    /// The same shape built once: the gym room's piles alone are thirty-odd identical plates, and the same props
+    /// come back question after question. Keyed by every vertex, so only a true copy matches.
+    func cachedMesh(_ mesh: LowPolyMesh, palette: Bool) -> MeshResource? {
+        var hasher = Hasher()
+        hasher.combine(palette)
+        hasher.combine(mesh.positions.count)
+        for p in mesh.positions { hasher.combine(p.x.bitPattern); hasher.combine(p.y.bitPattern); hasher.combine(p.z.bitPattern) }
+        hasher.combine(mesh.indices)
+        for uv in mesh.uvs { hasher.combine(uv.x.bitPattern); hasher.combine(uv.y.bitPattern) }
+        let key = hasher.finalize()
+        if let resource = meshCache[key] { return resource }
+        guard let resource = try? Self.meshResource(mesh, palette: palette) else { return nil }
+        if meshCache.count > 800 { meshCache.removeAll() }
+        meshCache[key] = resource
+        return resource
     }
 
     /// The mesh with a normal per face and either its own texture coordinates or, for a palette, one texel per
@@ -115,19 +137,60 @@ extension Flow {
 
     // MARK: - Light, again when things turn
 
-    /// Re-lights what has turned (or shines, fades, goes grey) since it was last lit. A few per frame at most:
-    /// a falling plate's colours lagging a frame can't be seen.
+    /// Re-lights what has turned (or shines, fades, goes grey) since it was last lit, then sends the new colours
+    /// to the GPU in one go. New models always; others up to a budget per frame: a falling plate's colours
+    /// lagging a frame can't be seen.
     func reshade() {
-        var budget = 48
-        for item in shaded where budget > 0 {
+        var budget = 160
+        for item in shaded {
             guard item.model.scene != nil else { continue }
+            guard let baked = item.bakedOrientation else { bake(item); continue }
+            guard budget > 0 else { continue }
             let orientation = item.model.orientation(relativeTo: nil)
-            let turned = item.bakedOrientation.map { abs(simd_dot($0.vector, orientation.vector)) < 0.99985 } ?? true
-            if item.dirty || turned || item.bakedState != item.state {
+            if item.dirty || abs(simd_dot(baked.vector, orientation.vector)) < 0.99985 || item.bakedState != item.state {
                 bake(item)
                 budget -= 1
             }
         }
+        uploadPalettes()
+    }
+
+    /// The palettes' new colours, copied into their GPU textures with one command buffer.
+    private func uploadPalettes() {
+        guard !paletteUploads.isEmpty else { return }
+        let uploads = paletteUploads
+        paletteUploads = [:]
+        guard let queue = Self.paletteQueue, let commands = queue.makeCommandBuffer() else { return }
+        var bytes: [UInt8] = []
+        var copies: [(offset: Int, width: Int, height: Int, target: MTLTexture)] = []
+        for upload in uploads.values {
+            copies.append((bytes.count, upload.width, upload.height, upload.texture.replace(using: commands)))
+            bytes += upload.bytes
+        }
+        guard let staging = queue.device.makeBuffer(bytes: bytes, length: bytes.count, options: .storageModeShared),
+              let blit = commands.makeBlitCommandEncoder() else { return }
+        for copy in copies {
+            blit.copy(from: staging, sourceOffset: copy.offset, sourceBytesPerRow: copy.width * 4,
+                      sourceBytesPerImage: copy.width * copy.height * 4, sourceSize: MTLSize(width: copy.width, height: copy.height, depth: 1),
+                      to: copy.target, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
+        }
+        blit.endEncoding()
+        commands.commit()
+    }
+
+    static let paletteQueue = MTLCreateSystemDefaultDevice()?.makeCommandQueue()
+
+    /// A palette's GPU texture: one sRGB texel per triangle.
+    static func paletteTexture(width: Int, height: Int) -> LowLevelTexture? {
+        var descriptor = LowLevelTexture.Descriptor()
+        descriptor.textureType = .type2D
+        descriptor.pixelFormat = .rgba8Unorm_srgb
+        descriptor.width = width
+        descriptor.height = height
+        descriptor.depth = 1
+        descriptor.mipmapLevelCount = 1
+        descriptor.textureUsage = [.shaderRead]
+        return try? LowLevelTexture(descriptor: descriptor)
     }
 
     func bake(_ item: FlowShadedModel) {
@@ -139,6 +202,7 @@ extension Flow {
         let part = item.part, state = item.state
         let opacity = part.opacity * state.opacity
         if state.grey {
+            item.paletteOpacity = nil
             var material = UnlitMaterial(applyPostProcessToneMap: false)
             material.color = .init(tint: FlowLook.missing.uiColor)
             material.blending = .transparent(opacity: .init(floatLiteral: FlowLook.missingOpacity * opacity))
@@ -188,13 +252,15 @@ extension Flow {
                 bytes[index * 4 + 1] = UInt8((colour.g * 255).rounded())
                 bytes[index * 4 + 2] = UInt8((colour.b * 255).rounded())
             }
-            guard let image = Self.image(bytes, width: layout.width, height: layout.rows) else { return }
-            if let palette = item.palette {
-                try? palette.replace(withImage: image, options: .init(semantic: .color))
-            } else {
-                item.palette = try? TextureResource(image: image, options: .init(semantic: .color))
+            if item.paletteTexture == nil {
+                item.paletteTexture = Self.paletteTexture(width: layout.width, height: layout.rows)
+                item.palette = item.paletteTexture.flatMap { try? TextureResource(from: $0) }
             }
-            guard let palette = item.palette else { return }
+            guard let texture = item.paletteTexture, let palette = item.palette else { return }
+            paletteUploads[ObjectIdentifier(texture)] = (texture, bytes, layout.width, layout.rows)
+            // Only new colours: the model keeps its material.
+            if item.paletteOpacity == opacity { return }
+            item.paletteOpacity = opacity
             material.color = .init(tint: .white, texture: .init(palette))
         }
         if opacity < 1 { material.blending = .transparent(opacity: .init(floatLiteral: opacity)) }
@@ -207,13 +273,6 @@ extension Flow {
         return RGB(colour.r + (w.r - colour.r) * amount, colour.g + (w.g - colour.g) * amount, colour.b + (w.b - colour.b) * amount)
     }
 
-    static func image(_ bytes: [UInt8], width: Int, height: Int) -> CGImage? {
-        var data = bytes
-        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                      space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-        return context.makeImage()
-    }
 
     /// The models under `entity` (to shine them, grey them out or fade them).
     func shadedModels(under entity: Entity) -> [FlowShadedModel] {

@@ -256,7 +256,8 @@ extension Flow {
                     r.entity.scale = SIMD3(repeating: max(0.0001, show))
                     r.entity.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
                 }
-                if show > 0.5 { r.wave(Float(t) + Float(j)) }
+                // The cloth is a new mesh each time: only rooms in view, 30 times a second.
+                if show > 0.5 && abs(Float(j) - rowPosition) < 1.5 && Int(t * 60) % 2 == 0 { r.wave(Float(t) + Float(j)) }
             }
             if !rowDragging && abs(rowTarget - rowPosition) < 0.02 { settleGym() }
             shadows[2].position.x = room.entity.position.x

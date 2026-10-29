@@ -276,8 +276,9 @@ public enum FlowProps {
         let scale: Float = 0.52
         for (i, p) in catalog.enumerated() {
             let (cx, cz) = spots[i], count = p.diameter > 0.4 ? 6 : 5, t = Float(p.thickness)
+            let model = plate(p, sides: 28)
             for j in 0..<count {
-                var one = plate(p, sides: 28)
+                var one = model
                 one.scale = [scale, scale, scale]
                 one.rotation = [0, Float(j) * 0.7, 0]
                 one.position = [cx, 0.004 + Float(j) * t * scale + t * scale / 2, cz]

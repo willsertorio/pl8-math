@@ -21,6 +21,8 @@ final class FlowDial {
     var onDetent: (() -> Void)?
     private var pool: [(entity: ModelEntity, shown: Int?)] = []
     private let span: Int
+    /// What the labels were last laid out for: when the dial is still, nothing needs touching.
+    private var laidOut: (position: Float, opacity: Float)?
     private weak var flow: Flow?
 
     init(flow: Flow, labels: [String], radius: Float, step: Float, width: Float, labelWidth: Float, size: Int, wrap: Bool = true) {
@@ -54,6 +56,8 @@ final class FlowDial {
     }
 
     func layout() {
+        if let laidOut, laidOut.position == position, laidOut.opacity == opacity { return }
+        laidOut = (position, opacity)
         let base = Int(position.rounded(.down))
         for j in pool.indices {
             let li = base + j - span, th = (Float(li) - position) * step

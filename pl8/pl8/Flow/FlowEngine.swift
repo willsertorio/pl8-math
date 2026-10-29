@@ -134,6 +134,9 @@ final class Flow {
     @ObservationIgnored var squashes: [ObjectIdentifier: FlowSquash] = [:]
     @ObservationIgnored var hitSizes: [ObjectIdentifier: SIMD3<Float>] = [:]
     @ObservationIgnored var shaded: [FlowShadedModel] = []
+    @ObservationIgnored var meshCache: [Int: MeshResource] = [:]
+    /// Palette colours waiting to go to the GPU this frame.
+    @ObservationIgnored var paletteUploads: [ObjectIdentifier: (texture: LowLevelTexture, bytes: [UInt8], width: Int, height: Int)] = [:]
     @ObservationIgnored var textures: [FlowPicture: TextureResource] = [:]
     @ObservationIgnored var physics: FlowPhysicsWorld?
     @ObservationIgnored var lastClick: Double = -1

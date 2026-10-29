@@ -220,6 +220,9 @@ extension Flow {
         return cleaned
     }
 
+    /// One for all: making a Core Image context is slow (it was most of a 0.4 s stall when the board stopped).
+    static let imageContext = CIContext()
+
     /// The sun's shadow of a still prop on the floor (the prototype's ShadowMaterial under a shadow-casting sun):
     /// every face of it flattened along the sun's rays onto y = 0, softened a little, at `opacity`.
     func groundShadow(of entity: Entity, opacity: Float, pixelsPerMetre: Float = 160) -> Entity? {
@@ -266,7 +269,7 @@ extension Flow {
         var image = mask.cgImage
         if let input = mask.cgImage.map({ CIImage(cgImage: $0) }),
            let blurred = CIFilter(name: "CIGaussianBlur", parameters: [kCIInputImageKey: input, kCIInputRadiusKey: 2.0])?.outputImage {
-            image = CIContext().createCGImage(blurred, from: input.extent)
+            image = Self.imageContext.createCGImage(blurred, from: input.extent)
         }
         guard let image, let texture = try? TextureResource(image: image, options: .init(semantic: .color)) else { return nil }
         var material = UnlitMaterial(applyPostProcessToneMap: false)
