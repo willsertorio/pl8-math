@@ -362,7 +362,7 @@ final class TitleStage {
                 parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(i) &* 17, width: width, justTheRim: true), tone: .flat(Look.ink), inked: false, casts: false))
             }
             let entity = Entity()
-            for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
+            for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows, light: .animation), duotone: true) {
                 entity.addChild(child)
             }
             root.addChild(entity)

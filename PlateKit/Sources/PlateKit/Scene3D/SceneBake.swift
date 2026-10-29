@@ -52,13 +52,18 @@ public enum SceneBake {
     /// shadow when it lands).
     public enum Content: Sendable { case all, withoutShadows, shadowsOnly }
 
+    /// Whose light: the room's (Lambert under its sun) or the animation scenes' (the title and the session-over
+    /// scale: `Look.animationLight`).
+    public enum Light: Sendable { case room, animation }
+
     public static func bake(_ parts: [PropPart], placement: RoomLayout.Placement, wall: RoomLayout.Wall?,
-                            content: Content = .all) -> [BakedPiece] {
+                            content: Content = .all, light: Light = .room) -> [BakedPiece] {
         bake([(wall, parts.map { PropPart(mesh: $0.mesh.placed(placement), tone: $0.tone, inked: $0.inked, casts: $0.casts) })],
-             content: content)
+             content: content, light: light)
     }
 
-    static func bake(_ groups: [(wall: RoomLayout.Wall?, parts: [PropPart])], content: Content = .all) -> [BakedPiece] {
+    static func bake(_ groups: [(wall: RoomLayout.Wall?, parts: [PropPart])], content: Content = .all,
+                     light: Light = .room) -> [BakedPiece] {
         var buckets: [Key: LowPolyMesh] = [:]
         var order: [Key] = []
         func add(_ mesh: LowPolyMesh, _ paint: BakedPiece.Paint, _ walls: Set<RoomLayout.Wall>) {
@@ -74,7 +79,7 @@ public enum SceneBake {
             var casters = LowPolyMesh()
             for part in group.parts {
                 if content != .shadowsOnly {
-                    for (paint, mesh) in shaded(part) { add(mesh, paint, walls) }
+                    for (paint, mesh) in shaded(part, light: light) { add(mesh, paint, walls) }
                     if part.inked { add(part.mesh.inkLines(width: inkWidth), .colour(Look.ink), walls) }
                 }
                 if part.casts { casters.append(part.mesh) }
@@ -89,8 +94,21 @@ public enum SceneBake {
     }
 
     /// A part's faces split by how much sun each gets, each with its paint.
-    static func shaded(_ part: PropPart) -> [(BakedPiece.Paint, LowPolyMesh)] {
+    static func shaded(_ part: PropPart, light: Light = .room) -> [(BakedPiece.Paint, LowPolyMesh)] {
         if case .flat(let colour) = part.tone { return [(.colour(colour), part.mesh)] }
+        if light == .animation {
+            // Toon: each face takes one of three steps of the sun; metal is just its colour here.
+            var steps: [Float: LowPolyMesh] = [:]
+            for triangle in 0..<part.mesh.triangleCount {
+                steps[Look.animationLight(normal: part.mesh.faceNormal(triangle)), default: LowPolyMesh()].append(part.mesh.face(triangle))
+            }
+            return steps.sorted { $0.key < $1.key }.map { light, mesh in
+                if case .picture(let picture) = part.tone {
+                    return (.picture(picture, tint: RGB(linear: SIMD3(repeating: min(1, light)))), mesh)
+                }
+                return (.colour(RGB(linear: albedo(part.tone).linear * light)), mesh)
+            }
+        }
         if case .metal(let colour) = part.tone {
             // Measured off the prototype's bar: ×0.97 on top, ×0.70 on the sides, ×0.40 underneath (sRGB).
             var steps: [Int: LowPolyMesh] = [:]

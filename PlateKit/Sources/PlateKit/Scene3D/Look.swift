@@ -81,9 +81,20 @@ public enum Look {
     public static let ink = boxDark
 
     /// The prototype's animation scenes (the title and the session-over scale) are two-tone: everything posterized
-    /// to box dark or box light by its brightness.
+    /// to box dark or box light by its brightness, after its grade (contrast 0.71, then brightness 0.68), so only
+    /// what's brighter than about 0.83 comes out light.
     public static func duotone(_ colour: RGB) -> RGB {
-        0.299 * colour.r + 0.587 * colour.g + 0.114 * colour.b > 0.5 ? boxLight : boxDark
+        let brightness = 0.299 * colour.r + 0.587 * colour.g + 0.114 * colour.b
+        return ((brightness - 0.5) * 0.71 + 0.5) * 0.68 >= 0.5 ? boxLight : boxDark
+    }
+
+    /// The animation scenes' light (the prototype's AnimLayer): a white hemisphere of 2.7 and a 1.5 sun from
+    /// (2, 6.46, 3) (sunA 60°), on toon materials whose ramp has three steps (70, 160, 255). How much light a face
+    /// with this normal gets (three.js: albedo / π × this, in linear light).
+    public static func animationLight(normal: SIMD3<Float>) -> Float {
+        let towardsSun = SIMD3<Float>(2, 4 * sin(Float.pi / 3) + 3, 3), ramp: [Float] = [70 / 255, 160 / 255, 1]
+        let u = normal.dot(towardsSun) / (normal.dot(normal) * towardsSun.dot(towardsSun)).squareRoot() * 0.5 + 0.5
+        return (ambient + sunIntensity * ramp[min(2, max(0, Int(u * 3)))]) / .pi
     }
 
     public static let ambient: Float = 2.7

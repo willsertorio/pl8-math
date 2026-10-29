@@ -94,10 +94,10 @@ final class ScaleStage {
             world.addChild(sky)
         }
         let parts = ScaleScene.parts()
-        for child in Diorama.entities(for: SceneBake.bake(ink(parts.base), placement: still, wall: nil, content: .withoutShadows), duotone: true) {
+        for child in Diorama.entities(for: SceneBake.bake(ink(parts.base), placement: still, wall: nil, content: .withoutShadows, light: .animation), duotone: true) {
             world.addChild(child)
         }
-        for child in Diorama.entities(for: SceneBake.bake(ink(parts.platform), placement: still, wall: nil, content: .withoutShadows), duotone: true) {
+        for child in Diorama.entities(for: SceneBake.bake(ink(parts.platform), placement: still, wall: nil, content: .withoutShadows, light: .animation), duotone: true) {
             platform.addChild(child)
         }
         world.addChild(platform)
@@ -113,14 +113,14 @@ final class ScaleStage {
         drops = ScaleScene.drops(perSide: perSide, unit: unit, barWeight: barWeight)
         dropEntities = drops.map { drop in
             var parts = drop.plate.map { SessionScene.parts(.init(plate: $0, centre: .zero, axis: .y, turn: drop.turn)) }
-                ?? PropModels.barbellParts()
+                ?? ScaleScene.barParts()
             // The prototype's rough sketch line round it (the sketch pass draws it when there is one).
             if !sketched {
                 parts.append(PropPart(mesh: ScaleScene.outline(parts, seed: UInt32(drop.at * 100)),
                                       tone: .flat(Look.ink), inked: false, casts: false))
             }
             let entity = Entity()
-            for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows), duotone: true) {
+            for child in Diorama.entities(for: SceneBake.bake(parts, placement: still, wall: nil, content: .withoutShadows, light: .animation), duotone: true) {
                 entity.addChild(child)
             }
             entity.isEnabled = false

@@ -42,6 +42,18 @@ public enum ScaleScene {
 
     /// The prototype's sketch outline (rough, grainy, doubled) round each part, sized for the scale's camera.
     /// - Parameter justTheRim: only the plate's own rim, not its steel hub (the title's plates, seen big).
+    /// buildDone's bar, not the room's: a dark #6E7378 shaft between #B9BEC4 collars and sleeves, along x.
+    public static func barParts() -> [PropPart] {
+        let steel = PropPart.Tone.paint(RGB(hex: "#B9BEC4")), shaft = PropPart.Tone.paint(RGB(hex: "#6E7378"))
+        var b = PropModels.Builder()
+        b.cylinder(0.014, 1.31, .x, 16, .zero, shaft, ink: false)
+        for side: Float in [-1, 1] {
+            b.cylinder(0.04, 0.03, .x, 16, [side * 0.67, 0, 0], steel, ink: false)
+            b.cylinder(0.025, 0.445, .x, 16, [side * (0.685 + 0.2225), 0, 0], steel, ink: false)
+        }
+        return b.parts
+    }
+
     public static func outline(_ parts: [PropPart], seed: UInt32, width: Float = 0.012, justTheRim: Bool = false) -> LowPolyMesh {
         var mesh = LowPolyMesh()
         for (n, part) in parts.enumerated() where part.tone != .flat(Look.ink) {

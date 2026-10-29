@@ -32,6 +32,44 @@ struct SessionOverTests {
         #expect(ScaleScene.total(perSide: [25, 10], barWeight: 20) == 90)
     }
 
+    @Test func theScalesBarIsADarkShaftWithLightCollarsAndSleeves() {
+        // buildDone's bar: a #6E7378 shaft 1.31 m long, #B9BEC4 collars at ±0.67 and sleeves out to ±1.13.
+        let parts = ScaleScene.barParts()
+        #expect(parts.count == 5)
+        let xs = parts.flatMap { part in part.mesh.positions.map { $0.x } }
+        #expect(abs((xs.max() ?? 0) - 1.13) < 0.001 && abs((xs.min() ?? 0) + 1.13) < 0.001)
+        for part in parts {
+            let shaft = part.mesh.positions.allSatisfy { abs($0.y) < 0.015 && abs($0.z) < 0.015 }
+            // Two-tone like the prototype's picture: every face of the shaft dark; the collars and sleeves light
+            // along their tops (their sides go dark like the prototype's, steel lit side-on is about 0.80).
+            let pieces = SceneBake.shaded(part, light: .animation).compactMap { paint, mesh -> (RGB, Float)? in
+                guard case .colour(let colour) = paint else { return nil }
+                return (colour, (0..<mesh.triangleCount).map { mesh.faceNormal($0).y }.max() ?? 0)
+            }
+            if shaft {
+                #expect(pieces.allSatisfy { Look.duotone($0.0) == Look.boxDark })
+            } else if let top = pieces.max(by: { $0.1 < $1.1 }) {
+                #expect(Look.duotone(top.0) == Look.boxLight)
+            }
+        }
+    }
+
+    @Test func theScaleIsLitLikeThePrototypesDoneScene() {
+        // Toon steps 70 / 160 / 255 under hemisphere 2.7 and a 1.5 sun from (2, 6.46, 3): a face towards the sun
+        // gets (2.7 + 1.5) / π, one side-on (2.7 + 1.5 × 160/255) / π, one away (2.7 + 1.5 × 70/255) / π.
+        #expect(abs(Look.animationLight(normal: [0, 1, 0]) - 4.2 / .pi) < 0.001)
+        #expect(abs(Look.animationLight(normal: [1, 0, 0]) - (2.7 + 1.5 * 160 / 255) / .pi) < 0.001)
+        #expect(abs(Look.animationLight(normal: [0, -1, 0]) - (2.7 + 1.5 * 70 / 255) / .pi) < 0.001)
+        // Lit so, the scale reads like the prototype's picture: a dark body, a light top.
+        let parts = ScaleScene.parts()
+        let tones = parts.platform.flatMap { SceneBake.shaded($0, light: .animation) }.compactMap { paint, mesh -> RGB? in
+            guard case .colour(let colour) = paint, (0..<mesh.triangleCount).contains(where: { mesh.faceNormal($0).y > 0.9 })
+            else { return nil }
+            return Look.duotone(colour)
+        }
+        #expect(tones.contains(Look.boxLight) && tones.contains(Look.boxDark))
+    }
+
     @Test func aFallTakesTheTimeToDropThreeMetres() {
         let fall = ScaleScene.fallTime
         #expect(abs(fall - (2 * 3 / 9.8).squareRoot()) < 0.001)
@@ -101,7 +139,26 @@ struct DuotoneTests {
         #expect(Look.duotone(RGB(hex: "#D3262E")) == Look.boxDark)        // red 25: dark, its print light
         #expect(Look.duotone(RGB(hex: "#1E5BC6")) == Look.boxDark)
         #expect(Look.duotone(RGB(hex: "#F2F2EE")) == Look.boxLight)       // white change plate
-        #expect(Look.duotone(RGB(hex: "#CDD2D8")) == Look.boxLight)       // the bar's steel
+        // The prototype grades first (contrast 0.71, then brightness 0.68) and splits at half after that: only
+        // what's brighter than about 0.83 comes out cream.
+        #expect(Look.duotone(RGB(0.84, 0.84, 0.84)) == Look.boxLight)
+        #expect(Look.duotone(RGB(0.82, 0.82, 0.82)) == Look.boxDark)
+        #expect(Look.duotone(RGB(hex: "#7F7F7F")) == Look.boxDark)
+    }
+
+    @Test func aTitlePlateKeepsALightHubUnderTheAnimationLight() {
+        // The title's plates lie along x, side-on to the sun: the chrome hub's faces stay light, the red rim dark.
+        guard let red = Plate.find(25, .kg) else { Issue.record("no 25 kg plate"); return }
+        let parts = PropModels.plateParts(red)
+        let hubFaces = SceneBake.shaded(parts[2], light: .animation).compactMap { paint, mesh -> RGB? in
+            guard case .colour(let colour) = paint, abs(mesh.faceNormal(0).x) > 0.9 else { return nil }
+            return Look.duotone(colour)
+        }
+        #expect(!hubFaces.isEmpty && hubFaces.allSatisfy { $0 == Look.boxLight })
+        let rim = SceneBake.shaded(parts[1], light: .animation).compactMap { paint, _ -> RGB? in
+            if case .colour(let colour) = paint { return Look.duotone(colour) } else { return nil }
+        }
+        #expect(rim.allSatisfy { $0 == Look.boxDark })
     }
 }
 
