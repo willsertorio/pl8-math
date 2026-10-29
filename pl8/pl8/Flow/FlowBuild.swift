@@ -29,6 +29,13 @@ final class FlowShadedModel {
         var grey = false
         /// How far towards `FlowLook.wash` (the abduction's beam greying a bell).
         var wash: Float = 0
+
+        /// Whether the colours would look the same: shine and wash in eighths (each step a re-light), back to
+        /// exactly none at the end. Opacity is the material's alone.
+        func sameColours(as other: State) -> Bool {
+            func step(_ v: Float) -> Int { v == 0 ? -1 : Int(v * 8) }
+            return grey == other.grey && step(shine) == step(other.shine) && step(wash) == step(other.wash)
+        }
     }
 
     init(model: ModelEntity, part: FlowPart) {
@@ -141,13 +148,19 @@ extension Flow {
     /// to the GPU in one go. New models always; others up to a budget per frame: a falling plate's colours
     /// lagging a frame can't be seen.
     func reshade() {
-        var budget = 160
+        var budget = 64
         for item in shaded {
             guard item.model.scene != nil else { continue }
-            guard let baked = item.bakedOrientation else { bake(item); continue }
+            guard let baked = item.bakedOrientation, let bakedState = item.bakedState else { bake(item); continue }
+            if bakedState.opacity != item.state.opacity && bakedState.sameColours(as: item.state) && !item.dirty {
+                // A fade: only the material changes.
+                bake(item, colours: false)
+                continue
+            }
             guard budget > 0 else { continue }
+            // Turned more than 3.5° (the light comes in steps; finer re-lighting doesn't show), or new colours.
             let orientation = item.model.orientation(relativeTo: nil)
-            if item.dirty || abs(simd_dot(baked.vector, orientation.vector)) < 0.99985 || item.bakedState != item.state {
+            if item.dirty || abs(simd_dot(baked.vector, orientation.vector)) < 0.99953 || !bakedState.sameColours(as: item.state) {
                 bake(item)
                 budget -= 1
             }
@@ -193,9 +206,10 @@ extension Flow {
         return try? LowLevelTexture(descriptor: descriptor)
     }
 
-    func bake(_ item: FlowShadedModel) {
-        perf?.bakes += 1
-        let orientation = item.model.orientation(relativeTo: nil)
+    /// - Parameter colours: false when only the opacity changed: the palette keeps its colours.
+    func bake(_ item: FlowShadedModel, colours: Bool = true) {
+        if colours { perf?.bakes += 1 }
+        let orientation = colours ? item.model.orientation(relativeTo: nil) : (item.bakedOrientation ?? item.model.orientation(relativeTo: nil))
         item.bakedOrientation = orientation
         item.bakedState = item.state
         item.dirty = false
@@ -235,6 +249,13 @@ extension Flow {
             }
             material.color = .init(tint: Self.washed(light, state.wash).uiColor, texture: .init(texture))
         case (_, .colour(let base)):
+            if !colours, let palette = item.palette {
+                // The same colours, another opacity.
+                if item.paletteOpacity == opacity { return }
+                item.paletteOpacity = opacity
+                material.color = .init(tint: .white, texture: .init(palette))
+                break
+            }
             // One texel per triangle, lit where it faces now.
             let layout = Self.paletteLayout(item.normals.count)
             var bytes = [UInt8](repeating: 255, count: layout.width * layout.rows * 4)
