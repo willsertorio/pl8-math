@@ -23,6 +23,7 @@ struct RootView: View {
         .task {
             seedIfNeeded()
             DataCleanup.mergeDuplicatePRs(in: context)
+            DataCleanup.removeNonLifts(in: context)
         }
     }
 

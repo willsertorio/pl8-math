@@ -49,7 +49,7 @@ Read the codebase first. Then propose a plan, including the files and types you'
 - **Current gym:** store the current gym's ID in `@AppStorage` (it's per device, and doesn't need to sync).
 - **The menu's Train board** shows the newest `Workout`.
 - **Wiping the board** deletes that workout or marks it cleared.
-- **No photos are stored, ever.** Keep only the parsed result.
+- **No photos are stored, ever.** Keep the recognized text and the parsed result (the text stays on the phone and in iCloud; it's how a bug from real use becomes a fixture). *(Will, 2026-10-30; the privacy policy says so.)*
 
 ---
 
@@ -145,7 +145,7 @@ It does exactly one job: holding the AI provider's key and calling it. It has no
   - The app uses **App Attest** (`DCAppAttestService`): it registers once, then sends an assertion with each request.
   - The server verifies the assertion and rejects everything else.
 - **Abuse limits:**
-  - 20 reads per device per day, tracked by the attested key ID in a tiny key-value store with a time-to-live (a counter only, never content).
+  - 20 reads per device per day, tracked by the attested key ID in a tiny key-value store with a time-to-live (a counter only, never content). App Attest also needs each key's public key and its sign counter kept, to check later requests; the privacy policy says so. *(Will, 2026-10-30.)*
   - A global spending cap, set in the AI provider's dashboard.
 - **Privacy:**
   - Never log the request body, the text or the image.

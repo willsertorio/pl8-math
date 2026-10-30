@@ -21,6 +21,16 @@ enum DataCleanup {
         try? context.save()
     }
 
+    /// Saved PRs whose name can't be a lift go: a receipt's "Order completed!" was read as a PR before 2026-10-30
+    /// (Fixtures/prs/2026-10-30-notebook.webp).
+    static func removeNonLifts(in context: ModelContext) {
+        let records = (try? context.fetch(FetchDescriptor<PersonalRecord>())) ?? []
+        let gone = records.filter { !LiftNames.couldBeALift($0.lift) }
+        guard !gone.isEmpty else { return }
+        for record in gone { context.delete(record) }
+        try? context.save()
+    }
+
     /// Replaying the first run starts from nothing: every gym, PR, workout and session is deleted.
     static func eraseEverything(in context: ModelContext) {
         try? context.delete(model: SetLog.self)

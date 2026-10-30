@@ -26,6 +26,12 @@ public enum LiftNames {
 
     /// "  back   squat " → "Back Squat", "BS" → "Back Squat", "backsquat" → "Back Squat" (spaces, dashes and
     /// case don't make a new lift). Unknown lifts are tidied the same way every time: "pull ups" → "Pull Ups".
+    /// Could this be a lift's name? Letters, and none of the marks a lift never has: "@ 80%" is a set,
+    /// "Order completed!" or "Total R$" is a receipt (2026-10-30).
+    public static func couldBeALift(_ name: String) -> Bool {
+        name.contains(#/[A-Za-z]{2}/#) && !name.contains { "@%!?$€£¥".contains($0) }
+    }
+
     /// "Back Squat" → "Back squat": how the Flow's questions and the PR notebook write a lift.
     public static func sentenceCase(_ name: String) -> String {
         guard let first = name.first else { return name }

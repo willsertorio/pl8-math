@@ -37,13 +37,14 @@
 
   <h2>What stays on your device and in your iCloud</h2>
   <p>The things you set up in the app stay on your iPhone: your gym's name, units, plates and bar, your PRs, and your workouts and finished sets. If you're signed in to iCloud, they're also synced to your <strong>private</strong> iCloud database through Apple's CloudKit, so they follow you to a new iPhone. We can't see or access this data. Apple's privacy policy covers iCloud.</p>
-  <p>We never store your photos. The app keeps only what it read from them, for example "Back squat 5×5 @ 75%".</p>
+  <p>We never store your photos. The app keeps the text it read from them and what it found in that text, for example "Back squat 5×5 @ 75%". Like the rest of your data, this stays on your iPhone and in your private iCloud.</p>
 
   <h2>Reading photos of your workout or PRs</h2>
   <p>When you upload a photo of a whiteboard or a PR list, your iPhone first tries to read it on the device. Most of the time, nothing leaves your phone.</p>
   <p>If your phone can't read it, the app asks your permission before using the cloud. If you allow it, the app sends the <strong>text it recognised</strong> to our server. It sends the photo itself only when no text could be recognised, and it removes location and other metadata first. Our server passes it to an AI service, Claude by Anthropic, which returns the workout or PRs and nothing else.</p>
   <ul>
     <li>Nothing you send is stored by us after the result is returned, and we don't log its contents.</li>
+    <li>To make sure only pl8(math) can use our server, your iPhone proves it's running the real app (Apple's App Attest). For that, our server keeps a random key your iPhone made for this app and a count of reads per day, to stop abuse. The key isn't linked to you, your Apple Account or your data.</li>
     <li>Under its commercial API terms, Anthropic does not use this content to train its models.</li>
     <li>You can turn the cloud option off at any time in the app. The app then uses only on-device reading or manual entry.</li>
   </ul>

@@ -13,7 +13,8 @@ public struct PREntry: Hashable, Codable, Sendable {
     }
 }
 
-/// Reads PRs from text: `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb` (SPEC 3.7).
+/// Reads PRs from text: `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb` (SPEC 3.7). A line without kg or lb
+/// must name a lift we know; a lift we don't know needs its unit (`Zercher Squat 120 kg`).
 /// Box apps list a lift with its weight on the right, which OCR reads as two lines (`Back Squat (Barbell)`,
 /// `185.19 Lb`), row by row (weight first or name first) or as a column of names and a column of weights: each
 /// weight-only line pairs with the earliest lift name waiting for one, and the other way round.
@@ -22,11 +23,15 @@ public enum PRParser {
         var entries: [PREntry] = []
         var waitingNames: [String] = []
         var waitingWeights: [(value: Double, unit: WeightUnit?)] = []
-        for raw in OCRText.latinized(text).split(whereSeparator: \.isNewline) {
-            let line = withoutBrackets(String(raw))
+        let lines = OCRText.latinized(text).split(whereSeparator: \.isNewline).map { withoutBrackets(String($0)) }
+        // When the list's weights say kg or lb, a lone number without one is something else (the status bar's "30"),
+        // not a weight: paired with the first name it shifted every PR by one row (2026-10-30).
+        let weightsHaveUnits = lines.contains { weightOnly($0)?.unit != nil }
+        for line in lines {
             if let entry = parseLine(line) {
                 entries.append(entry)
             } else if let weight = weightOnly(line) {
+                if weight.unit == nil && weightsHaveUnits { continue }
                 if waitingNames.isEmpty {
                     waitingWeights.append(weight)                       // its name may come next
                 } else {
@@ -86,10 +91,12 @@ public enum PRParser {
         var name = String(match.lift)
         // "Back Squat 1RM", "Snatch PR" → the lift alone.
         name = name.replacing(#/\s*[-–:]?\s*(?:1\s*RM|PR)\s*$/#.ignoresCase(), with: "")
-        // A real word, not the status bar's "5G".
-        guard name.contains(#/[A-Za-z]{2}/#), !name.contains("@"), !name.contains("%") else { return nil }
+        // A real word, not the status bar's "5G", nor a set ("@ 80%") or a receipt ("Order completed!").
+        guard LiftNames.couldBeALift(name) else { return nil }
 
         let unit: WeightUnit? = match.unit.map { $0.lowercased().hasPrefix("k") ? .kg : .lb }
+        // Without kg or lb, only a lift we know: "Subtotal 45.90" isn't a PR, "Snatch 85" is.
+        guard unit != nil || LiftNames.firstKnown(in: name) != nil else { return nil }
         return PREntry(lift: LiftNames.canonical(name), value: value, unit: unit)
     }
 }

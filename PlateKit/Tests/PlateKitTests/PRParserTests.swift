@@ -137,3 +137,31 @@ struct PRReadingOrderTests {
         #expect(PRParser.parse("Deadlift (Barbell) 253.53 Lb ›") == [PREntry(lift: "Deadlift", value: 253.53, unit: .lb)])
     }
 }
+
+/// Bug from real use, 2026-10-30 (Fixtures/prs/2026-10-30-notebook.webp): on Will's PR page each lift had the weight of
+/// the row above (Back squat 30 kg, Bench press 185.19, Deadlift 132.28, Front squat 253.53 lb): the status bar's
+/// "30" read on its own line paired with the first name. And a receipt's "Order completed!" line became a PR.
+@Suite("PR screenshot, 2026-10-30: stray lines")
+struct PRStrayLinesTests {
+    @Test func aLoneNumberAboveTheListDoesNotShiftThePRs() throws {
+        let text = try PRAppScreenshotTests.fixture().replacingOccurrences(of: "5G 30", with: "5G\n30")
+        #expect(PRParser.parse(text) == PRAppScreenshotTests.expected)
+    }
+
+    @Test func receiptLinesAreNotPRs() {
+        for line in ["Order completed! 45.90", "Order completed! R$ 45,90", "Subtotal 45.90", "Total: $120.00", "Shipping 10"] {
+            #expect(PRParser.parse(line).isEmpty, "\(line)")
+        }
+        // A lift we don't know still counts when its line says kg or lb.
+        #expect(PRParser.parse("Zercher Squat 120 kg").map(\.lift) == ["Zercher Squat"])
+        #expect(PRParser.parse("Snatch 85").map(\.lift) == ["Snatch"])
+    }
+
+    @Test func savedNamesThatCannotBeLiftsAreFound() {
+        #expect(!LiftNames.couldBeALift("Order completed!"))
+        #expect(!LiftNames.couldBeALift("Order completed! R$"))
+        #expect(!LiftNames.couldBeALift("3 Back Squat @80%"))
+        #expect(LiftNames.couldBeALift("Zercher Squat"))
+        #expect(LiftNames.couldBeALift("Clean & Jerk"))
+    }
+}
