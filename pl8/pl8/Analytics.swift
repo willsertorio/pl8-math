@@ -58,7 +58,7 @@ enum Analytics {
     static func start() {
         guard ScreenshotMode.shot == nil,
               let key = Bundle.main.object(forInfoDictionaryKey: "PostHogAPIKey") as? String, !key.isEmpty else { return }
-        let config = PostHogConfig(apiKey: key, host: "https://eu.i.posthog.com")
+        let config = PostHogConfig(projectToken: key, host: "https://eu.i.posthog.com")
         config.personProfiles = .never
         config.captureApplicationLifecycleEvents = true
         config.captureScreenViews = false

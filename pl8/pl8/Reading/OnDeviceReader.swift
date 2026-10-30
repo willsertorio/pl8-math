@@ -24,13 +24,13 @@ enum OnDeviceReader {
     }
 
     /// 0 and "" mean "not written".
-    private static func block(_ block: GeneratedBlock) -> ReadResult.Block {
+    private nonisolated static func block(_ block: GeneratedBlock) -> ReadResult.Block {
         let label: String? = block.label.isEmpty ? nil : block.label
         let note: String? = block.note.isEmpty ? nil : block.note
         return ReadResult.Block(label: label, lift: block.lift, sets: block.sets.map(set), note: note)
     }
 
-    private static func set(_ set: GeneratedSet) -> ReadResult.Set {
+    private nonisolated static func set(_ set: GeneratedSet) -> ReadResult.Set {
         let percent: Double? = set.percent > 0 ? set.percent : nil
         let weight: Double? = set.weight > 0 ? set.weight : nil
         return ReadResult.Set(reps: set.reps, percent: percent, weight: weight)

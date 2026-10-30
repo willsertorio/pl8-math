@@ -220,7 +220,7 @@ extension Flow {
             })
         }
         tick = { [weak self] _, t in
-            guard let self else { return }
+            guard self != nil else { return }
             ui.now = t
             for (i, model) in models.enumerated() {
                 let turn = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) * simd_quatf(angle: sin(Float(t) * 0.8 + Float(i)) * 0.12, axis: [0, 1, 0])
