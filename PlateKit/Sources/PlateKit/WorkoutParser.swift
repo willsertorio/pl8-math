@@ -58,6 +58,11 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
                              sets: Array(repeating: set, count: max(1, sets)))
     }
 
+    /// A block from a reading result (ReadResult): one lift, its PR the lift itself.
+    static func read(letter: String, lift: String, format: String?, note: String?, sets: [ParsedSet]) -> StrengthBlock {
+        StrengthBlock(letter: letter, label: nil, name: lift, prLift: lift, format: format, note: note, sets: sets)
+    }
+
     /// The same block with every set at `target` (editing the plan).
     public func settingPercent(_ target: Target) -> StrengthBlock {
         StrengthBlock(letter: letter, label: label, name: name, prLift: prLift, format: format, note: note,
@@ -140,9 +145,13 @@ public enum WorkoutParser {
         let ordered = sections.enumerated()
             .sorted { ($0.element.letter, $0.offset) < ($1.element.letter, $1.offset) }
             .map(\.element)
-        return ordered.flatMap { parseBlock(letter: $0.letter, label: $0.label, lines: $0.lines) }
+        let blocks = ordered.flatMap { parseBlock(letter: $0.letter, label: $0.label, lines: $0.lines) }
+        guard blocks.isEmpty else { return blocks }
+        // Not the box app's format: a whiteboard's (docs/DATA-AND-SERVICES.md §2.3), checked like every stage's.
+        return BoardFormats.read(screenshots.joined(separator: "\n"))?.strengthBlocks() ?? []
     }
 
+    /// The box app's format first; when it finds nothing, the whiteboard formats (BoardFormats).
     public static func parse(_ text: String) -> [StrengthBlock] {
         parse(screenshots: [text])
     }

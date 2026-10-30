@@ -21,7 +21,9 @@ public enum LiftNames {
         "ohs": "Overhead Squat",
         "dl": "Deadlift",
         "c&j": "Clean & Jerk",
+        "cj": "Clean & Jerk",
         "clean and jerk": "Clean & Jerk",
+        "bench": "Bench Press",
     ]
 
     /// "  back   squat " → "Back Squat", "BS" → "Back Squat", "backsquat" → "Back Squat" (spaces, dashes and
@@ -48,12 +50,19 @@ public enum LiftNames {
     public static func canonical(_ name: String) -> String {
         let tidy = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         if let known = lookup[tidy.lowercased()] ?? compactLookup[key(tidy)] { return known }
+        // A plural of a lift we know: "cleans", "Back squats", "snatches".
+        for cut in [1, 2] where tidy.count > cut + 2 && tidy.lowercased().hasSuffix(cut == 1 ? "s" : "es") {
+            if let known = compactLookup[key(String(tidy.dropLast(cut)))] { return known }
+        }
         // Only all-lowercase or ALL-CAPS names get capitalised; "Clean to Parallel" is left as written.
         guard tidy == tidy.lowercased() || tidy == tidy.uppercased() else { return tidy }
         return tidy.split(separator: " ").map { word in
             word.first!.isLetter ? word.prefix(1).uppercased() + word.dropFirst().lowercased() : String(word)
         }.joined(separator: " ")
     }
+
+    /// A lift we know, however it's spelled ("back squats", "BS").
+    public static func isKnown(_ name: String) -> Bool { known.contains(canonical(name)) }
 
     /// The same for every spelling of a lift: letters and digits only, lowercased ("Pull-Ups" → "pullups";
     /// "&" counts as "and"). Use it to find a lift's one PR.
