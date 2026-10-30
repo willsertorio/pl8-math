@@ -263,6 +263,11 @@ final class ScaleStage {
         let kilos = { (size: Double, unit: WeightUnit) in Float(unit == .lb ? size * 0.4536 : size) }
         bodies = zip(drops, dropEntities).map { (drop: ScaleScene.Drop, entity: Entity) -> FlowBody? in
             guard entity.isEnabled else { return nil }
+            // Exactly at rest and flat first, like the prototype's (it lifts each plate onto the platform): the last
+            // hop and the platform's bounce left the bottom plate a few millimetres inside the now solid scale, and
+            // pushing it out threw the whole stack into the air.
+            entity.position = SIMD3(drop.offset.x, drop.restY, drop.offset.y)
+            entity.orientation = simd_quatf(angle: drop.turn + drop.spin, axis: [0, 1, 0])
             physics.root.addChild(entity, preservingWorldTransform: true)
             if let plate = drop.plate {
                 let radius = Float(plate.diameter) / 2, thickness = Float(plate.thickness)

@@ -194,22 +194,24 @@ struct ScreenshotHost: View {
         }
     }
 
-    /// `session-over-drag`: once the scale's things can be grabbed, the bar pulled up and away and let go (it falls
-    /// off), then the top plate lifted and held in the air: the screen reads what's left on the platform (92.5).
+    /// `session-over-drag`: once the scale's things can be grabbed, the bar flung off to the side (it falls away),
+    /// then the top plate lifted and held in the air: the screen reads what's left on the platform (92.5).
     static func dragScale(_ stage: ScaleStage) async {
         while !stage.draggable { try? await Task.sleep(for: .milliseconds(50)) }
-        func pull(_ index: Int, by delta: CGPoint, release: Bool) async {
+        try? await Task.sleep(for: .seconds(1))
+        func pull(_ index: Int, by delta: CGPoint, steps: Int, release: Bool) async {
             guard let from = stage.screenPoint(ofDrop: index), stage.grab(at: from) else { return }
-            for step in 1...30 {
+            for step in 1...steps {
                 try? await Task.sleep(for: .milliseconds(20))
-                stage.drag(to: CGPoint(x: from.x + delta.x * CGFloat(step) / 30, y: from.y + delta.y * CGFloat(step) / 30))
+                let u = CGFloat(step) / CGFloat(steps)
+                stage.drag(to: CGPoint(x: from.x + delta.x * u, y: from.y + delta.y * u))
             }
             if release { stage.release() }
         }
         let bar = 6, topPlate = 5
-        await pull(bar, by: CGPoint(x: 150, y: -240), release: true)
-        try? await Task.sleep(for: .seconds(1.5))
-        await pull(topPlate, by: CGPoint(x: -100, y: -190), release: false)
+        await pull(bar, by: CGPoint(x: -340, y: -60), steps: 15, release: true)
+        try? await Task.sleep(for: .seconds(2))
+        await pull(topPlate, by: CGPoint(x: -90, y: -190), steps: 30, release: false)
     }
 
     /// Gym "79" in kg with every plate and the 20 kg bar, four PRs, and today's workout (Fixtures 01/10).
