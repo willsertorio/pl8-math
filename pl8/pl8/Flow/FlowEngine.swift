@@ -158,6 +158,7 @@ final class Flow {
         subscriptions.append(arView.scene.subscribe(to: SceneEvents.Update.self) { [weak self] event in
             self?.frame(Float(event.deltaTime))
         })
+        data.askCloudConsent = { [weak self] in await self?.askCloudConsent() ?? false }
     }
 
     /// No AR, a clear background (the SwiftUI one shows through), no effects of its own, the sketch pass after.
@@ -707,6 +708,8 @@ struct FlowAlert: Identifiable {
     struct Button {
         let label: String
         var destructive = false
+        /// The answer to give, not a way out: shown in the alert's default style ("Allow").
+        var primary = false
         var action: (() -> Void)?
     }
     let id = UUID()

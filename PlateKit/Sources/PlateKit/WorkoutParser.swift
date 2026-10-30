@@ -58,6 +58,20 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
                              sets: Array(repeating: set, count: max(1, sets)))
     }
 
+    /// Within the limits every reading stage is held to (§2.4): reps 1–50, any % between 30 and 110, at least one set.
+    public var isLikely: Bool {
+        !sets.isEmpty && sets.allSatisfy { set in
+            ReadResult.reps.contains(set.reps) && set.target.map { target in
+                ReadResult.percent.contains(target.low) && (target.high.map { ReadResult.percent.contains($0) } ?? true)
+            } ?? true
+        }
+    }
+
+    /// The same block with other sets (tests).
+    func replacingSets(_ sets: [ParsedSet]) -> StrengthBlock {
+        StrengthBlock(letter: letter, label: label, name: name, prLift: prLift, format: format, note: note, sets: sets, rpe: rpe)
+    }
+
     /// A block from a reading result (ReadResult): one lift, its PR the lift itself.
     static func read(letter: String, lift: String, format: String?, note: String?, sets: [ParsedSet]) -> StrengthBlock {
         StrengthBlock(letter: letter, label: nil, name: lift, prLift: lift, format: format, note: note, sets: sets)

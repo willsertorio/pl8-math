@@ -179,3 +179,28 @@ struct ReadResultTests {
         #expect(unknownUnit.prEntries() == [PREntry(lift: "Snatch", value: 85, unit: nil)])
     }
 }
+
+/// The rules' own output is checked with the same limits, item by item: one odd line doesn't throw away the rest.
+@Suite("The rules' output is checked too (DATA-AND-SERVICES §2.4)")
+struct LikelyOutputTests {
+    @Test func aBlockIsLikelyWithinTheLimits() {
+        func block(_ sets: [ParsedSet]) -> StrengthBlock { .typed(letter: "A", lift: "Back Squat", sets: 1, reps: 1, target: .single(80)).replacingSets(sets) }
+        #expect(block([ParsedSet(reps: 5, target: .range(75, 78))]).isLikely)
+        #expect(block([ParsedSet(reps: 3, target: nil)]).isLikely)                 // a % to ask for is fine
+        #expect(block([ParsedSet(reps: 5, target: .plus(80))]).isLikely)
+        #expect(!block([ParsedSet(reps: 0, target: .single(80))]).isLikely)
+        #expect(!block([ParsedSet(reps: 60, target: .single(80))]).isLikely)
+        #expect(!block([ParsedSet(reps: 5, target: .single(20))]).isLikely)
+        #expect(!block([ParsedSet(reps: 5, target: .range(100, 120))]).isLikely)
+        #expect(!block([]).isLikely)
+    }
+
+    @Test func aPRIsLikelyWithinTheLimits() {
+        #expect(PREntry(lift: "Deadlift", value: 180, unit: .kg).isLikely)
+        #expect(PREntry(lift: "Deadlift", value: 1000, unit: .lb).isLikely)
+        #expect(!PREntry(lift: "Deadlift", value: 600, unit: .kg).isLikely)
+        #expect(PREntry(lift: "Deadlift", value: 600, unit: nil).isLikely)          // its unit is asked later
+        #expect(!PREntry(lift: "Deadlift", value: 0.5, unit: .kg).isLikely)
+        #expect(!PREntry(lift: "Order completed", value: 45, unit: .kg).isLikely)
+    }
+}

@@ -58,7 +58,7 @@ struct FlowView: View {
         .alert(flow.alert?.title ?? "", isPresented: Binding(get: { flow.alert != nil }, set: { if !$0 { flow.alert = nil } }),
                presenting: flow.alert) { alert in
             ForEach(Array(alert.buttons.enumerated()), id: \.offset) { _, button in
-                Button(button.label, role: button.destructive ? .destructive : (alert.buttons.count > 1 && !button.destructive ? .cancel : nil)) {
+                Button(button.label, role: button.destructive ? .destructive : (alert.buttons.count > 1 && !button.primary ? .cancel : nil)) {
                     button.action?()
                 }
             }
@@ -336,6 +336,17 @@ extension Flow {
     }
 
     /// Asks for a photo (flPickPhoto), then shows the reading veil for at least 3 s while `read` works.
+    /// Before anything leaves the phone the first time (docs/DATA-AND-SERVICES.md §2.2): the iPhone's own alert,
+    /// over the reading plate.
+    func askCloudConsent() async -> Bool {
+        await withCheckedContinuation { continuation in
+            alert = FlowAlert(title: "Read it in the cloud?",
+                              message: "Your phone couldn't read this one. pl8(math) can send the text (or the photo, if needed) to our server, where an AI service reads it. Nothing is kept after it's read.",
+                              buttons: [.init(label: "Not now", action: { continuation.resume(returning: false) }),
+                                        .init(label: "Allow", primary: true, action: { continuation.resume(returning: true) })])
+        }
+    }
+
     func pickPhoto(_ kind: FlowPhotoRequest.Kind, reading text: String, read: @escaping (UIImage) async -> Bool, then: @escaping (Bool) -> Void) {
         photoRequest = FlowPhotoRequest(kind: kind) { [weak self] image in
             guard let self else { return }

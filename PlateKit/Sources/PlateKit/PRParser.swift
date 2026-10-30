@@ -13,6 +13,14 @@ public struct PREntry: Hashable, Codable, Sendable {
     }
 }
 
+extension PREntry {
+    /// Within the limits every reading stage is held to (§2.4): a name that can be a lift, and 1–500 kg or
+    /// 1–1,100 lb (1–1,100 while its unit is still to be asked).
+    public var isLikely: Bool {
+        LiftNames.couldBeALift(lift) && ReadResult.weights(in: unit ?? .lb).contains(value)
+    }
+}
+
 /// Reads PRs from text: `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb` (SPEC 3.7). A line without kg or lb
 /// must name a lift we know; a lift we don't know needs its unit (`Zercher Squat 120 kg`).
 /// Box apps list a lift with its weight on the right, which OCR reads as two lines (`Back Squat (Barbell)`,

@@ -115,13 +115,16 @@ final class FlowData {
         save()
     }
 
-    /// Reads a PR screenshot into the PRs; true when it found any.
+    /// The one-time "Read it in the cloud?" question; the Flow shows it.
+    var askCloudConsent: () async -> Bool = { false }
+    /// How the last photo was read (the analytics `photo_read` event).
+    private(set) var lastRead: (kind: ReadResult.Kind, stage: PhotoReader.Stage, milliseconds: Int)?
+
+    /// Reads a PR screenshot into the PRs, in stages (PhotoReader); true when it found any.
     func readPRs(_ image: UIImage) async -> Bool {
-        guard let lines = try? await TextReader.lines(in: image) else { return false }
-        var entries = PRParser.parse(lines.joined(separator: "\n"))
-        if entries.isEmpty, let joined = try? await TextReader.lines(in: image.pngData() ?? Data(), joiningRows: true) {
-            entries = PRParser.parse(joined.joined(separator: "\n"))
-        }
+        let read = await PhotoReader.prs(image, unit: unit, consent: askCloudConsent)
+        lastRead = (kind: ReadResult.Kind.prs, stage: read.stage, milliseconds: read.milliseconds)
+        var entries = read.entries
         if PRParser.needsUnit(entries) { entries = PRParser.assumingUnit(unit, for: entries) }
         guard !entries.isEmpty else { return false }
         let all = records
@@ -146,13 +149,12 @@ final class FlowData {
         return (try? context.fetch(descriptor))?.first
     }
 
-    /// Reads a workout screenshot onto the board; true when it found a lift.
+    /// Reads a workout screenshot onto the board, in stages (PhotoReader); true when it found a lift.
     func readWorkout(_ image: UIImage) async -> Bool {
-        guard let lines = try? await TextReader.lines(in: image) else { return false }
-        let text = lines.joined(separator: "\n")
-        let blocks = WorkoutParser.parse(screenshots: [text])
-        guard !blocks.isEmpty else { return false }
-        let workout = Workout(sourceText: text, blocks: blocks)
+        let read = await PhotoReader.workout(image, unit: unit, consent: askCloudConsent)
+        lastRead = (kind: ReadResult.Kind.workout, stage: read.stage, milliseconds: read.milliseconds)
+        guard !read.blocks.isEmpty else { return false }
+        let workout = Workout(sourceText: read.text, blocks: read.blocks)
         context.insert(workout)
         save()
         self.workout = workout
