@@ -26,11 +26,18 @@ public enum LiftNames {
 
     /// "  back   squat " → "Back Squat", "BS" → "Back Squat", "backsquat" → "Back Squat" (spaces, dashes and
     /// case don't make a new lift). Unknown lifts are tidied the same way every time: "pull ups" → "Pull Ups".
-    /// Could this be a lift's name? Letters, and none of the marks a lift never has: "@ 80%" is a set,
-    /// "Order completed!" or "Total R$" is a receipt (2026-10-30).
+    /// Could this be a lift's name? Letters, none of the marks a lift never has ("@ 80%" is a set, "Total R$" a
+    /// receipt), and none of a receipt's words ("Order completed", "Subtotal"), whole words only (2026-10-30).
     public static func couldBeALift(_ name: String) -> Bool {
-        name.contains(#/[A-Za-z]{2}/#) && !name.contains { "@%!?$€£¥".contains($0) }
+        guard name.contains(#/[A-Za-z]{2}/#), !name.contains(where: { "@%!?$€£¥#".contains($0) }) else { return false }
+        let words = name.lowercased().split { !$0.isLetter }
+        return !words.contains { receiptWords.contains(String($0)) }
     }
+
+    static let receiptWords: Set<String> = [
+        "order", "completed", "subtotal", "total", "shipping", "delivery", "fee", "discount", "tax", "payment", "paid",
+        "price", "amount", "receipt", "invoice", "purchase",
+    ]
 
     /// "Back Squat" → "Back squat": how the Flow's questions and the PR notebook write a lift.
     public static func sentenceCase(_ name: String) -> String {

@@ -157,6 +157,19 @@ struct PRStrayLinesTests {
         #expect(PRParser.parse("Snatch 85").map(\.lift) == ["Snatch"])
     }
 
+    @Test func receiptWordsAreNeverLifts() {
+        // The mark after "Order completed" on Will's page is half under the pencil: the words alone are enough.
+        for name in ["Order completed", "Order completed l", "Order #48213", "Subtotal", "Total", "Shipping", "Delivery fee",
+                     "Discount", "Tax", "Payment", "Amount paid", "Price"] {
+            #expect(!LiftNames.couldBeALift(name), "\(name)")
+        }
+        #expect(PRParser.parse("Order completed 45.90 kg").isEmpty)
+        // Lifts that only look close stay lifts.
+        for name in ["Back Squat", "Clean & Jerk", "Sots Press", "Pause Squat", "Deficit Deadlift", "Zercher Squat"] {
+            #expect(LiftNames.couldBeALift(name), "\(name)")
+        }
+    }
+
     @Test func savedNamesThatCannotBeLiftsAreFound() {
         #expect(!LiftNames.couldBeALift("Order completed!"))
         #expect(!LiftNames.couldBeALift("Order completed! R$"))
