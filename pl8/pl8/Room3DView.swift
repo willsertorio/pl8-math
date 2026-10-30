@@ -17,7 +17,7 @@ struct Room3DView: View {
     @Query private var records: [PersonalRecord]
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
 
-    private var gym: Gym? { gyms.first(where: { $0.isCurrent }) ?? gyms.first }
+    private var gym: Gym? { Gym.current(in: gyms) }
 
     /// Your PRs on the board, today's workout on the whiteboard.
     private var boards: Boards {

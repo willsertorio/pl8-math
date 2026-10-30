@@ -18,8 +18,7 @@ import SwiftUI
             // Space Grotesk everywhere, like the prototype's screens.
             .font(Theme.text(17))
         }
-        // Screenshot mode keeps its demo data in memory, away from the real data.
-        .modelContainer(for: [Gym.self, PersonalRecord.self, PRHistory.self, Workout.self, Session.self, SetLog.self],
-                        inMemory: ScreenshotMode.shot != nil)
+        // iCloud when it can, the phone otherwise; screenshot mode in memory (AppData).
+        .modelContainer(AppData.container)
     }
 }

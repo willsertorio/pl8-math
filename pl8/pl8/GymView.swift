@@ -12,7 +12,7 @@ struct GymDrawerContent: View {
     @State private var confirmRemove = false
     @State private var confirmReplay = false
 
-    private var current: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+    private var current: Gym? { Gym.current(in: gyms) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -62,7 +62,7 @@ struct GymDrawerContent: View {
     }
 
     private func switchTo(_ gym: Gym) {
-        for other in gyms { other.isCurrent = (other.id == gym.id) }
+        gym.makeCurrent()
         try? context.save()
     }
 
@@ -76,7 +76,7 @@ struct GymDrawerContent: View {
         guard let current, gyms.count > 1 else { return }
         let next = gyms.first { $0.id != current.id }
         context.delete(current)
-        next?.isCurrent = true
+        next?.makeCurrent()
         try? context.save()
     }
 }

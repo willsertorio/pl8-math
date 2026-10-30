@@ -51,9 +51,9 @@ struct PREditor: View {
                     }
                 }
 
-                if let record, !record.history.isEmpty {
+                if let record, let history = record.history, !history.isEmpty {
                     Section("Earlier") {
-                        ForEach(record.history.sorted { $0.date > $1.date }) { entry in
+                        ForEach(history.sorted { $0.date > $1.date }) { entry in
                             LabeledContent(
                                 "\(WeightUnit.trimmed(entry.value)) \(entry.unit.rawValue)",
                                 value: entry.date.formatted(date: .abbreviated, time: .shortened)

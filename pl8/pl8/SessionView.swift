@@ -252,7 +252,7 @@ struct SessionView: View {
     /// Saves the session to history with its planned loads (SPEC 3.8).
     private func endSession() {
         let now = Date.now
-        for log in session.setLogs where log.checkedAt == nil { log.checkedAt = now }
+        for log in session.setLogs ?? [] where log.checkedAt == nil { log.checkedAt = now }
         if session.startedAt == nil { session.startedAt = now }
         session.endedAt = now
         try? context.save()

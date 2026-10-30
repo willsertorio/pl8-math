@@ -20,7 +20,7 @@ struct HomeView: View {
     @State private var keyboardHeight: CGFloat = 0
     @State private var picks = 0
 
-    private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+    private var gym: Gym? { Gym.current(in: gyms) }
     private var today: Workout? { workouts.first { Calendar.current.isDateInToday($0.date) } }
 
     private var station: RoomLayout.Station {

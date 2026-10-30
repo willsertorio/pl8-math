@@ -25,7 +25,7 @@ struct ReadyToLift: View {
         let missingPRs = Planner.missingPRs(blocks: blocks, records: records)
         let missingPercents = blocks.indices.filter { blocks[$0].pctMissing }
         let isReady = !blocks.isEmpty && missingPRs.isEmpty && missingPercents.isEmpty
-        let unfinished = workout.sessions.first { $0.endedAt == nil }
+        let unfinished = workout.sessions?.first { $0.endedAt == nil }
         VStack(alignment: .leading, spacing: 10) {
             ForEach(missingPercents, id: \.self) { index in
                 let block = blocks[index]

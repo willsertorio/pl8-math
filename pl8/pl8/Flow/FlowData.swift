@@ -31,10 +31,11 @@ final class FlowData {
             gyms = [gym]
             save()
         }
-        if !gyms.contains(where: \.isCurrent) { gyms[0].isCurrent = true }
+        // Kept per phone (Gym.current); the first time, from the old flag on the gym.
+        Gym.current(in: gyms)?.makeCurrent()
     }
 
-    var gymIndex: Int { gyms.firstIndex(where: \.isCurrent) ?? 0 }
+    var gymIndex: Int { Gym.current(in: gyms).flatMap { current in gyms.firstIndex { $0 === current } } ?? 0 }
     var gym: Gym { gyms[gymIndex] }
 
     var name: String {
@@ -62,13 +63,12 @@ final class FlowData {
 
     func makeCurrent(_ index: Int) {
         guard gyms.indices.contains(index) else { return }
-        for (i, gym) in gyms.enumerated() { gym.isCurrent = i == index }
-        save()
+        gyms[index].makeCurrent()
     }
 
     /// A new, empty gym at the end of the row, made current (set up through name → units → plates → bar).
     func addGym() {
-        let gym = Gym(name: "", unit: self.gym.unit, isCurrent: false)
+        let gym = Gym(name: "", unit: self.gym.unit)
         gym.sortIndex = (gyms.map(\.sortIndex).max() ?? 0) + 1
         gym.plateSizes = []
         context.insert(gym)
@@ -138,8 +138,10 @@ final class FlowData {
 
     // MARK: - The workout and the session
 
+    /// The newest workout not wiped off the board.
     func latestWorkout() -> Workout? {
-        var descriptor = FetchDescriptor<Workout>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+        var descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.clearedAt == nil },
+                                                  sortBy: [SortDescriptor(\.date, order: .reverse)])
         descriptor.fetchLimit = 1
         return (try? context.fetch(descriptor))?.first
     }
@@ -157,8 +159,13 @@ final class FlowData {
         return true
     }
 
-    /// Wiped off the board: the board is clean until the next upload.
-    func wipeBoard() { workout = nil }
+    /// Wiped off the board: the board is clean until the next upload, also after the app restarts (it used to come
+    /// back). The workout stays for the sessions lifted from it.
+    func wipeBoard() {
+        workout?.clearedAt = .now
+        save()
+        workout = nil
+    }
 
     /// The board's lines (flDrawBoard): "A. BACK SQUAT", "5 × 5 @ 75%", "→ 100 kg".
     var boardLines: [FlowBoardLine]? {
@@ -193,7 +200,7 @@ final class FlowData {
     func endSession() {
         guard let session else { return }
         let now = Date.now
-        for log in session.setLogs where log.checkedAt == nil { log.checkedAt = now }
+        for log in session.setLogs ?? [] where log.checkedAt == nil { log.checkedAt = now }
         session.endedAt = now
         save()
     }

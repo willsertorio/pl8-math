@@ -20,6 +20,7 @@ PlateKit/            Swift package: Sources/PlateKit, Tests/PlateKitTests
 Fixtures/            real screenshots, OCR text and expected results (see Fixtures/README.md)
 reference/           the web prototypes and the art/layout values; read-only, never ship
 design/flow-handoff/ the Flow design handoff (M7); read-only, never ship
+docs/                data, photo reading and analytics spec (M8) and the privacy policy
 SPEC.md  CLAUDE.md  DECISIONS.md
 ```
 
@@ -40,4 +41,4 @@ SPEC.md  CLAUDE.md  DECISIONS.md
 - `reference/plate-math-web-prototype.html` — the earlier prototype whose plate rules were tested at the box; the golden values come from it.
 
 ## Current milestone
-M7 — the Flow (design/flow-handoff, now v2: Helvetica Neue, Swiss red, the question lower), started 2026-10-29, built 2026-10-29, v2 applied the same night (checked against the v2 prototype in CI pictures; waiting on Will’s check on his iPhone). M6 built 2026-10-17. M0–M2 done 2026-10-13, M3 done 2026-10-14, M5 done 2026-10-15, M4 done 2026-10-16 (used in a real class; session page reworked from that). (Update this line as milestones finish.)
+M8 — data and services (docs/DATA-AND-SERVICES.md), started 2026-10-30: step 1 of 5 (iCloud-ready data) built, waiting on CI and Will's iPhone. M7 — the Flow (design/flow-handoff, now v2: Helvetica Neue, Swiss red, the question lower), started 2026-10-29, built 2026-10-29, v2 applied the same night (checked against the v2 prototype in CI pictures; waiting on Will’s check on his iPhone). M6 built 2026-10-17. M0–M2 done 2026-10-13, M3 done 2026-10-14, M5 done 2026-10-15, M4 done 2026-10-16 (used in a real class; session page reworked from that). (Update this line as milestones finish.)

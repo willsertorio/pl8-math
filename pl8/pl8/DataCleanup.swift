@@ -14,7 +14,7 @@ enum DataCleanup {
             let keep = group.filter { $0.value != nil }.max { $0.updatedAt < $1.updatedAt } ?? group[0]
             keep.lift = LiftNames.canonical(keep.lift)
             for other in group where other !== keep {
-                for entry in other.history { entry.record = keep }
+                for entry in other.history ?? [] { entry.record = keep }
                 context.delete(other)
             }
         }

@@ -26,7 +26,7 @@ struct PlateCalculatorView: View {
     @Query(sort: \Session.createdAt, order: .reverse) private var sessions: [Session]
     @State private var editingPR: EditingPR?
 
-    private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+    private var gym: Gym? { Gym.current(in: gyms) }
     private var unit: WeightUnit { gym?.unit ?? .lb }
 
     /// The saved PR for a lift, matching names the same way the parser does.
@@ -317,7 +317,7 @@ struct PlateCalculatorView: View {
         var parts = [
             session.createdAt.formatted(.dateTime.day().month().hour().minute()),
             session.gymName,
-            "\(session.setLogs.count) sets",
+            "\(session.setLogs?.count ?? 0) sets",
         ]
         if let top = session.heaviestTotal {
             parts.append("top \(WeightUnit.trimmed(top)) \(session.gymUnit.rawValue)")

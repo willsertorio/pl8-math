@@ -31,7 +31,7 @@ struct FirstRunView: View {
     /// The keyboard's height, so the room shows above it and the drawer while you type the name.
     @State private var keyboardHeight: CGFloat = 0
 
-    private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+    private var gym: Gym? { Gym.current(in: gyms) }
 
     /// Where each question looks in the room (SPEC 2.1, 2.2).
     private var station: RoomLayout.Station {
@@ -268,7 +268,7 @@ struct OpeningScreen: View {
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
     @State private var opening: OpeningPhase = .title
 
-    private var gym: Gym? { gyms.first { $0.isCurrent } ?? gyms.first }
+    private var gym: Gym? { Gym.current(in: gyms) }
 
     var body: some View {
         let today = workouts.first { Calendar.current.isDateInToday($0.date) }

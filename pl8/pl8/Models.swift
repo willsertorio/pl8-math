@@ -2,17 +2,21 @@ import Foundation
 import SwiftData
 import PlateKit
 
+// The saved data, version 2 (SchemaVersions.swift): ready for iCloud, so every property has a default or can be
+// empty, and every relationship can be empty and has an inverse (docs/DATA-AND-SERVICES.md §1).
+
 /// A gym's setup (SPEC Part 4). The rules live in PlateKit; this is what gets saved.
 @Model
 final class Gym {
     var id = UUID()
     /// Uppercase, up to 8 characters.
-    var name: String
-    var unit: WeightUnit
+    var name: String = ""
+    var unit: WeightUnit = WeightUnit.kg
     /// Heaviest first. Which sizes the gym has, not how many.
-    var plateSizes: [Double]
-    var barWeight: Double
-    var isCurrent: Bool
+    var plateSizes: [Double] = []
+    var barWeight: Double = 20
+    /// Until 2026-10-30 the current gym was marked here; now it's per phone (`Gym.current`), read from here once.
+    var isCurrent: Bool = false
     var placeID: String?
     /// What the gym has in each unit, kept when you switch (the Flow: a gym is { name, unit, plates[unit], bar[unit] }).
     /// Nil until that unit has been set up.
@@ -23,13 +27,12 @@ final class Gym {
     /// Its place in the row of gyms.
     var sortIndex: Int = 0
 
-    init(name: String, unit: WeightUnit, isCurrent: Bool = true) {
+    init(name: String, unit: WeightUnit) {
         let defaults = GymSetup(unit: unit)
         self.name = GymSetup.normalizedName(name)
         self.unit = unit
         self.plateSizes = defaults.plateSizes
         self.barWeight = defaults.barWeight
-        self.isCurrent = isCurrent
     }
 
     /// What PlateKit needs to plan loads.
@@ -61,6 +64,17 @@ final class Gym {
         case .lb: lbPlates = plateSizes; lbBar = barWeight
         }
     }
+
+    /// Which gym is current belongs to the phone, not to iCloud (docs/DATA-AND-SERVICES.md §1): its id is kept in
+    /// UserDefaults. Before that it was a flag on the gym, still read when nothing is kept yet.
+    static let currentKey = "currentGymID"
+
+    static func current(in gyms: [Gym]) -> Gym? {
+        let id = UserDefaults.standard.string(forKey: currentKey)
+        return gyms.first { $0.id.uuidString == id } ?? gyms.first(where: \.isCurrent) ?? gyms.first
+    }
+
+    func makeCurrent() { UserDefaults.standard.set(id.uuidString, forKey: Self.currentKey) }
 }
 
 /// A PR. It keeps the unit it was entered in; earlier values go to `history`.
@@ -68,13 +82,13 @@ final class Gym {
 final class PersonalRecord {
     var id = UUID()
     /// Canonical lift name, e.g. "Back Squat".
-    var lift: String
+    var lift: String = ""
     /// Nil until the user enters it.
     var value: Double?
-    var unit: WeightUnit
-    var updatedAt: Date
+    var unit: WeightUnit = WeightUnit.kg
+    var updatedAt: Date = Date.now
     @Relationship(deleteRule: .cascade, inverse: \PRHistory.record)
-    var history: [PRHistory] = []
+    var history: [PRHistory]? = []
 
     init(lift: String, value: Double? = nil, unit: WeightUnit = .kg) {
         self.lift = LiftNames.canonical(lift)
@@ -86,7 +100,7 @@ final class PersonalRecord {
     /// Saves a new value; the old one (if any) is kept in history.
     func update(value newValue: Double, unit newUnit: WeightUnit) {
         if let oldValue = value {
-            history.append(PRHistory(value: oldValue, unit: unit, date: updatedAt))
+            history = (history ?? []) + [PRHistory(value: oldValue, unit: unit, date: updatedAt)]
         }
         value = newValue
         unit = newUnit
@@ -97,9 +111,9 @@ final class PersonalRecord {
 /// An earlier value of a PR.
 @Model
 final class PRHistory {
-    var value: Double
-    var unit: WeightUnit
-    var date: Date
+    var value: Double = 0
+    var unit: WeightUnit = WeightUnit.kg
+    var date: Date = Date.now
     var record: PersonalRecord?
 
     init(value: Double, unit: WeightUnit, date: Date) {
@@ -113,13 +127,15 @@ final class PRHistory {
 @Model
 final class Workout {
     var id = UUID()
-    var date: Date
+    var date: Date = Date.now
     /// The text the blocks were read from.
-    var sourceText: String
+    var sourceText: String = ""
     /// The blocks, saved as JSON so SwiftData only stores plain data. Use `blocks` instead.
-    var blocksData: Data
+    var blocksData: Data = Data()
     @Relationship(deleteRule: .nullify, inverse: \Session.workout)
-    var sessions: [Session] = []
+    var sessions: [Session]? = []
+    /// When it was wiped off the board: the board stays clean, the sessions keep their workout.
+    var clearedAt: Date?
 
     init(sourceText: String, blocks: [StrengthBlock], date: Date = .now) {
         self.date = date
@@ -160,27 +176,27 @@ private enum BlockCache {
 @Model
 final class Session {
     var id = UUID()
-    var createdAt: Date
+    var createdAt: Date = Date.now
     var workout: Workout?
     /// Lift names by block index, so history reads well even if the workout is deleted.
-    var liftNames: [String]
+    var liftNames: [String] = []
     /// Each lift's PR unit by block index: totals are shown in it (SPEC 3.2).
     var prUnits: [WeightUnit] = []
     /// The PR each lift is based on, by block index (e.g. "Snatch" for Snatch Pull + Snatch), for the new-PR check.
     var prLifts: [String] = []
 
     // Gym snapshot: later changes to the gym don't change history.
-    var gymName: String
-    var gymUnit: WeightUnit
-    var barWeight: Double
-    var plateSizes: [Double]
+    var gymName: String = ""
+    var gymUnit: WeightUnit = WeightUnit.kg
+    var barWeight: Double = 20
+    var plateSizes: [Double] = []
 
     /// Set when the first and last sets are checked (M4).
     var startedAt: Date?
     var endedAt: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \SetLog.session)
-    var setLogs: [SetLog] = []
+    var setLogs: [SetLog]? = []
 
     init(gym: Gym, workout: Workout?, plan: SessionPlan) {
         self.createdAt = .now
@@ -195,7 +211,7 @@ final class Session {
 
     /// SwiftData doesn't keep a relationship's order, so each log has an `order`.
     var orderedLogs: [SetLog] {
-        setLogs.sorted { $0.order < $1.order }
+        (setLogs ?? []).sorted { $0.order < $1.order }
     }
 
     func liftName(for blockIndex: Int) -> String {
@@ -218,7 +234,7 @@ final class Session {
         for (order, record) in plan.setRecords.enumerated() {
             let log = SetLog(order: order, record: record)
             context.insert(log)
-            session.setLogs.append(log)
+            log.session = session
         }
         try? context.save()
         return session
@@ -226,7 +242,7 @@ final class Session {
 
     /// The heaviest working set: what was lifted where reported, else what was planned.
     var heaviestLog: SetLog? {
-        setLogs.filter { !$0.isWarmUp }.max { $0.liftedTotal < $1.liftedTotal }
+        (setLogs ?? []).filter { !$0.isWarmUp }.max { $0.liftedTotal < $1.liftedTotal }
     }
 
     var heaviestTotal: Double? { heaviestLog?.liftedTotal }
@@ -241,15 +257,15 @@ final class Session {
 /// One set of a session.
 @Model
 final class SetLog {
-    var order: Int
-    var blockIndex: Int
-    var setIndex: Int
-    var isWarmUp: Bool
-    var reps: Int
-    var pctText: String
-    var plannedTotal: Double
-    var unit: WeightUnit
-    var perSide: [Double]
+    var order: Int = 0
+    var blockIndex: Int = 0
+    var setIndex: Int = 0
+    var isWarmUp: Bool = false
+    var reps: Int = 0
+    var pctText: String = ""
+    var plannedTotal: Double = 0
+    var unit: WeightUnit = WeightUnit.kg
+    var perSide: [Double] = []
     var checkedAt: Date?
     /// What the user said they lifted (last set of each lift).
     var reportedTotal: Double?

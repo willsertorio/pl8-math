@@ -199,9 +199,18 @@ Box apps put the weight on the right of the lift (`Back Squat (Barbell)` … `18
 
 ## Part 4 — Data (SwiftData)
 
-- `Gym`: id, name (≤ 8 chars; the Flow's dials make 2), unit (kg|lb), plateSizes [Double], barWeight, isCurrent, placeID? (later), and since the Flow: what it has in the other unit (kgPlates/lbPlates, kgBar/lbBar, optional, filled as you switch) and its place in the row of gyms (sortIndex).
+**Data, photo reading and analytics** (2026-10-30): `docs/DATA-AND-SERVICES.md` is the spec for everything behind the screens (iCloud sync, the reading pipeline, the read server, PostHog, the App Store privacy setup), and `docs/privacy.html` is the privacy policy it must match. Will's decisions on it (2026-10-30), which win over the doc:
+- **iOS 18**, not 17: every iPhone that runs 17 runs 18, and the Flow's RealityKit needs 18.
+- **Our models stay** (below), made iCloud-ready, not the doc's starting models.
+- **The cloud-reading switch** lives in the iPhone's Settings app, under pl8(math).
+- **A screenshot that can't be read** leaves question marks on the board or the page (2.0), not a message; tap again to retry.
+- **The read server** runs on Vercel, pinned to Frankfurt.
+
+The models are versioned (`SchemaVersions.swift`): version 1 is the data until 2026-10-30, version 2 is iCloud-ready (every property has a default or can be empty, every relationship can be empty and has an inverse, nothing unique). Which gym is current is kept per phone, not synced; a wiped board stays wiped (`Workout.clearedAt`).
+
+- `Gym`: id, name (≤ 8 chars; the Flow's dials make 2), unit (kg|lb), plateSizes [Double], barWeight, placeID? (later), and since the Flow: what it has in the other unit (kgPlates/lbPlates, kgBar/lbBar, optional, filled as you switch) and its place in the row of gyms (sortIndex). (`isCurrent` stays only to be read once.)
 - `PersonalRecord`: id, lift (canonical name), value, unit, updatedAt. Keep previous values as `PRHistory` entries.
-- `Workout`: id, date, sourceText, blocks (Codable `StrengthBlock` array).
+- `Workout`: id, date, sourceText, blocks (Codable `StrengthBlock` array), clearedAt? (wiped off the board).
 - `Session`: id, workout, liftNames, prLifts and prUnits (by block index, so history reads well if the workout is deleted, the new-PR check knows which PR a lift uses, and totals show in each PR's unit), gym snapshot (name, unit, bar, plates), startedAt?, endedAt?, setLogs.
 - `SetLog`: blockIndex, setIndex, isWarmUp, reps, pctText, plannedTotal, unit, perSide [Double], checkedAt?, reportedTotal?.
 Default PR list: Back squat, Front squat, Deadlift, Clean, Snatch, Bench press (empty values).
@@ -234,7 +243,8 @@ Each milestone ends with tests green and something Will can try on his iPhone.
 | M5 | 3D spike | One plate + bar in a `RealityView` with the target look; decision logged |
 | M6 | The 3D box | Stations, camera flights, shelf piles, flag, PR board, whiteboard, rack loading, kit drop, bell, opening, session-over scale |
 | M7 | The Flow | Every screen of `design/flow-handoff` built and checked against the prototype's pictures |
-| M8 | Polish | Haptics and sound pass, accessibility, History screen, PR screenshot import |
+| M8 | Data and services | `docs/DATA-AND-SERVICES.md`: iCloud-ready data, the reading pipeline, the read server, analytics, the App Store privacy setup |
+| M9 | Polish | Haptics and sound pass, accessibility, History screen |
 | Later | | Gym search with Google Places, shared gym setups, AI fallback parsing, TestFlight |
 
 ---
