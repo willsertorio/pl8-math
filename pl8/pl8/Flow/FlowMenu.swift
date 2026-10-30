@@ -302,6 +302,7 @@ extension Flow {
         // What each awake item does.
         let edit = { [weak self] (step: Step) in
             guard let self else { return }
+            Analytics.send(.gymEdited(field: step.rawValue))
             self.buzz(.light)
             self.checkSound()
             self.menuActive = "gym"

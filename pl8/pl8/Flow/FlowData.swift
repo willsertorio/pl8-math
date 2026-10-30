@@ -74,11 +74,13 @@ final class FlowData {
         context.insert(gym)
         gyms.append(gym)
         makeCurrent(gyms.count - 1)
+        Analytics.send(.gymAdded)
     }
 
     /// The last gym can't go.
     func deleteGym(at index: Int) {
         guard gyms.count > 1, gyms.indices.contains(index) else { return }
+        Analytics.send(.gymDeleted)
         let gone = gyms.remove(at: index)
         context.delete(gone)
         makeCurrent(max(0, index - 1))
@@ -164,6 +166,7 @@ final class FlowData {
     /// Wiped off the board: the board is clean until the next upload, also after the app restarts (it used to come
     /// back). The workout stays for the sessions lifted from it.
     func wipeBoard() {
+        Analytics.send(.boardWiped)
         workout?.clearedAt = .now
         save()
         workout = nil
@@ -196,6 +199,7 @@ final class FlowData {
         session.startedAt = .now
         self.session = session
         save()
+        Analytics.send(.sessionStarted(setsTotal: plan.setRecords.count))
         return FlowPlan(session: session)
     }
 

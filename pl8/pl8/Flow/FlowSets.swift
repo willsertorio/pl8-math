@@ -199,6 +199,7 @@ extension Flow {
         if direction > 0 {
             guard i < n - 1 else { return }                      // the last set ends with its button
             doneSets.insert(i)
+            Analytics.send(.setCompleted(index: i))
             checkSound()
             buzz(.success)
             setIndex = i + 1
@@ -264,7 +265,14 @@ extension Flow {
             // Committed on release (flCardDrag): the set changes now; the cards finish sliding after.
             let next = ui.peek
             if go, next != nil {
-                if direction > 0 { self.doneSets.insert(i0); self.buzz(.success) } else { self.doneSets.remove(i0 - 1); self.buzz(.light) }
+                if direction > 0 {
+                    self.doneSets.insert(i0)
+                    Analytics.send(.setCompleted(index: i0))
+                    self.buzz(.success)
+                } else {
+                    self.doneSets.remove(i0 - 1)
+                    self.buzz(.light)
+                }
                 self.checkSound()
                 self.setIndex = i0 + direction
                 ui.done = self.doneSets
@@ -402,7 +410,14 @@ extension Flow {
         checkSound()
         buzz(.success)
         doneSets.insert(setIndex)
+        Analytics.send(.setCompleted(index: setIndex))
         data.endSession()
+        var minutes = 0
+        if let started = data.session?.startedAt {
+            let ended: Date = data.session?.endedAt ?? Date.now
+            minutes = Int(ended.timeIntervalSince(started) / 60)
+        }
+        Analytics.send(.sessionFinished(setsDone: doneSets.count, setsTotal: plan?.sets.count ?? 0, minutes: minutes))
         setsUI?.visible = false
         later(0.5) { [weak self] in self?.go(.done) }
     }

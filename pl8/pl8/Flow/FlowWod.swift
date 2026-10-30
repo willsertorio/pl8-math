@@ -94,6 +94,9 @@ extension Flow {
     // MARK: - 6 · "You're strong! What are we doing today?" (flWod)
 
     func stepWod() {
+        if mode == .firstRun, !UserDefaults.standard.bool(forKey: Flow.setUpKey) {
+            Analytics.send(.onboardingCompleted(seconds: Int(Date.now.timeIntervalSince(onboardingStart ?? .now))))
+        }
         UserDefaults.standard.set(true, forKey: Flow.setUpKey)
         setCamera(Self.boardCamera.position, Self.boardCamera.target)
         let board = makeBoard()

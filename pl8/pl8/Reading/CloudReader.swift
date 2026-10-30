@@ -122,6 +122,7 @@ enum CloudConsent {
         if let answer { return answer }
         let yes = await ask()
         UserDefaults.standard.set(yes, forKey: key)
+        Analytics.send(.cloudConsent(allowed: yes))
         return yes
     }
 }

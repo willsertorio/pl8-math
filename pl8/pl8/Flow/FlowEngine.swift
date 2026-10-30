@@ -75,6 +75,8 @@ final class Flow {
     @ObservationIgnored var subscriptions: [any Cancellable] = []
     @ObservationIgnored var stepSubscriptions: [any Cancellable] = []
     @ObservationIgnored var mode: Mode = .firstRun
+    /// When the first run's first question showed (for `onboarding_completed`).
+    @ObservationIgnored var onboardingStart: Date?
     /// The data behind the flow (gym, PRs, plan).
     @ObservationIgnored var data: FlowData
 
@@ -372,6 +374,10 @@ final class Flow {
         applyStyle()
         let building = CACurrentMediaTime()
         defer { perf?.event("build \(next.rawValue)", ms: (CACurrentMediaTime() - building) * 1000) }
+        if mode == .firstRun, let name = Analytics.onboardingStep(next) {
+            if onboardingStart == nil { onboardingStart = .now }
+            Analytics.send(.onboardingStepViewed(step: name))
+        }
         switch next {
         case .name: stepName()
         case .unit: stepUnit()

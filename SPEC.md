@@ -209,6 +209,8 @@ Box apps put the weight on the right of the lift (`Back Squat (Barbell)` … `18
 - **A screenshot that can't be read** leaves question marks on the board or the page (2.0), not a message; tap again to retry.
 - **The read server** runs on Vercel, pinned to Frankfurt.
 
+**Analytics** (data step 5): PostHog EU, anonymous, the spec's events only (`Analytics.swift`); off until `PostHogAPIKey` is in `Info.plist`.
+
 The models are versioned (`SchemaVersions.swift`): version 1 is the data until 2026-10-30, version 2 is iCloud-ready (every property has a default or can be empty, every relationship can be empty and has an inverse, nothing unique). Which gym is current is kept per phone, not synced; a wiped board stays wiped (`Workout.clearedAt`).
 
 - `Gym`: id, name (≤ 8 chars; the Flow's dials make 2), unit (kg|lb), plateSizes [Double], barWeight, placeID? (later), and since the Flow: what it has in the other unit (kgPlates/lbPlates, kgBar/lbBar, optional, filled as you switch) and its place in the row of gyms (sortIndex). (`isCurrent` stays only to be read once.)

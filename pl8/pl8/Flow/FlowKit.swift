@@ -53,6 +53,7 @@ extension Flow {
         physics = world
         world.floor()
         let spots = FlowKitLayout.spots(kit: plan.kit, unit: plan.unit)
+        Analytics.send(.kitViewed(plateCount: spots.count))
         // Fences just out of view; the near one stays clear of the last row (the prototype's could catch the
         // smallest plates on top of it).
         let near = max(1.3, (spots.map { $0.z + Float($0.plate.diameter) / 2 }.max() ?? 0) + 0.45)

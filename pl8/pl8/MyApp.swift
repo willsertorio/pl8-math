@@ -2,7 +2,10 @@ import SwiftData
 import SwiftUI
 
 @main struct MyApp: App {
-    init() { Fonts.register() }
+    init() {
+        Fonts.register()
+        Analytics.start()
+    }
 
     var body: some Scene {
         WindowGroup {

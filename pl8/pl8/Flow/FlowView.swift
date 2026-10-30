@@ -354,6 +354,9 @@ extension Flow {
             let started = self.t, question = self.clearings
             Task { @MainActor in
                 let ok = await read(image)
+                if let last = self.data.lastRead {
+                    Analytics.send(.photoRead(kind: last.kind.rawValue, stage: last.stage.rawValue, milliseconds: last.milliseconds))
+                }
                 let wait = max(0, 3 - (self.t - started))
                 try? await Task.sleep(for: .seconds(wait))
                 self.readingText = nil
