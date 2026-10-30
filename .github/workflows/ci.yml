@@ -1,6 +1,7 @@
 # Checks every push so Will doesn't have to (DECISIONS 2026-10-16):
 #   platekit  — PlateKit's tests, then the 3D room compared with the prototype, station by station
 #   app       — the app built for the iPhone Simulator, then screenshots of its main screens
+#   server    — the read server's tests (App Attest with Apple's real attestations, the endpoints) and typecheck
 # Results: the run's summary, the "prototype-check" and "screenshots" artifacts, and (for pull requests) the
 # pictures on the ci-screens branch, where Claude's session can fetch them with git.
 name: CI
@@ -16,6 +17,22 @@ concurrency:
   cancel-in-progress: false   # a new push waits, so every commit gets its pictures
 
 jobs:
+  server:
+    name: Read server tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+
   platekit:
     name: PlateKit tests + prototype check
     runs-on: ubuntu-24.04
