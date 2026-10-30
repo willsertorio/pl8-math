@@ -100,9 +100,14 @@ extension Flow {
         board.entity.scale = SIMD3(repeating: 0.62)
         board.canvas?.draw(data.boardLines)
         var boardHasPlan = data.workout != nil
-        // My PRs: the notebook, and the pencil that appears when it opens.
+        // My PRs: the notebook, and the pencil that appears when it opens. At rest the notebook and the gym's box
+        // are a little smaller than they open up (Will, 2026-10-30: the three in harmony): on an iPhone 16 the
+        // notebook's top lines up with the board's (299 / 293 pt) and the box's front edge sits on the line of the
+        // board's wheels (534 pt), the box set back a little for that.
+        let restSize: Float = 0.85, bookRestY: Float = 0.64, roomRestBack: Float = 0.3
         let book = build(FlowProps.notebook(title: "MY PRs", rows: data.prRows))
-        book.position.y = 0.8
+        book.position.y = bookRestY
+        book.scale = SIMD3(repeating: restSize)
         book.orientation = simd_quatf(angle: -0.25, axis: [1, 0, 0])
         let hinge = book.findEntity(named: "hinge")
         let pen = build(FlowProps.pencil())
@@ -120,7 +125,7 @@ extension Flow {
             wrapper.addChild(model)
             wrapper.position.x = (Float(i) - position) * spacing
             let shadow = softShadow(0.7)
-            shadow.scale = [1, 0.6, 1]
+            shadow.scale = i == 0 ? [1, 0.6, 1] : [restSize, 0.6, restSize]
             wrapper.addChild(shadow)
             add(wrapper)
             wrappers.append(wrapper); models.append(model); shadows.append(shadow)
@@ -155,8 +160,10 @@ extension Flow {
             case "prs":
                 hinge?.orientation = simd_quatf(angle: -2.95 * e, axis: [0, 1, 0])
                 book.orientation = Flow.quaternion([-0.25 + 0.15 * e, 0.18 * (1 - e), 0])
-                book.scale = SIMD3(repeating: 1 - 0.3 * e)
+                book.scale = SIMD3(repeating: restSize + (0.7 - restSize) * e)
                 book.position.x = 0.37 * e
+                book.position.y = bookRestY + (0.8 - bookRestY) * e
+                shadows[1].scale = SIMD3<Float>(restSize, 0.6, restSize) * (1 - e) + SIMD3<Float>(1, 0.6, 1) * e
                 pen.scale = SIMD3(repeating: max(0.0001, Float(Ease.outBack(Double(min(1, max(0, (k - 0.4) / 0.6))), 1.4))))
             case "gym":
                 room.open(k)
@@ -195,11 +202,30 @@ extension Flow {
                 labelOpacity = [1, 1, 1]
             })
         }
-        // First time: the items pop in; back from an edit: the item is already awake.
+        // First time: the board rolls in from the right like on its question (stepWod), the others pop in; back
+        // from an edit: the item is already awake.
+        var boardRoll: Float = 0
         if let back = menuActive.flatMap({ keys.firstIndex(of: $0) }) {
             activate(back, true)
         } else {
-            for (i, wrapper) in wrappers.enumerated() { popIn(wrapper, delay: 0.12 + Double(i) * 0.09) }
+            for (i, wrapper) in wrappers.enumerated() where i > 0 || index != 0 { popIn(wrapper, delay: 0.12 + Double(i) * 0.09) }
+            if index == 0 {
+                // In from the right, turning as it comes, slowing to a stop with no bounce; its shadow comes with it.
+                board.entity.position.x = 3.6
+                shadows[0].position.x = 3.6
+                boardRoll = -1.9
+                later(0.12) { [weak self] in
+                    guard let self else { return }
+                    self.click(0.5)
+                    self.anim(1.3, { u in
+                        let e = Float(Ease.outQuart(u)), er = Float(1 - pow(1 - min(1, u * 1.08), 3))
+                        board.entity.position.x = 3.6 * (1 - e)
+                        boardRoll = -1.9 * (1 - er)
+                        shadows[0].position.x = board.entity.position.x
+                        for wheel in board.wheels { wheel.orientation = simd_quatf(angle: -(1 - e) * 40, axis: [1, 0, 0]) }
+                    })
+                }
+            }
         }
 
         let settleGym = { [weak self] in
@@ -238,7 +264,7 @@ extension Flow {
                 switch keys[i] {
                 case "gym": room.entity.orientation = simd_quatf(angle: sway * calm, axis: [0, 1, 0])
                 case "prs": if active != i { book.orientation = Flow.quaternion([-0.25, 0.18 + sway, 0]) }
-                default: models[i].orientation = simd_quatf(angle: sway * calm, axis: [0, 1, 0])
+                default: models[i].orientation = simd_quatf(angle: sway * calm + boardRoll, axis: [0, 1, 0])
                 }
                 if let point = self.project([wrappers[i].position.x, -0.45, wrappers[i].position.z]) {
                     let opacity = active == nil ? max(0.25, 1 - Double(ad) * 0.75) : labelOpacity[i]
@@ -252,7 +278,11 @@ extension Flow {
             if !rowDragging { rowPosition += (rowTarget - rowPosition) * (1 - exp(-dt * 9)) }
             for (j, r) in rooms.enumerated() {
                 r.entity.position = right * (Float(j) - rowPosition) * roomSpacing
-                if r !== room {
+                if r === room {
+                    // At rest, smaller and set back; full size and in place as it opens.
+                    r.entity.scale = SIMD3(repeating: restSize + (1 - restSize) * show)
+                    r.entity.position.z -= roomRestBack * (1 - show)
+                } else {
                     // v2: the empty slot at about 70 %, slowly growing and shrinking (65–75 % over 4.8 s) and
                     // turning gently side to side (±0.35 rad over 11 s), so it reads as something to tap.
                     let breathe: Float = r.isAdd ? 0.7 + 0.05 * sin(Float(t) * 1.3) : 1
@@ -265,6 +295,7 @@ extension Flow {
             if !rowDragging && abs(rowTarget - rowPosition) < 0.02 { settleGym() }
             shadows[2].position.x = room.entity.position.x
             shadows[2].position.z = room.entity.position.z
+            shadows[2].scale = SIMD3<Float>(1, 0.6, 1) * (restSize + (1 - restSize) * show)
             shadows[2].isEnabled = abs(rowPosition - Float(current)) < 0.5
         }
 
@@ -310,7 +341,8 @@ extension Flow {
             self.pickPhoto(.workout, reading: "Reading your workout…", read: { [weak self] image in
                 await self?.data.readWorkout(image) ?? false
             }, then: { [weak self] ok in
-                guard let self, ok else { return }
+                guard let self else { return }
+                guard ok else { board.canvas?.drawUnread(); return }
                 board.canvas?.draw(self.data.boardLines)
                 boardHasPlan = true
                 self.shine([board.entity], duration: 0.6)
@@ -324,7 +356,8 @@ extension Flow {
             self.pickPhoto(.prs, reading: "Reading your PRs…", read: { [weak self] image in
                 await self?.data.readPRs(image) ?? false
             }, then: { [weak self] ok in
-                guard let self, ok else { return }
+                guard let self else { return }
+                guard ok else { self.repaint(book, part: "page", with: .notebookUnread); return }
                 self.repaint(book, part: "page", with: .notebookPage(self.data.prRows))
                 self.shine([book], duration: 0.7)
                 self.sparkles(at: wrappers[1].position + [0.4, 0.9, 0.4], count: 5, spread: 1)

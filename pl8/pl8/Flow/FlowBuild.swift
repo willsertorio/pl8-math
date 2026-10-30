@@ -373,16 +373,13 @@ enum FlowArt {
             }
         case .notebookPage(let rows):
             return draw(512, 680) { g in
-                g.setFillColor(UIColor(red: 0xFB / 255, green: 0xF8 / 255, blue: 0xF2 / 255, alpha: 1).cgColor)
-                g.fill(CGRect(x: 0, y: 0, width: 512, height: 680))
-                g.setStrokeColor(UIColor(red: 70 / 255, green: 110 / 255, blue: 190 / 255, alpha: 0.28).cgColor)
-                g.setLineWidth(2)
-                for y in stride(from: 120, to: 680, by: 62) { g.strokeLineSegments(between: [CGPoint(x: 30, y: y), CGPoint(x: 490, y: y)]) }
-                g.setStrokeColor(UIColor(red: 210 / 255, green: 60 / 255, blue: 60 / 255, alpha: 0.35).cgColor)
-                g.strokeLineSegments(between: [CGPoint(x: 78, y: 0), CGPoint(x: 78, y: 680)])
-                let ink = UIColor(red: 0x1C / 255, green: 0x2A / 255, blue: 0x55 / 255, alpha: 1)
-                baseline("PRs", font: marker(48), colour: ink, at: CGPoint(x: 96, y: 88))
-                for (i, row) in rows.enumerated() { baseline(row, font: marker(34), colour: ink, at: CGPoint(x: 96, y: 170 + CGFloat(i) * 62)) }
+                drawPage(g)
+                for (i, row) in rows.enumerated() { baseline(row, font: marker(34), colour: pageInk, at: CGPoint(x: 96, y: 170 + CGFloat(i) * 62)) }
+            }
+        case .notebookUnread:
+            return draw(512, 680) { g in
+                drawPage(g)
+                questionMarks(g, centre: CGPoint(x: 295, y: 360), size: 150, colour: pageInk)
             }
         case .gymFront(let name):
             return draw(256, 256) { g in
@@ -449,6 +446,42 @@ enum FlowArt {
             baseline(line.format, font: marker(40), colour: ink, at: CGPoint(x: 100, y: y + 56))
             baseline(line.load, font: marker(40), colour: ink, at: CGPoint(x: 600, y: y + 56))
             y += 150
+        }
+    }
+
+    /// The PR page's ink: a ballpoint navy.
+    static let pageInk = UIColor(red: 0x1C / 255, green: 0x2A / 255, blue: 0x55 / 255, alpha: 1)
+
+    /// notebookModel2's page: cream, ruled in blue with a red margin, "PRs" at the top.
+    static func drawPage(_ g: CGContext) {
+        g.setFillColor(UIColor(red: 0xFB / 255, green: 0xF8 / 255, blue: 0xF2 / 255, alpha: 1).cgColor)
+        g.fill(CGRect(x: 0, y: 0, width: 512, height: 680))
+        g.setStrokeColor(UIColor(red: 70 / 255, green: 110 / 255, blue: 190 / 255, alpha: 0.28).cgColor)
+        g.setLineWidth(2)
+        for y in stride(from: 120, to: 680, by: 62) { g.strokeLineSegments(between: [CGPoint(x: 30, y: y), CGPoint(x: 490, y: y)]) }
+        g.setStrokeColor(UIColor(red: 210 / 255, green: 60 / 255, blue: 60 / 255, alpha: 0.35).cgColor)
+        g.strokeLineSegments(between: [CGPoint(x: 78, y: 0), CGPoint(x: 78, y: 680)])
+        baseline("PRs", font: marker(48), colour: pageInk, at: CGPoint(x: 96, y: 88))
+    }
+
+    /// The board when a screenshot couldn't be read: clean, then question marks where the workout would go.
+    static func drawUnreadBoard(_ g: CGContext) {
+        drawBoard(g, lines: nil)
+        questionMarks(g, centre: CGPoint(x: 512, y: 400), size: 210, colour: FlowLook.dark.uiColor)
+    }
+
+    /// Three question marks in marker, each a little turned and sized differently, as if written by hand: what the
+    /// board or the PR page shows when a screenshot couldn't be read (no message: Will, 2026-10-30).
+    static func questionMarks(_ g: CGContext, centre: CGPoint, size: CGFloat, colour: UIColor) {
+        let font = marker(size)
+        let turns: [CGFloat] = [-0.16, 0.05, 0.2], lifts: [CGFloat] = [0.05, -0.05, 0.02], sizes: [CGFloat] = [0.9, 1.08, 0.95]
+        for i in 0..<3 {
+            g.saveGState()
+            g.translateBy(x: centre.x + CGFloat(i - 1) * size * 0.6, y: centre.y + lifts[i] * size)
+            g.rotate(by: turns[i])
+            g.scaleBy(x: sizes[i], y: sizes[i])
+            centred("?", font: font, colour: colour, at: .zero)
+            g.restoreGState()
         }
     }
 

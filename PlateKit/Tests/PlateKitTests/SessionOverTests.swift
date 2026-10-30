@@ -211,4 +211,52 @@ struct RoughOutlineTests {
         #expect(ScaleScene.parts().base.contains { $0.tone == .flat(Look.ink) })
         #expect(ScaleScene.outline(PropModels.barbellParts(), seed: 1).triangleCount > 0)
     }
+
+    // MARK: - At the end: drag the bar and the plates (startDonePhysics, stepDonePhysics)
+
+    @Test func theScalesSolidPartsAreItsBodyColumnAndHead() {
+        // No floor and no walls: only the scale itself is solid; its body's top is the platform's top.
+        let solids = ScaleScene.solids
+        #expect(solids.count == 3)
+        let body = solids[0]
+        #expect(abs(body.centre.y + body.size.y / 2 - ScaleScene.platformTop) < 0.0001)
+        #expect(abs(body.size.x - 0.84) < 0.0001)
+        #expect(abs(body.size.z - 0.84) < 0.0001)
+        // The column and the head stand at the back, under the screen.
+        #expect(solids[1].centre.z < -0.3 && solids[2].centre.z < -0.3)
+        #expect(abs(solids[2].centre.y - 0.86) < 0.0001)
+    }
+
+    @Test func theBarsPiecesAreTheShaftCollarsAndSleeves() {
+        let pieces = ScaleScene.barPieces
+        #expect(pieces.count == 5)
+        #expect(pieces[0].radius == 0.014 && pieces[0].length == 1.31 && pieces[0].x == 0)
+        let ends = pieces.map { abs($0.x) + $0.length / 2 }
+        #expect(abs((ends.max() ?? 0) - 1.13) < 0.0001)
+    }
+
+    @Test func somethingIsOnThePlatformWhenItRestsWithinItsEdges() {
+        let top = ScaleScene.platformTop
+        #expect(ScaleScene.onPlatform([0, top + 0.03, 0]))
+        #expect(ScaleScene.onPlatform([0.4, top + 0.2, -0.4]))                 // near a corner, up the stack
+        #expect(!ScaleScene.onPlatform([0.45, top + 0.03, 0]))                 // over the edge
+        #expect(!ScaleScene.onPlatform([0, top - 0.2, 0]))                     // fallen past it
+    }
+
+    @Test func onceTouchedTheReadingIsWhatIsStillOnThePlatform() {
+        let top = ScaleScene.platformTop
+        let things: [(position: SIMD3<Float>, weight: Double, held: Bool)] = [
+            ([0, top + 0.03, 0], 25, false),
+            ([0.02, top + 0.09, 0], 25, false),
+            ([0, top + 0.6, 0.1], 20, true),                                   // the bar, in the hand
+            ([1.2, -3, 0], 2.5, false)                                         // pulled off, falling away
+        ]
+        #expect(ScaleScene.reading(things) == 50)
+        #expect(ScaleScene.reading([]) == 0)
+    }
+
+    @Test func theDragStartsShortlyAfterTheLastLanding() {
+        // The prototype's physAt: 0.7 s after the bar lands.
+        #expect(abs(ScaleScene.dragDelay - 0.7) < 0.0001)
+    }
 }

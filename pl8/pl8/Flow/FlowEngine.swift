@@ -188,7 +188,7 @@ final class Flow {
         dustTick(dt)
         sparkleTick(dt)
         squashTick(dt)
-        physics?.step(dt, flow: self)
+        physics?.step(dt)
         let relit = perf == nil ? 0 : CACurrentMediaTime()
         reshade()
         if perf != nil { relightTime = CACurrentMediaTime() - relit }

@@ -55,6 +55,8 @@ public enum FlowPicture: Hashable, Sendable {
     case notebookCover(String)
     /// The PR page: ruled, "PRs", one row per PR.
     case notebookPage([String])
+    /// The PR page when a screenshot couldn't be read: "PRs", then question marks.
+    case notebookUnread
     /// The gym box's front: its name in Space Grotesk on light.
     case gymFront(String)
     /// The gym's flag: its name in light on dark.

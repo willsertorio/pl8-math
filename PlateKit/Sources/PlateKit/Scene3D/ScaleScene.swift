@@ -50,16 +50,42 @@ public enum ScaleScene {
         return (base.parts, platform.parts)
     }
 
+    /// buildDone's bar as cylinders along x: the shaft, then each side's collar and sleeve.
+    public static let barPieces: [(radius: Float, length: Float, x: Float)] = [(0.014, 1.31, 0)]
+        + [Float(-1), 1].flatMap { side in [(Float(0.04), Float(0.03), side * 0.67), (0.025, 0.445, side * (0.685 + 0.2225))] }
+
     /// buildDone's bar, not the room's: a dark #6E7378 shaft between #B9BEC4 collars and sleeves, along x.
     public static func barParts() -> [PropPart] {
         let steel = PropPart.Tone.paint(RGB(hex: "#B9BEC4")), shaft = PropPart.Tone.paint(RGB(hex: "#6E7378"))
         var b = PropModels.Builder()
-        b.cylinder(0.014, 1.31, .x, 16, .zero, shaft, ink: false)
-        for side: Float in [-1, 1] {
-            b.cylinder(0.04, 0.03, .x, 16, [side * 0.67, 0, 0], steel, ink: false)
-            b.cylinder(0.025, 0.445, .x, 16, [side * (0.685 + 0.2225), 0, 0], steel, ink: false)
+        for (n, piece) in barPieces.enumerated() {
+            b.cylinder(piece.radius, piece.length, .x, 16, [piece.x, 0, 0], n == 0 ? shaft : steel, ink: false)
         }
         return b.parts
+    }
+
+    // MARK: - At the end: drag the bar and the plates (startDonePhysics, stepDonePhysics)
+
+    /// How long after the last landing the things on the scale can be grabbed (the prototype's physAt).
+    public static let dragDelay: Float = 0.7
+
+    /// What's solid once they can: the body with the platform (its top the platform's top), the column and the head.
+    /// No floor and no walls: anything pulled off the scale falls away.
+    public static let solids: [(size: SIMD3<Float>, centre: SIMD3<Float>)] = [
+        ([0.84, platformTop, 0.84], [0, platformTop / 2, 0]),
+        ([0.05, 0.74, 0.05], [0, 0.45, -0.39]),
+        ([0.36, 0.2, 0.1], [0, 0.86, -0.39])
+    ]
+
+    /// Resting on the scale: over the platform (to its edges) and not below its top.
+    public static func onPlatform(_ position: SIMD3<Float>) -> Bool {
+        abs(position.x) < 0.42 && abs(position.z) < 0.42 && position.y > platformTop - 0.005
+    }
+
+    /// Once something has been grabbed, the screen shows what's still on the platform; the one in the hand doesn't
+    /// count.
+    public static func reading(_ things: [(position: SIMD3<Float>, weight: Double, held: Bool)]) -> Double {
+        things.reduce(0) { sum, thing in sum + (!thing.held && onPlatform(thing.position) ? thing.weight : 0) }
     }
 
     /// The prototype's sketch outline (rough, grainy, doubled) round each part, sized for the scale's camera.

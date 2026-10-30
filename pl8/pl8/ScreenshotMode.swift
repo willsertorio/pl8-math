@@ -1,13 +1,14 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UIKit
 import PlateKit
 
 /// For the automatic checks (.github/workflows/ci.yml): launched with `-pl8Shot <screen>`, the app fills an
 /// in-memory store with demo data and opens that one screen, so the Simulator can take its picture.
 /// Screens: `room-<station>` (overview, corner, nameFlag, flag, bar, pr, board, kit, setv), `firstrun-name`,
 /// `firstrun-plates`, `session` (the kit), `session-sets` (the first set), `session-pull` (a deadlift set, bar on the floor), `opening-title`, `opening-box` (the closed
-/// box), `session-over` (the scale), `home`, `tab-<train|prs|gym|history>` (home with that drawer open).
+/// box), `session-over` (the scale), `session-over-drag` (its bar and top plate pulled off), `home`, `tab-<train|prs|gym|history>` (home with that drawer open).
 enum ScreenshotMode {
     static let shot: String? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -21,6 +22,7 @@ struct ScreenshotHost: View {
     @Environment(\.modelContext) private var context
     @State private var session: Session?
     @State private var seeded = false
+    @State private var scaleStage = ScaleStage()
 
     var body: some View {
         Group {
@@ -38,8 +40,9 @@ struct ScreenshotHost: View {
                 HomeView()
             } else if shot.hasPrefix("tab-"), let tab = HomeView.Tab(rawValue: String(shot.dropFirst(4))) {
                 HomeView(open: tab)
-            } else if shot == "session-over" {
-                SessionOverView(perSide: [25, 20, 2.5], unit: .kg, barWeight: 20) {}
+            } else if shot == "session-over" || shot == "session-over-drag" {
+                SessionOverView(perSide: [25, 20, 2.5], unit: .kg, barWeight: 20, stage: scaleStage) {}
+                    .task { if shot == "session-over-drag" { await Self.dragScale(scaleStage) } }
             } else if shot == "firstrun-name" {
                 FirstRunView(startAt: .name) {}
             } else if shot == "firstrun-plates" {
@@ -57,7 +60,7 @@ struct ScreenshotHost: View {
     }
 
     /// The Flow's screens (SPEC 2.0): `flow-<step>`, plus states — `flow-plates-ticked`, `flow-sets-last`,
-    /// `flow-menu-<train|prs|gym>` (that item awake).
+    /// `flow-menu-<train|prs|gym>` (that item awake), `flow-menu-at-<prs|gym>` (at rest on it).
     static func flowStart(_ shot: String) -> Flow.Step {
         let name = String(shot.dropFirst(5)).components(separatedBy: "-").first ?? ""
         if name == "prDial" { return .prDial }
@@ -78,7 +81,14 @@ struct ScreenshotHost: View {
             flow.setIndex = plan.sets.count - 1
             flow.doneSets = Set(0..<(plan.sets.count - 1))
         }
+        // An empty board, so a tap asks for a screenshot (flow-wod-unread).
+        if shot == "flow-wod-unread" { flow.data.wipeBoard() }
         if shot.hasPrefix("flow-menu-") { flow.menuActive = ["back": "prs", "delete": "gym", "add": "gym"][String(shot.dropFirst(10))] ?? String(shot.dropFirst(10)) }
+        // The menu at rest on My PRs or the gym, nothing awake; or just opened, the board rolling in.
+        if let at = ["flow-menu-at-prs": Float(1), "flow-menu-at-gym": 2, "flow-menu-roll": 0][shot] {
+            flow.menuPosition = at
+            flow.menuActive = nil
+        }
         script(flow, shot: shot)
         if shot == "flow-plates-ticked" {
             Task { @MainActor in
@@ -92,7 +102,8 @@ struct ScreenshotHost: View {
     /// the units question), `flow-unit-abduct` (KG dropped on the scale, frozen mid-abduction), `flow-plates-stroke`
     /// (a stroke down the YES column, held), `flow-plates-done` (released → the bar question),
     /// `flow-kit-down` / `flow-kit-up` (drag previews, held), `flow-sets-drag` (the card half-way to the next set),
-    /// `flow-menu-back` (an awake item pulled half-way back), `flow-menu-delete` (holding the gym → the alert).
+    /// `flow-menu-back` (an awake item pulled half-way back), `flow-menu-delete` (holding the gym → the alert),
+    /// `flow-wod-unread` / `flow-prs-unread` (a screenshot that can't be read → question marks).
     static func script(_ flow: Flow, shot: String) {
         // Times are on the Flow's own clock: the CI's Simulator draws slowly, so its clock runs behind the wall's.
         func at(_ seconds: Double, _ action: @escaping @MainActor () -> Void) {
@@ -156,14 +167,49 @@ struct ScreenshotHost: View {
         case "flow-menu-add":
             // Swiped along the row of gyms to its last slot, the empty one to tap for a new gym.
             drag({ project([0, 0.5, 0]) }, by: CGPoint(x: -220 * flow.layoutScale, y: 0), at: 2.5, duration: 0.4, release: true)
+        case "flow-menu-roll":
+            at(0.5) { flow.frozen = true }
         case "flow-reading":
             // The loader over the board, as after picking a workout's screenshot.
             at(2.0) { flow.readingText = "Reading your workout…" }
         case "flow-menu-delete":
             at(2.0) { flow.pointerDown(project([0, 0.5, 0])) }
+        case "flow-wod-unread", "flow-prs-unread":
+            // The empty board (or the open notebook) tapped, and a picture with nothing to read handed in as if picked
+            // (before the picker can show): question marks on the board or the page.
+            let wod = shot == "flow-wod-unread"
+            at(wod ? 4.0 : 4.5) {
+                let q = project(wod ? [0, 1.23, 0] : [0.3, 0.2, 0])
+                flow.pointerDown(q)
+                flow.pointerUp(q)
+                guard let request = flow.photoRequest else { return }
+                flow.photoRequest = nil
+                request.picked(UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
+                    UIColor.white.setFill()
+                    context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+                })
+            }
         default:
             break
         }
+    }
+
+    /// `session-over-drag`: once the scale's things can be grabbed, the bar pulled up and away and let go (it falls
+    /// off), then the top plate lifted and held in the air: the screen reads what's left on the platform (92.5).
+    static func dragScale(_ stage: ScaleStage) async {
+        while !stage.draggable { try? await Task.sleep(for: .milliseconds(50)) }
+        func pull(_ index: Int, by delta: CGPoint, release: Bool) async {
+            guard let from = stage.screenPoint(ofDrop: index), stage.grab(at: from) else { return }
+            for step in 1...30 {
+                try? await Task.sleep(for: .milliseconds(20))
+                stage.drag(to: CGPoint(x: from.x + delta.x * CGFloat(step) / 30, y: from.y + delta.y * CGFloat(step) / 30))
+            }
+            if release { stage.release() }
+        }
+        let bar = 6, topPlate = 5
+        await pull(bar, by: CGPoint(x: 150, y: -240), release: true)
+        try? await Task.sleep(for: .seconds(1.5))
+        await pull(topPlate, by: CGPoint(x: -100, y: -190), release: false)
     }
 
     /// Gym "79" in kg with every plate and the 20 kg bar, four PRs, and today's workout (Fixtures 01/10).

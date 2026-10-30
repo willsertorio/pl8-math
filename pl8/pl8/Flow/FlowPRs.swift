@@ -87,7 +87,8 @@ extension Flow {
                 self.pickPhoto(.prs, reading: "Reading your PRs…", read: { [weak self] image in
                     await self?.data.readPRs(image) ?? false
                 }, then: { [weak self] ok in
-                    guard let self, ok else { return }
+                    guard let self else { return }
+                    guard ok else { self.repaint(book, part: "page", with: .notebookUnread); return }
                     busy = true
                     self.repaint(book, part: "page", with: .notebookPage(self.data.prRows))
                     self.shine([book], duration: 0.6)

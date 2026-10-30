@@ -60,7 +60,12 @@ final class FlowPhysicsWorld {
 
     /// Makes `entity` a dynamic body.
     func add(_ entity: Entity, shape: ShapeResource, mass: Float, radius: Float, lockRotation: Bool = false, squash: Entity? = nil) -> FlowBody {
-        entity.components.set(CollisionComponent(shapes: [shape]))
+        add(entity, shapes: [shape], mass: mass, radius: radius, lockRotation: lockRotation, squash: squash)
+    }
+
+    /// Makes `entity` a dynamic body of several pieces (the scale's bar).
+    func add(_ entity: Entity, shapes: [ShapeResource], mass: Float, radius: Float, lockRotation: Bool = false, squash: Entity? = nil) -> FlowBody {
+        entity.components.set(CollisionComponent(shapes: shapes))
         var body = PhysicsBodyComponent(massProperties: .init(mass: mass), material: Self.bodyMaterial, mode: .dynamic)
         if lockRotation { body.isRotationLocked = (x: true, y: true, z: true) }
         entity.components.set(body)
@@ -71,7 +76,7 @@ final class FlowPhysicsWorld {
         return flowBody
     }
 
-    func step(_ dt: Float, flow: Flow) {
+    func step(_ dt: Float) {
         onStep?(dt)
         for body in bodies { body.lastVelocity = body.entity.components[PhysicsMotionComponent.self]?.linearVelocity ?? .zero }
         guard let grab, dt > 0 else { return }

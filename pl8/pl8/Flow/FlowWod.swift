@@ -34,6 +34,16 @@ final class FlowBoardCanvas {
         upload()
     }
 
+    /// Clean, with question marks: the screenshot couldn't be read.
+    func drawUnread() {
+        UIGraphicsPushContext(context)
+        FlowArt.drawUnreadBoard(context)
+        UIGraphicsPopContext()
+        cells = []
+        wiped = false
+        upload()
+    }
+
     /// Wipes a circle round `point` (canvas pixels); true when the board has just become clean.
     func wipe(at point: CGPoint) -> Bool {
         guard !wiped else { return false }
@@ -165,7 +175,7 @@ extension Flow {
                 board.canvas?.reset()
                 self.pickPhoto(.workout, reading: "Reading your workout…", read: { [weak self] image in
                     await self?.data.readWorkout(image) ?? false
-                }, then: { ok in if ok { ready() } })
+                }, then: { ok in if ok { ready() } else { board.canvas?.drawUnread() } })
             })
         }
     }

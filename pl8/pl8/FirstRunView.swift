@@ -317,9 +317,10 @@ struct OpeningTitle: View {
         ZStack {
             Theme.background
             // Behind the plates, like the prototype's (its text layer sits under the 3D): they fly past in front.
+            // Helvetica Neue like the rest of the Flow (Will, 2026-10-30): the display role, at the prototype's 39 pt.
             Text("pl8(math)")
-                .font(Theme.display(39))
-                .tracking(4.3)
+                .font(.custom(FlowType.medium, size: 39))
+                .tracking(-0.035 * 39)
                 .foregroundStyle(cream)
             GeometryReader { geometry in
                 // Drawn like the prototype's layer: through the sketch pass, which outlines each plate.

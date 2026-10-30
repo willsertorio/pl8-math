@@ -8,6 +8,8 @@ import PlateKit
 struct SketchStageView: UIViewRepresentable {
     /// The scene's entities, a camera among them.
     let entities: () -> [Entity]
+    /// Handed the view once it's made (the scale casts its touches through it).
+    var made: (ARView) -> Void = { _ in }
 
     func makeUIView(context: Context) -> SketchARView {
         let view = SketchARView(frame: CGRect(x: 0, y: 0, width: 393, height: 852), cameraMode: .nonAR, automaticallyConfigureSession: false)
@@ -15,6 +17,7 @@ struct SketchStageView: UIViewRepresentable {
         let anchor = AnchorEntity(world: .zero)
         for entity in entities() { anchor.addChild(entity) }
         view.scene.addAnchor(anchor)
+        made(view)
         return view
     }
 
