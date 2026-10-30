@@ -16,20 +16,31 @@ enum AppData {
         if ScreenshotMode.shot != nil {
             return try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         }
-        let configuration = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        let synced = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+        var problems: [String] = []
         do {
-            let container = try ModelContainer(for: schema, migrationPlan: DataMigration.self, configurations: configuration)
+            let container = try ModelContainer(for: schema, migrationPlan: DataMigration.self, configurations: synced)
             if arguments.contains("-pl8DataCheck") { DataCheck.report(DataCheck.counts(container), to: "data-check.txt") }
             return container
         } catch {
-            // A store that won't open is moved aside, not lost, and the app starts with a new one: it opens either way.
-            let backup = moveAside(configuration.url)
-            if arguments.contains("-pl8DataCheck") {
-                DataCheck.report(["result: failed", "error: \(error)", "moved to: \(backup?.path ?? "-")"], to: "data-check.txt")
-            }
-            if let fresh = try? ModelContainer(for: schema, migrationPlan: DataMigration.self, configurations: configuration) { return fresh }
-            return try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none))
+            problems.append("with iCloud: \(error)")
         }
+        // iCloud is what failed (its setup, the account, the container): the same store on the phone only.
+        let local = ModelConfiguration(schema: schema, cloudKitDatabase: .none)
+        do {
+            let container = try ModelContainer(for: schema, migrationPlan: DataMigration.self, configurations: local)
+            DataCheck.report(problems, to: "data-error.txt")
+            return container
+        } catch {
+            problems.append("on the phone: \(error)")
+        }
+        // The store itself won't open: it's moved aside, not lost, and the app starts with a new one.
+        let backup = moveAside(local.url)
+        problems.append("moved to: \(backup?.path ?? "-")")
+        DataCheck.report(problems, to: "data-error.txt")
+        if arguments.contains("-pl8DataCheck") { DataCheck.report(["result: failed"] + problems, to: "data-check.txt") }
+        if let fresh = try? ModelContainer(for: schema, migrationPlan: DataMigration.self, configurations: local) { return fresh }
+        return try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none))
     }
 
     /// The store's files go to "Store backups/<seconds>" next to it.
