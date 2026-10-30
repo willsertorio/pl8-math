@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import PlateKit
 
 /// The app's saved data (docs/DATA-AND-SERVICES.md §1): SwiftData, synced through the user's private iCloud
 /// database when the app is signed with its iCloud container and the user is signed in; on the phone only
