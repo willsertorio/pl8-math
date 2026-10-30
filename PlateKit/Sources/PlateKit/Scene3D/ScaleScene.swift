@@ -51,8 +51,11 @@ public enum ScaleScene {
     }
 
     /// buildDone's bar as cylinders along x: the shaft, then each side's collar and sleeve.
-    public static let barPieces: [(radius: Float, length: Float, x: Float)] = [(0.014, 1.31, 0)]
-        + [Float(-1), 1].flatMap { side in [(Float(0.04), Float(0.03), side * 0.67), (0.025, 0.445, side * (0.685 + 0.2225))] }
+    public static let barPieces: [(radius: Float, length: Float, x: Float)] = [
+        (radius: 0.014, length: 1.31, x: 0),
+        (radius: 0.04, length: 0.03, x: -0.67), (radius: 0.025, length: 0.445, x: -0.9075),
+        (radius: 0.04, length: 0.03, x: 0.67), (radius: 0.025, length: 0.445, x: 0.9075)
+    ]
 
     /// buildDone's bar, not the room's: a dark #6E7378 shaft between #B9BEC4 collars and sleeves, along x.
     public static func barParts() -> [PropPart] {
@@ -72,9 +75,9 @@ public enum ScaleScene {
     /// What's solid once they can: the body with the platform (its top the platform's top), the column and the head.
     /// No floor and no walls: anything pulled off the scale falls away.
     public static let solids: [(size: SIMD3<Float>, centre: SIMD3<Float>)] = [
-        ([0.84, platformTop, 0.84], [0, platformTop / 2, 0]),
-        ([0.05, 0.74, 0.05], [0, 0.45, -0.39]),
-        ([0.36, 0.2, 0.1], [0, 0.86, -0.39])
+        (size: SIMD3<Float>(0.84, platformTop, 0.84), centre: SIMD3<Float>(0, platformTop / 2, 0)),
+        (size: SIMD3<Float>(0.05, 0.74, 0.05), centre: SIMD3<Float>(0, 0.45, -0.39)),
+        (size: SIMD3<Float>(0.36, 0.2, 0.1), centre: SIMD3<Float>(0, 0.86, -0.39))
     ]
 
     /// Resting on the scale: over the platform (to its edges) and not below its top.

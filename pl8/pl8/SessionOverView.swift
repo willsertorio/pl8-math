@@ -241,7 +241,8 @@ final class ScaleStage {
             // The kick: the camera jumps at random by up to 5 % of the view, dying away fast.
             shake *= exp(-dt * 10)
             let reach = shake * 0.05 * ScaleScene.viewHeight
-            camera.position = eye + (right * Float.random(in: -0.5...0.5) + up * Float.random(in: -0.5...0.5)) * reach
+            let jolt: SIMD3<Float> = right * Float.random(in: -0.5...0.5) + up * Float.random(in: -0.5...0.5)
+            camera.position = eye + jolt * reach
             if landed.allSatisfy({ $0 }) && (instantly || t > (drops.last?.at ?? 0) + ScaleScene.fallTime + ScaleScene.dragDelay) { break }
             try? await Task.sleep(for: .milliseconds(8))
         }
