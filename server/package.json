@@ -1,0 +1,24 @@
+{
+  "name": "pl8-read-server",
+  "private": true,
+  "type": "module",
+  "description": "pl8(math)'s read server: reads a workout or PR photo's text with Claude for the app, and nothing else (docs/DATA-AND-SERVICES.md §3).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@upstash/redis": "^1.40.0",
+    "cbor-x": "^1.6.8",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

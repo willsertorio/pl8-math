@@ -38,6 +38,15 @@ A learning project: shipping a native iOS app with AI (Claude Code), test-first,
 
 ## Part 2 — Experience
 
+### 2.0 The Flow (2026-10-29, replaces the screens of 2.2–2.4)
+The design reference is now **the Flow**: `design/flow-handoff/HANDOFF.md` (the spec, every number) and `design/flow-handoff/prototype/index.html` (the running prototype; `source/` is its readable code, the highest-numbered `comp_flow*.js` wins). One question at a time, one 3D object per question, a menu after the first session. Where the handoff and the sections below disagree, the handoff wins for screens and look; Part 3 (the math) and Part 4 (data) still decide loads and storage.
+- **Whole screens are replaced** (Will, 2026-10-29): first run, home with its tabs and drawers, and the session page become the Flow's screens. The room diorama leaves the main path.
+- **Order:** opening → gym name (two letter dials, so names are **2 characters**) → kilos or pounds (kettlebells dropped on a scale) → plates (a checklist you tick by drawing) → bar (carousel) → PRs (notebook, pencil, number dial with a KG/LB switch, or a photo) → workout (whiteboard: upload, wipe, start) → plate kit → sets → the scale → the **menu** (carousel: Train · My PRs · Gym). After the first session the app opens on the menu.
+- **Kept out for now** (Will, 2026-10-29): History, the missing-PR and missing-% prompts, typing / editing / scanning a workout with the camera, the Replay and Move-with-the-phone switches. They come back later.
+- **Look (v2, `CHANGES-v2.md`):** Swiss red `#E5321C`, light `#F4F1EA`, dark `#151515`; white cards with 22 pt corners; Helvetica Neue in roles (display 33 Medium, labels 21 Medium, body 17, small caps 12); Permanent Marker on surfaces. Rough edges are the prototype's screen-space sketch pass, copied as a Metal post-process (rough on red screens, smooth on the light grid of the kit and sets).
+- **Will's changes on top of the handoff** (2026-10-30): the opening's "pl8(math)" and the scale's "You lifted a …" in Helvetica Neue too; a screenshot that can't be read leaves question marks on the board or the notebook's page, no message; once the scale has settled, its bar and plates can be dragged off (the prototype's drag) and its screen reads what's left on it; in the menu the board rolls in from the right as on its question (no pop), and the notebook and the gym's box rest at 85 %, lined up with the board, growing to full size as they open.
+- **Gyms:** several gyms, each remembering its plates and bar per unit; one is current. The Gym item in the menu opens the box into a room where each thing edits one setting.
+
 The prototype (web, Three.js) is the reference for flow, look and feel:
 `reference/prototype-app-logic.js` (all screens and the 3D scene) and `reference/scene-layout-and-look.json` (room layout, camera shots, colours, fonts).
 The prototype fakes scanning and keeps no data; the rules in Part 3 replace its simplified math.
@@ -59,7 +68,7 @@ Stations (camera shot names from `scene-layout-and-look.json`):
 | Rack | `setv` | Bar on the rack, loaded for the current set |
 
 ### 2.2 First run
-**0 · Opening.** Title "pl8(math)" → tap → a closed box pops in → tap → the box opens and the room unfolds (walls drop, furniture lands). Light haptic on each tap.
+**0 · Opening.** Title "pl8(math)" in cream over the orange, real plates in the prototype's two tones drifting up on both sides, slowly tumbling → tap → a closed box pops in far off in the sky, turning slowly and floating → tap → the box opens like the prototype's runOnb (it turns to face you, the lid floats up and away, the walls glide down — the ones facing the overview all the way — and the camera drifts in to the overview), then the whiteboard rolls in and the bench is tossed in, and the setup starts. Light haptic on each tap.
 
 **1 · Gym setup** — one question per sheet, each answer visibly builds the room:
 1. *"Where are you training now?"* Name, up to 8 characters, uppercase. As you type, the flag on the back wall unrolls with the name.
@@ -76,31 +85,26 @@ While reading: a spinning plate loader. Then the whiteboard in the room shows th
 Before Start, the app asks for anything it's missing (see 3.6): a PR it doesn't have ("What's your Snatch PR?", saved to PRs) and any % it couldn't read ("What % for Back Squat?").
 
 ### 2.3 A session
-**4 · Plate kit.** Camera to the kit floor; the session's plates drop onto the floor with a little physics and dust. Floating card: one chip per plate size, e.g. **2 × 45 LB**, which you tick off as you collect them. Button: **Start session**.
+**4–6 · The session page.** Like the prototype: the room on the whole screen and one frosted card at the bottom, swiped up (anywhere) for the next. No title or tab bar: a Back button over the room, and on the sets a **Plates** button that goes back to the kit.
+- **Plate kit** card: chips, e.g. **2 × 45 LB**, to tick off, and **Start session**. The plates on the floor can be picked up (they lift 32 cm and follow the finger) and thrown; the walls, platform and rack stop them (prototype kit grab). The room shows the kit floor from close: the plates drop onto it with real physics (from 7–9.5 m, slightly tilted and spinning, the prototype's friction and bounce), heaviest first.
+- **Pulls** (a lift with *dead*, *snatch* or *clean* in its name) start from the floor: the bar goes down from the J-hooks onto the platform (0.75 s) and the camera follows; it goes back up for the next lift (prototype barTick).
+- While a set is in view the room fades towards box light behind the bar and its plates (prototype renderDimmed). Plates slide off the sleeve end and drop to the floor, the new ones slide on and seat with a clank.
+- **Set** cards, like the prototype's: `WARM-UP · SNATCH` small, **"Set 3 of 6"** big, "1 rep · 140 kg" on the right (the load in the PR's unit), the lift's sets as a bar filled up to this one, and the change from the set before. No Done (Will's first class). The room shows one sleeve of the bar close up, carrying that set's plates, which slide off and on between sets; plates on the bar are missing from the floor. Plates start just outside the collar on every bar: a lighter bar has shorter sleeves, not a shorter shaft, so plates never reach the J-hooks.
+- Last card: *"Take off … each side, then put the bar back"* and **End session**.
+Nothing to tick off per set and no "How much did you lift?" (Will's first real class, 2026-10-16). No grey explanation text anywhere in the app.
 
-**5 · Set by set.** Camera to the rack. Floating card at the bottom:
-- small label: block name, e.g. `WARM-UP · SNATCH` or `SNATCH`
-- **big: "Set 3 of 6" and "1 rep"** — set number and reps are the most prominent text (learned at the box)
-- secondary: the load in the PR's unit, e.g. `145 lb`, and the % (`75–80%`)
-- the change from the last set: *"Take off 5, then add 10 each side"* / *"Same plates as the last set"*
-- progress dots for this block (done = green, current = dark)
-- big **Done** button; a small **Plates** button returns to the kit and back without losing your place.
-On the rack, the plates slide off and on the sleeves to match the set. For pulls from the floor (snatch, clean, deadlift) the camera aims lower.
-**Done** → success haptic → next unchecked set.
-
-**6 · Last set of each lift** → "How much did you lift?" prefilled with the planned load (one tap to confirm). If it beats the PR → "New PR! Update Snatch to 90 kg?" → yes updates the PR and rings the bell.
-
-**7 · Session over.** After the last set: the bell rings (three strikes) and a "scale" weighs the session's heaviest set (its plates and bar, total, label *Heaviest set*). Tap → kit is put away, camera to overview, tab bar appears. The session is saved to history.
+**7 · Session over.** After **End session**: the bell rings (three strikes, heard and felt) and a "scale" weighs the session's heaviest set, like the prototype's 'done' scene and in its two tones (everything posterized to box dark or box light): its plates fall onto a platform scale one by one, heaviest first, then the bar lands across them; the scale's screen counts up to the total; label *Heaviest set*; then *"You lifted a lion."* word by word — the animal nearest the total in kg on a log scale (the prototype's list, house cat to blue whale). Tap → back to Train, tab bar appears. The session is saved to history.
 
 ### 2.4 Home (after first run)
-Tab bar: **Train** · **PRs** · **Gym**.
+Like the prototype's home: the whole room on the screen (overview, floating a little, drag to orbit), and a tab bar below: **Train** · **PRs** · **Gym** · **History**. A tab opens its drawer over the room and the camera flies to its station: Train → whiteboard, PRs → PR board, Gym → plate shelf, History → the flag wall.
 - **Train** → whiteboard + "Add today's workout" (step 3). If today's workout exists, offer to resume it.
 - **PRs** → PR list (add, edit, delete, swipe to delete).
 - **Gym** → gym sheet: gyms as chips (tap to switch, **+ Add gym**, remove current), name, units (segmented), plates (chips), bar (chips). The room updates live.
 - **History** (not in the prototype yet): list of sessions → session detail (date, duration, gym, each lift's sets and loads). Placement to be decided (see Open decisions).
 
 ### 2.5 Look & feel
-- **Scene:** palette box light `#F0E2F3`, box dark `#6C3713`, flat background `#FF6200`. Toon shading, hand-drawn outline in the dark brown (double line, slight roughness). Plates are the only saturated colours.
+- **Screens:** a copy of the prototype's (applyUILook, LOOK_DEF): Space Grotesk 600 for text and 700 for headings, buttons and chips; black on white; drawers white and square with a slightly rough edge, a back arrow on the left and the action on the right; 40 pt square black buttons; pill chips (black when picked, soft grey when not); values in grey; the session's cards frosted with 10 pt corners.
+- **Scene:** a copy of the prototype's diorama (reference/prototype-app-logic.js applyLayout and its builders), palette box light `#F0E2F3`, box dark `#6C3713`, flat background `#FF6200`. Its light is baked into exact flat colours (three.js Lambert, sky 2.7 + sun 1.5 from (−8, 20, 12), no tone mapping): shadows are the props projected onto the floor, platform and sunlit walls; metal is shaded bright on top and dark underneath. Thin ink lines on hard edges, a rough grainy double line round the box. Plates show their printed faces (number, unit); the PR board its table; the flag the gym's name. The wall fan sweeps and spins, and its wind stirs the flag. With **Move with the phone** on (the Gym drawer, on by default, off with Reduce Motion), tilting the phone moves the intro (near plates more than far ones, the box against the sky) and swings the room at home towards the low side on a spring. Impacts kick the camera and puff a little dust (kit plates landing, the bar landing on the platform, plates seating or falling off, the bench landing, plates on the scale). A wall hides while the camera is outside it, with the fan, bar holder and window on it. Drag to orbit, pinch to zoom (polar ≤ 0.49π, 1.2–90 m). Plates are the only saturated colours.
 - **Plates:** real sizes and IWF-style colours — table in 3.1.
 - **UI:** black on white. Space Grotesk (display 700, text 600), heading 25 pt. Drawers: square corners, 2 pt black border, rough hand-drawn edge. Buttons: solid black, square, 40 pt (big: 56 pt), rough edge. Fields: outline, 56 pt tall, radius 14. Exact values: `reference/scene-layout-and-look.json` → `uiLook`.
 - **Haptics:** `.selection` for picks and steppers · `.impact(.light)` for continue/toggles · `.success` for set done and workout read · `.impact(.medium)` for camera shutter · `.warning` for missing info.
@@ -146,7 +150,7 @@ Bars — kg: 20 / 15 / 10. lb: 45 / 35 / 15. Collars are ignored.
 ### 3.3 One load
 Inputs: target range (low, optional high, optional "plus"), bar weight, the gym's plate sizes. Plates per side are unlimited.
 
-1. Loadable totals = bar + 2 × (any sum of plate sizes). Step = 2 × smallest plate.
+1. Loadable totals = bar + 2 × (any sum of plate sizes).
 2. Per side, use the **fewest plates**; on ties prefer the **larger plates**. List them heaviest first (inner to outer).
 3. Choose the total:
    - **Range** `75–78%` → the heaviest loadable total inside the range; if none is inside, the one nearest the middle (tie → lighter).
@@ -160,6 +164,7 @@ Each round = nearest loadable total. Drop a round if it isn't heavier than the p
 Label each round "Round n", with "≈N% 1RM".
 
 ### 3.5 Kit and changes
+- **Plates per set**: always the fewest plates per side (SPEC 3.3). When several combinations are equally few, choose them across the whole session so the kit is as small as possible; among equally small kits, the fewest plates to change between sets. Totals never change.
 - **Kit**: for each plate size, the most of it any single set (warm-up included) needs on one side, × 2. Plus the bar. Sorted heaviest first.
 - **Change between sets** (same bar, consecutive sets): keep the longest common inner part of the two per-side lists; the rest of the old list comes off (outer first), the rest of the new list goes on.
   Text: *"Take off A + B, then add C each side"*, *"Add C each side"*, *"Take off A each side"*, *"Same plates as the last set"*.
@@ -167,35 +172,51 @@ Label each round "Round n", with "≈N% 1RM".
 ### 3.6 Reading a workout
 Input: text lines (from Vision OCR, or typed). Output: strength blocks, each `{name, prLift, format, note, sets[{reps, pctLow, pctHigh?, plus}], pctMissing}`.
 
-1. **Blocks** start at a line that is just a letter and a dot (`A.`, `B.`…). Labels inside a block ("After Party", "6 Sets", "Compete") stay in the block.
-2. **A strength line** has reps, a movement and a percentage: `1 Snatch @75-80% 1RM Snatch`, `3 Back Squat @80-80+% 1RM Back Squat`, `5x3 @80%`.
+1. **Blocks** start at a line that begins with a letter and a dot (`A.`, `B.`…, or `C. After a Party`); text after the dot is the block's label. Labels inside a block ("After Party", "6 Sets", "Compete") stay in the block.
+2. **A strength line** has reps, a movement and a percentage: `1 Snatch @75-80% 1RM Snatch`, `3 Back Squat @80-80+% 1RM Back Squat`, `5x3 @80%`. Long lines wrap on a phone, so a line that starts with reps but has no % yet (or ends right after `1RM`) continues on the next line, until a new set, header, note or block letter.
    The lift whose PR applies is the text after `1RM`; if absent, the movement itself.
 3. **Anything with a % of 1RM is strength**, whatever the block is called and wherever it appears (including after the WOD). A block with no % lines is a WOD and is ignored, even if it lists loads like `(50/35)`.
 4. Consecutive strength lines for the same movement form one lift; each line is one set.
-5. Format headers expand a single line: `N Minute EMOM` + one line → N sets; `E2MOM N min` → N/2 sets; `N Sets` + one line → N sets; `NxR @P%` → N sets of R reps.
+5. Format headers expand a single line: `N Minute EMOM` + one line → N sets; `E2MOM N min` → N/2 sets; `N Sets` + one line → N sets; `NxR @P%` → N sets of R reps. `N-M Sets` counts as N. Under a Sets header, several lines of one lift are one round done N times (`2-3 Sets` + `10 Deadlift @60%` + `5 Deadlift @65%` → 10, 5, 10, 5) — except a plain `N Sets` with exactly N lines, where each line is one set. EMOM lines are never repeated.
 6. **Hidden %**: a line that looks like a strength line whose % was cut off or garbled → keep the block with `pctMissing = true`; the app asks "What % for Back Squat?" (accepts `83-85`, `80`, `80+`). Never invent a %.
    A line counts as cut off when it starts with `<reps> <known lift>`, sits under a format header (`N Minute EMOM`, `N Sets`), and has leftover fragments of a strength line: `@`, `%`, `RM`, or the lift's last word repeated (the 05/10 OCR reads `2 Back Squat K checn J Squat`).
    Complexes joined with `+` that have no `@`/`%` anywhere (05/10 block A) are technique work, not hidden %, and are ignored.
-7. **Lift names** match case-insensitively, trimmed, with an alias list (`Back squat` = `Back Squat` = `BS`). Unknown lifts are added to the PR list when the user enters their PR.
-8. Several screenshots of one workout are read in order and joined.
-9. (Later, optional) AI fallback when the rules find nothing.
+7. **RPE instead of %** (`@ 5/10 RPE`, `@ RPE 8`, `@8 RPE`; the `@` is required): the block is strength with the % missing; the app suggests RPE × 10 (5/10 → 50%) as the answer to "What % for …?", which the user confirms or changes. Its PR is the first known lift named in the line (e.g. "Muscle Clean + …" → Clean), changeable in Edit.
+8. **Lift names** match case-insensitively, trimmed, with an alias list (`Back squat` = `Back Squat` = `BS`). Unknown lifts are added to the PR list when the user enters their PR.
+9. Several screenshots of one workout are read and joined. They may overlap and be picked in any order: lines a screenshot repeats from an earlier one are dropped (with the status bar above them), a block letter seen twice keeps its longer version, and blocks are ordered by letter. Fixed loads in brackets and a dangling "or" are not part of the movement (`10 Deadlift (315/225) (OR 60% 1RM)` → Deadlift); the box app's buttons ("Check-In") aren't notes.
+10. **Whiteboard formats** (docs/DATA-AND-SERVICES.md §2.3, 2026-10-30), read when the box app's format finds nothing: `Back squat 5x5 @ 75%`, `5 × 5 @ 75%` under a line naming the lift, `Deadlift 3-3-3 @80%`, `EMOM 10: 3 cleans @ 70%` (10 sets), `Bench 5/3/1` (no %: missing), `Strict press 4x6 @ 40kg`, `A. BACK SQUAT` then `5x5 @ 75%`. `×`/`x`/`X`, `@`, `%`, `kg`/`lb`/`#` and spacing are normalised; plurals and synonyms name the lift (`cleans` → Clean, `bench` → Bench Press, `cj` → Clean & Jerk). Sets with no lift, or a load that's neither a % nor a weight, are left out, never guessed. A fixed weight (`@ 40kg`) is read but, by rule 3, not planned (open with Will).
+11. **Every reading stage gives the same result** (`ReadResult`, §2.4: blocks of `{label, lift, sets[{reps, percent, weight}], note}`, or PRs `{lift, weight}`), used only if it passes: reps 1–50, percent 30–110, weight 1–500 kg (1,100 lb), a name that can be a lift, at least one block or PR. The on-device model and the cloud (step 3) come after the rules, only when they find nothing.
+12. **The stages** (data step 3, `pl8/Reading/`): Vision's text → the rules (a block or PR outside the limits is left out, the rest kept) → Apple's on-device model on iOS 26 phones that have it (guided generation into the result's shape, 6 s) → the cloud, after a one-time "Read it in the cloud?" alert, remembered, and switchable in the iPhone's Settings app under pl8(math) (the text when there is some, the photo only when the phone found fewer than 8 characters: 1600 px, JPEG 0.7, redrawn so no EXIF or location; App Attest; 15 s). The cloud stage stays off until the read server's address is in `Info.plist` (`PL8ReadServer`); the server is `server/` (its README has the deploy steps). If all fail: the question marks (2.0).
 
 ### 3.7 Reading PRs
 Lines like `Back Squat 140 kg`, `Snatch - 85kg`, `Deadlift: 405 lb`. Unit from the line; if missing, ask once for the whole screenshot.
+Box apps put the weight on the right of the lift (`Back Squat (Barbell)` … `185.19 Lb`), which OCR reads as two lines, row by row or column by column: a weight-only line goes to the earliest known lift name still waiting for one. Brackets (the app's category) aren't part of the lift; a "name" needs two letters in a row (not the status bar's `5G 30`).
+**Stray lines** (2026-10-30): a lone number without kg or lb is ignored when the list's weights have a unit (the status bar's `30` once shifted every PR by a row); a line without kg or lb must name a lift we know, so a lift we don't know needs its unit (`Zercher Squat 120 kg`, but not `Subtotal 45.90`); a name with `! ? $ € £ ¥ #` (or `@ %`) or a receipt's word (order, completed, total, subtotal, shipping, delivery, fee, discount, tax, payment, paid, price, amount, receipt, invoice, purchase) is never a lift (`Order completed!`), and saved PRs with such names are removed.
+**One PR per lift.** Spellings that differ only in spaces, dashes, case or `&`/`and` are the same lift (`backsquat` = `Back Squat`); unknown lifts are tidied the same way each time (`pull ups` → `Pull Ups`). A screenshot or edit for a lift that already has a PR updates it; a screenshot naming a lift twice keeps the last value.
 
 ### 3.8 Session data
-- **Duration** = first check to last check.
-- **History stores the planned loads**, except the last set of each lift, which stores what the user said they lifted.
-- **New PR**: after the last set of each lift (and any "plus" set), compare the reported weight (converted) with the PR; if higher, offer to update.
+- **Duration** = from opening the session to **End session**.
+- **History stores the planned loads.** The app doesn't ask what was lifted and doesn't check for new PRs during a session; PRs are updated on the PRs tab.
 
 ---
 
 ## Part 4 — Data (SwiftData)
 
-- `Gym`: id, name (≤ 8 chars), unit (kg|lb), plateSizes [Double], barWeight, isCurrent, placeID? (later).
+**Data, photo reading and analytics** (2026-10-30): `docs/DATA-AND-SERVICES.md` is the spec for everything behind the screens (iCloud sync, the reading pipeline, the read server, PostHog, the App Store privacy setup), and `docs/privacy.html` is the privacy policy it must match. Will's decisions on it (2026-10-30), which win over the doc:
+- **iOS 18**, not 17: every iPhone that runs 17 runs 18, and the Flow's RealityKit needs 18.
+- **Our models stay** (below), made iCloud-ready, not the doc's starting models.
+- **The cloud-reading switch** lives in the iPhone's Settings app, under pl8(math).
+- **A screenshot that can't be read** leaves question marks on the board or the page (2.0), not a message; tap again to retry.
+- **The read server** runs on Vercel, pinned to Frankfurt.
+
+**Analytics** (data step 5): PostHog EU, anonymous, the spec's events only (`Analytics.swift`); off until `PostHogAPIKey` is in `Info.plist`.
+
+The models are versioned (`SchemaVersions.swift`): version 1 is the data until 2026-10-30, version 2 is iCloud-ready (every property has a default or can be empty, every relationship can be empty and has an inverse, nothing unique). Which gym is current is kept per phone, not synced; a wiped board stays wiped (`Workout.clearedAt`).
+
+- `Gym`: id, name (≤ 8 chars; the Flow's dials make 2), unit (kg|lb), plateSizes [Double], barWeight, placeID? (later), and since the Flow: what it has in the other unit (kgPlates/lbPlates, kgBar/lbBar, optional, filled as you switch) and its place in the row of gyms (sortIndex). (`isCurrent` stays only to be read once.)
 - `PersonalRecord`: id, lift (canonical name), value, unit, updatedAt. Keep previous values as `PRHistory` entries.
-- `Workout`: id, date, sourceText, blocks (Codable `StrengthBlock` array).
-- `Session`: id, workout, gym snapshot (name, unit, bar, plates), startedAt?, endedAt?, setLogs.
+- `Workout`: id, date, sourceText, blocks (Codable `StrengthBlock` array), clearedAt? (wiped off the board).
+- `Session`: id, workout, liftNames, prLifts and prUnits (by block index, so history reads well if the workout is deleted, the new-PR check knows which PR a lift uses, and totals show in each PR's unit), gym snapshot (name, unit, bar, plates), startedAt?, endedAt?, setLogs.
 - `SetLog`: blockIndex, setIndex, isWarmUp, reps, pctText, plannedTotal, unit, perSide [Double], checkedAt?, reportedTotal?.
 Default PR list: Back squat, Front squat, Deadlift, Clean, Snatch, Bench press (empty values).
 
@@ -208,7 +229,8 @@ Default PR list: Back squat, Front squat, Deadlift, Clean, Snatch, Bench press (
 - **Vision** (`VNRecognizeTextRequest`, accurate) for screenshots; **VisionKit** `DataScannerViewController` for the camera; `PhotosPicker` for uploads.
 - **RealityKit** `RealityView` for the room; procedural meshes (box, cylinder) like the prototype; `PhysicsBodyComponent` for the kit drop; a camera entity animated between shots.
 - Haptics: `.sensoryFeedback`. Sound: `AVAudioEngine` (bell can be a short bundled file).
-- **Risk to spike early**: the hand-drawn outline and toon look in RealityKit (needs a custom material or post-process). Fallback: flat toon colours without outline.
+- **The Flow** (M7): an `ARView` without AR, transparent, with the prototype's sketch pass as a Metal post-process (`FlowSketch.metal`); everything else as above.
+- **Hand-drawn outline** (spiked in M5, used by the scale and the opening): an inverted hull — a slightly bigger, inside-out copy of each shape in the dark brown, two of them with noise-jittered corners for the sketch line — built by `PlateKit.LowPolyMesh`, drawn with `UnlitMaterial`. No custom shaders. Limits: silhouettes only (no inner lines or real gap between the two lines).
 
 ---
 
@@ -225,13 +247,15 @@ Each milestone ends with tests green and something Will can try on his iPhone.
 | M4 | **The app in plain 2D** | Full flow from 2.2–2.4 with SwiftUI sheets over a flat background; used in a real class |
 | M5 | 3D spike | One plate + bar in a `RealityView` with the target look; decision logged |
 | M6 | The 3D box | Stations, camera flights, shelf piles, flag, PR board, whiteboard, rack loading, kit drop, bell, opening, session-over scale |
-| M7 | Polish | Haptics and sound pass, accessibility, History screen, PR screenshot import |
+| M7 | The Flow | Every screen of `design/flow-handoff` built and checked against the prototype's pictures |
+| M8 | Data and services | `docs/DATA-AND-SERVICES.md`: iCloud-ready data, the reading pipeline, the read server, analytics, the App Store privacy setup |
+| M9 | Polish | Haptics and sound pass, accessibility, History screen |
 | Later | | Gym search with Google Places, shared gym setups, AI fallback parsing, TestFlight |
 
 ---
 
 ## Open decisions
-1. Where History lives: a 4th tab, or the wall calendar in the room (the prototype already builds a calendar object).
-2. Does the opening box animation play on every launch, or only the first?
-3. "Type it in": keep the prototype's simple form (lift, sets, reps, one %), or allow a % per set?
+1. ~~Where History lives~~ — decided 2026-10-14: a 4th tab (Train · PRs · Gym · History). The wall calendar in the room can link to it in M6.
+2. ~~Does the opening box animation play on every launch, or only the first?~~ — for now every launch (decided 2026-10-15, for testing); revisit before TestFlight.
+3. ~~"Type it in"~~ — decided 2026-10-14: the simple form (lift, sets, reps, one %).
 4. Plate counts per gym (e.g. only two 2.5s) — currently out of scope.

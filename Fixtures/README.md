@@ -10,6 +10,13 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 | `2026-10-01.ocr.txt` | Text read from it (Tesseract, during prototyping). Regenerate with Vision in M2 and keep both. |
 | `2026-10-02.png` / `.ocr.txt` | 02/10 |
 | `2026-10-05.png` / `.ocr.txt` | 05/10 — the Back Squat line in block D is hidden under the app's "Check-In" button |
+| `2026-10-01.vision.txt` | 01/10 read by Vision on the iPhone (from Will's own screenshot; again a Cyrillic А in "A.") |
+| `2026-10-02.vision.txt` | 02/10 fixture image read by Vision on the iPhone |
+| `2026-10-05.vision.txt` | 05/10 fixture image read by Vision on the iPhone. Vision reads the Back Squat % through the Check-In button, so D is **not** missing its % here (the `.ocr.txt` keeps the hidden-% case) |
+| `2026-10-14.png` / `.screen.txt` | 14/10 — the B sets are so long they wrap over 3 lines each, and only C was read. A is RPE-based (`@ 5/10 RPE`). The text is transcribed line by line as shown on screen (how Vision splits lines); replace with the real Vision text when available. D is cut off at the bottom. |
+| `2026-10-14-top` / `-bottom` (`.webp` + `.vision.txt`) | 14/10 as two screenshots read by Vision. They overlap (end of C, start of D are on both). Will picked the bottom one first. E's lines are `10 Deadlift (315/225) (OR 60% 1RM)`: nothing after 1RM but `)`, which became the PR ("What's your ) PR?"). |
+| `2026-10-02-app.vision.txt` | 02/10 as the box's app showed it later, read by Vision (no image saved): block B is a fixed-load AMRAP and C is "C. After a Party" on one line |
+| `2026-10-13.webp` / `.vision.txt` | 13/10 — read by Vision on the iPhone. Vision read "A." with a **Cyrillic А** (and Cyrillic letters in "TIMECAP"), so the block was missed. |
 
 ### Expected parse
 
@@ -28,10 +35,39 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 - C (dumbbell snatch + lunges, 50/35): ignored
 - D "After Party" · Back Squat · EMOM · prLift `Back Squat` · 5 × 2 · **pctMissing** (the user then enters `83-85`)
 
+**01/10** (`.vision.txt`): same as 01/10 above.
+
+**02/10** (`.vision.txt`): same as 02/10 above.
+
+**05/10** (`.vision.txt`): same as 05/10 above, except D reads `83–85` ×5 directly (no question).
+
+**02/10, app version** (`2026-10-02-app.vision.txt`)
+- A · Snatch Balance · EMOM · 6 × 1: `68, 68, 73, 73, 75, 75`
+- B (Back Squats 225/155, RPE 8, no %): ignored
+- C "After a Party" (For Time): ignored
+
+**14/10** (`.screen.txt`)
+- A · Muscle Clean + 3 Hang Power Clean to Parallel Catch + 3 Tall Cleans · prLift `Clean` (first known lift named) · 3 × 3 · **% missing, RPE 5** → suggested `50%` · note "Rest 90 seconds between sets"
+- B · Clean Pull + 1 Hang Power Clean + 1 Floating Power Clean + 1 Power Clean · prLift `Power Clean` · 3 × 1: `68–70, 73–75, 75–78` · note "Rest as needed between sets"
+- C · Power Clean · EMOM · 5 sets: `2@80, 2@83, 2@85, 1@85+, 1@85+`
+- D: cut off (only its header is on this screenshot)
+
+**14/10, two screenshots** (`-top` + `-bottom` `.vision.txt`, in either order)
+- A, B, C as 14/10 above (C's last two sets once, not twice)
+- D (power snatches and clean & jerks, fixed loads): ignored
+- E "After Party" · `2-3 Sets` (→ 2 rounds) · Deadlift · prLift `Deadlift` · `10@60`, `5@65`, `10@60`, `5@65`
+
+**13/10** (`.vision.txt`)
+- A · Split Jerk · EMOM · prLift `Split Jerk` · 6 × 1: `83, 83, 85, 85, 85–88, 85–88`
+- B (run, double unders, wall walks): ignored
+- C "After a Party" (planks, cut off by Check-In, no %): ignored
+
 ## Golden loads (M1)
 
 Gym plate sets used below — **lb**: 55, 45, 35, 25, 15, 10, 5, 2.5 · **kg**: 25, 20, 15, 10, 5, 2.5, 2, 1.5, 1, 0.5.
 Format: `reps @ total [plates per side]`. Totals in the gym's unit.
+
+> **2026-10-16:** the totals below are the golden values tested at the box and still hold. The plates per side and the kits are the web prototype's (fewest plates per set, larger plates on a tie); the app now picks, among equally short combinations, the ones that need the smallest kit (SPEC 3.5), so some arrangements and kits differ. `PlateKit/Tests/PlateKitTests/GoldenTests.swift` has the current ones.
 
 ### 01/10 · Back Squat PR 100 kg · lb gym, 45 lb bar
 - Warm-up: `5@85 [15+5]` · `3@120 [35+2.5]` · `3@145 [45+5]`
@@ -69,8 +105,14 @@ Format: `reps @ total [plates per side]`. Totals in the gym's unit.
 - Kit: just the bar
 
 ### Edge: missing small plates · Back Squat PR 100 kg @75–78% ×5 reps · lb gym with only 45, 35, 25, 15, 10 · 45 lb bar
-- Warm-up: `5@85 [10+10]` · `5@125 [25+15]` · `5@145 [35+15]`
+- Warm-up: `5@85 [10+10]` · `5@115 [35]` · `5@145 [35+15]`
 - Back Squat: `5@165 [45+15]`
-- Kit: 2×45, 2×35, 2×25, 2×15, **4×10**
+- Kit: 2×45, 2×35, 2×15, **4×10**
+- (The prototype gave `5@125 [25+15]` for round 2 because it only tried totals in steps of 2 × the smallest plate. Changed to follow SPEC 3.3 — see DECISIONS.md 2026-10-13.)
 
 These numbers come from `reference/plate-math-web-prototype.html`, the web prototype Will tested at the box. If a Swift result differs, check the rule in `SPEC.md` 3.3–3.5 before changing either.
+
+## PR screenshots
+
+- `prs/2026-10-16-app.webp` — the box app's "Recordes pessoais" list, in lb with decimals; `.screen.txt` is its text as Vision reads it (name line, then weight line). Expected: Back Squat 185.19, Bench Press 88.18, Clean & Jerk 125, Clean Pull 132.28, Deadlift 253.53, Front Squat 170, Muscle Snatch 70.55 (all lb). Will can replace the `.screen.txt` with real Vision text.
+- `prs/2026-10-30-notebook.webp` — Will's My PRs page after real use (no source screenshot saved). Two bugs: each lift has the weight of the row above (Back squat 30 kg, Bench press 185.19, Deadlift 132.28, Front squat 253.53 lb), as when the status bar's "30" is read on its own line above the 2026-10-16 list and pairs with the first name; and a receipt's "Order completed!" line became a PR. Expected: the 2026-10-16 list read with a lone "30" above it gives the 2026-10-16 values; receipt lines ("Order completed! 45.90", "Subtotal 45.90") give no PR; a saved PR named "Order completed!" is removed at launch.
