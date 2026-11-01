@@ -1,0 +1,14 @@
+{
+  "name": "pl8-visual-check",
+  "private": true,
+  "description": "Renders the prototype and PlateKit's baked room from the same camera shots and scores how alike they are.",
+  "type": "module",
+  "scripts": {
+    "check": "node compare.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.56.1",
+    "pngjs": "7.0.0",
+    "three": "0.169.0"
+  }
+}

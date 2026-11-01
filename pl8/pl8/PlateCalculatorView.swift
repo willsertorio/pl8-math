@@ -1,0 +1,412 @@
+import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
+import UIKit
+import PlateKit
+
+/// A test screen for M1–M3: read a workout screenshot (or pick a sample), set up the gym and PRs,
+/// and see every load PlateKit plans. Not the real design (that's M4+).
+struct PlateCalculatorView: View {
+    // Workout
+    @State private var workoutID = SampleWorkout.all[0].id
+    @State private var photo: PhotosPickerItem?
+    @State private var isReading = false
+    @State private var readError: String?
+    @State private var readCount = 0
+    /// Vision's text when nothing was found, so it can be copied for a fixture.
+    @State private var failedText: String?
+    @State private var percentAnswers: [Int: String] = [:]
+
+    // Saved data (SwiftData)
+    @Environment(\.modelContext) private var context
+    @Query private var gyms: [Gym]
+    @Query private var records: [PersonalRecord]
+    @Query(sort: \Workout.date, order: .reverse) private var savedWorkouts: [Workout]
+    @Query(sort: \Session.createdAt, order: .reverse) private var sessions: [Session]
+    @State private var editingPR: EditingPR?
+
+    private var gym: Gym? { Gym.current(in: gyms) }
+    private var unit: WeightUnit { gym?.unit ?? .lb }
+
+    /// The saved PR for a lift, matching names the same way the parser does.
+    private func record(for lift: String) -> PersonalRecord? {
+        Planner.record(for: lift, in: records)
+    }
+
+    /// The saved workout picked in the Workout picker, if it is one.
+    private var savedWorkout: Workout? {
+        savedWorkouts.first { $0.id.uuidString == workoutID }
+    }
+
+    private var blocks: [StrengthBlock] { savedWorkout?.blocks ?? [] }
+
+    private var workouts: [SampleWorkout] {
+        savedWorkouts.map { SampleWorkout.from($0) } + SampleWorkout.all
+    }
+
+    private var workout: SampleWorkout {
+        workouts.first { $0.id == workoutID } ?? SampleWorkout.all[0]
+    }
+
+    private var plan: SessionPlan {
+        let lifts = workout.lifts.map { lift in
+            let saved = record(for: lift.prLift)
+            return LiftInput(
+                name: lift.name,
+                pr: saved?.value ?? 0,
+                prUnit: saved?.unit ?? .kg,
+                sets: lift.sets
+            )
+        }
+        return SessionPlan(gym: gym?.setup ?? GymSetup(unit: .lb), lifts: lifts)
+    }
+
+    var body: some View {
+        let plan = plan
+        Form {
+            screenshotSection
+
+            Section("Workout") {
+                Picker("Workout", selection: $workoutID) {
+                    ForEach(workouts) { sample in
+                        Text(sample.name).tag(sample.id)
+                    }
+                }
+            }
+
+            Section("Gym") {
+                if let gym {
+                    GymEditor(gym: gym)
+                }
+            }
+
+            Section {
+                ForEach(workout.prLifts, id: \.self) { lift in
+                    let saved = record(for: lift)
+                    Button {
+                        editingPR = EditingPR(lift: lift)
+                    } label: {
+                        LabeledContent(lift) {
+                            if let saved, let value = saved.value {
+                                Text("\(WeightUnit.trimmed(value)) \(saved.unit.rawValue)")
+                            } else {
+                                Text("Add PR").foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                    .tint(.primary)
+                }
+            } header: {
+                Text("PRs")
+            } footer: {
+                Text("Tap a PR to change it. Earlier values are kept.")
+            }
+
+            Section("Plate kit") {
+                LabeledContent("Bar", value: weightText(plan.kit.bar))
+                ForEach(plan.kit.plates, id: \.size) { item in
+                    LabeledContent(weightText(item.size), value: "× \(item.count)")
+                }
+            }
+
+            Section("Warm-up") {
+                ForEach(plan.warmUp, id: \.round.number) { set in
+                    SetRow(
+                        title: "\(set.round.label) · \(set.reps) reps",
+                        total: unit.display(set.load.total, in: plan.lifts.first?.prUnit ?? unit),
+                        detail: set.round.percentText,
+                        plates: platesText(set.load.perSide),
+                        change: set.change.text
+                    )
+                }
+            }
+
+            ForEach(Array(plan.lifts.enumerated()), id: \.offset) { _, lift in
+                Section(lift.name) {
+                    ForEach(lift.sets, id: \.number) { set in
+                        SetRow(
+                            title: "Set \(set.number) · \(set.reps) \(set.reps == 1 ? "rep" : "reps")",
+                            total: plan.displayTotal(set),
+                            detail: set.target.text,
+                            plates: platesText(set.load.perSide),
+                            change: set.change.text,
+                            warning: set.load.isLighterThanBar ? "Lighter than the bar" : nil
+                        )
+                    }
+                }
+            }
+
+            Section {
+                Button("Save session") { saveSession(plan) }
+                    .disabled(plan.lifts.isEmpty || gym == nil)
+                ForEach(sessions) { session in
+                    NavigationLink {
+                        SessionDetailView(session: session)
+                    } label: {
+                        Text(sessionTitle(session))
+                    }
+                }
+                .onDelete { offsets in
+                    for index in offsets { context.delete(sessions[index]) }
+                    try? context.save()
+                }
+            } header: {
+                Text("Sessions")
+            } footer: {
+                Text("Saves the plan above with today's gym. Swipe left to delete.\nPlateKit \(PlateKit.version)")
+            }
+        }
+        .navigationTitle("Plate math")
+        .scrollDismissesKeyboard(.interactively)
+        .sensoryFeedback(.success, trigger: readCount)
+        .onChange(of: photo) { _, item in
+            guard let item else { return }
+            Task { await read(item) }
+        }
+        .onChange(of: workoutID) { _, _ in
+            percentAnswers = [:]
+            failedText = nil
+        }
+        .sheet(item: $editingPR) { item in
+            PREditor(lift: item.lift, record: record(for: item.lift))
+        }
+    }
+
+    // MARK: - Screenshot
+
+    @ViewBuilder
+    private var screenshotSection: some View {
+        Section("Screenshot") {
+            PhotosPicker(selection: $photo, matching: .images) {
+                Label("Upload a screenshot", systemImage: "photo.on.rectangle")
+            }
+
+            if isReading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Reading…")
+                }
+            }
+
+            if let readError {
+                Text(readError).foregroundStyle(.orange)
+            }
+
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(blockTitle(block)).font(.headline)
+                    if let note = block.note {
+                        Text(note).font(.footnote).foregroundStyle(Theme.ink)
+                    }
+                    if block.pctMissing {
+                        HStack {
+                            TextField("What % for \(block.name)?", text: answerBinding(index))
+                                .keyboardType(.numbersAndPunctuation)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit { answerPercent(index) }
+                            Button("OK") { answerPercent(index) }
+                                .buttonStyle(.bordered)
+                                .disabled(Target(parsing: percentAnswers[index] ?? "") == nil)
+                        }
+                        if let answer = percentAnswers[index], !answer.isEmpty, Target(parsing: answer) == nil {
+                            Text("Try 83-85, 80 or 80+").font(.footnote).foregroundStyle(.orange)
+                        }
+                    } else {
+                        Text(block.sets.compactMap { $0.target?.text }.joined(separator: ", "))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.ink)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
+            if let readText = failedText ?? savedWorkout?.sourceText {
+                DisclosureGroup("Text Vision read") {
+                    Text(readText)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                    Button("Copy text") {
+                        UIPasteboard.general.string = readText
+                    }
+                }
+            }
+        }
+
+        if !savedWorkouts.isEmpty {
+            Section {
+                ForEach(savedWorkouts) { saved in
+                    Button(saved.title) { workoutID = saved.id.uuidString }
+                        .tint(.primary)
+                }
+                .onDelete { offsets in
+                    for index in offsets { context.delete(savedWorkouts[index]) }
+                    try? context.save()
+                }
+            } header: {
+                Text("Saved workouts")
+            } footer: {
+                Text("Swipe left to delete.")
+            }
+        }
+    }
+
+    /// Saves the answer to "What % for …?" into the workout.
+    private func answerPercent(_ index: Int) {
+        guard let workout = savedWorkout, let target = Target(parsing: percentAnswers[index] ?? "") else { return }
+        var updated = workout.blocks
+        guard updated.indices.contains(index) else { return }
+        updated[index] = updated[index].fillingMissingPercent(with: target)
+        workout.blocks = updated
+        percentAnswers[index] = nil
+        try? context.save()
+    }
+
+    private func read(_ item: PhotosPickerItem) async {
+        isReading = true
+        readError = nil
+        defer { isReading = false }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                readError = "Couldn't open that image."
+                return
+            }
+            let text = try await TextReader.lines(in: data).joined(separator: "\n")
+            let parsed = WorkoutParser.parse(text)
+            if parsed.isEmpty {
+                readError = "No strength work found in that screenshot."
+                failedText = text
+                return
+            }
+            failedText = nil
+            let workout = Workout(sourceText: text, blocks: parsed)
+            context.insert(workout)
+            try? context.save()
+            workoutID = workout.id.uuidString
+            readCount += 1
+        } catch {
+            readError = "Couldn't read that image: \(error.localizedDescription)"
+        }
+    }
+
+    /// "D · After Party · Back Squat · EMOM · 5 × 2"
+    private func blockTitle(_ block: StrengthBlock) -> String {
+        let reps = block.sets.first?.reps ?? 0
+        let parts: [String?] = [block.letter, block.label, block.name, block.format, "\(block.sets.count) × \(reps)"]
+        return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
+    // MARK: - Helpers
+
+    private func weightText(_ weight: Double) -> String {
+        "\(WeightUnit.trimmed(weight)) \(unit.rawValue)"
+    }
+
+    private func platesText(_ perSide: [Double]) -> String {
+        if perSide.isEmpty { return "Empty bar" }
+        return perSide.map(WeightUnit.trimmed).joined(separator: " + ") + " \(unit.rawValue) each side"
+    }
+
+    private func saveSession(_ plan: SessionPlan) {
+        guard let gym else { return }
+        _ = Session.start(workout: savedWorkout, plan: plan, prLifts: workout.lifts.map(\.prLift), gym: gym, in: context)
+    }
+
+    /// "14 Oct, 09:30 · MY BOX · 14 sets · top 260 lb"
+    private func sessionTitle(_ session: Session) -> String {
+        var parts = [
+            session.createdAt.formatted(.dateTime.day().month().hour().minute()),
+            session.gymName,
+            "\(session.setLogs?.count ?? 0) sets",
+        ]
+        if let top = session.heaviestTotal {
+            parts.append("top \(WeightUnit.trimmed(top)) \(session.gymUnit.rawValue)")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func answerBinding(_ index: Int) -> Binding<String> {
+        Binding(get: { percentAnswers[index] ?? "" }, set: { percentAnswers[index] = $0 })
+    }
+}
+
+/// Which PR the editor sheet is open for.
+private struct EditingPR: Identifiable {
+    let lift: String
+    var id: String { lift }
+}
+
+/// The gym's name, units, bar and plates, saved as you change them.
+private struct GymEditor: View {
+    @Bindable var gym: Gym
+
+    var body: some View {
+        TextField("Gym name", text: Binding(
+            get: { gym.name },
+            set: { gym.name = GymSetup.normalizedName($0) }
+        ))
+        .textInputAutocapitalization(.characters)
+        .autocorrectionDisabled()
+
+        Picker("Units", selection: Binding(get: { gym.unit }, set: { gym.switchUnit(to: $0) })) {
+            Text("Kilograms").tag(WeightUnit.kg)
+            Text("Pounds").tag(WeightUnit.lb)
+        }
+        .pickerStyle(.segmented)
+
+        Picker("Bar", selection: $gym.barWeight) {
+            ForEach(Bar.weights(gym.unit), id: \.self) { weight in
+                Text("\(WeightUnit.trimmed(weight)) \(gym.unit.rawValue)").tag(weight)
+            }
+        }
+
+        ForEach(Plate.catalog(gym.unit), id: \.size) { plate in
+            Toggle(isOn: Binding(
+                get: { gym.plateSizes.contains(plate.size) },
+                set: { gym.setPlate(plate.size, isOn: $0) }
+            )) {
+                HStack {
+                    Circle()
+                        .fill(Color(hex: plate.colorHex))
+                        .overlay(Circle().stroke(.secondary, lineWidth: 0.5))
+                        .frame(width: 12 + 16 * plate.diameter, height: 12 + 16 * plate.diameter)
+                    Text("\(WeightUnit.trimmed(plate.size)) \(gym.unit.rawValue)")
+                }
+            }
+        }
+    }
+}
+
+/// One set: title and total on top, then the % and plates, then what to change.
+struct SetRow: View {
+    let title: String
+    let total: String
+    let detail: String
+    let plates: String
+    let change: String
+    var warning: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).font(.headline)
+                Spacer()
+                Text(total).font(.headline).monospacedDigit()
+            }
+            Text("\(detail) · \(plates)")
+                .font(.subheadline)
+                .foregroundStyle(Theme.ink)
+            Text(change).font(.footnote)
+            if let warning {
+                Text(warning).font(.footnote).foregroundStyle(.orange)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+#Preview {
+    NavigationStack {
+        PlateCalculatorView()
+    }
+}
