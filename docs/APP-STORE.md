@@ -7,6 +7,7 @@ What to type in App Store Connect, from `DATA-AND-SERVICES.md` §5 and how the a
 - **Bundle ID:** com.williansertorio.pl8
 - **Category:** Health & Fitness
 - **Privacy Policy URL:** https://willsertorio.github.io/pl8-math/privacy.html
+- **Support URL:** https://willsertorio.github.io/pl8-math/support.html
 - **Price:** Free. No in-app purchases.
 - **Devices:** iPhone only.
 
@@ -25,8 +26,7 @@ What to type in App Store Connect, from `DATA-AND-SERVICES.md` §5 and how the a
 Everything else (Contact Info, Health & Fitness, Location, Identifiers, Purchases, Financial Info, Contacts, Browsing
 and Search History, Sensitive Info, Other Data): **Not collected.**
 
-\* Only once the read server is live (`PL8ReadServer` set in `Info.plist`). If you release without it, answer **No**
-for both User Content rows, and change them when the cloud reading goes on.
+\* The read server is live, so answer **Yes** for both User Content rows.
 
 Why the answers are what they are:
 - **Not linked:** no accounts, no sign-in; analytics use a random id made by the app.
