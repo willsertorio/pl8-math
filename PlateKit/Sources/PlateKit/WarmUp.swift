@@ -4,11 +4,11 @@ public struct WarmUpRound: Hashable, Sendable {
     public let number: Int
     public let reps: Int
     public let load: Load
-    /// The load as a whole-number percentage of the PR, for "≈N% 1RM".
+    /// The load as a whole-number percentage of the PR, for "≈N% 1RM"; 0 when there's no PR (a fixed weight).
     public let percentOfMax: Int
 
     public var label: String { "Round \(number)" }
-    public var percentText: String { "≈\(percentOfMax)% 1RM" }
+    public var percentText: String { percentOfMax > 0 ? "≈\(percentOfMax)% 1RM" : "Warm-up" }
 }
 
 extension PlateSolver {

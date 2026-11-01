@@ -47,8 +47,8 @@ struct BoardFormatsTests {
         #expect(block?.pctMissing == true)
     }
 
-    @Test func aFixedWeightIsReadButNotPlanned() {
-        // SPEC 3.6 rule 3: loads without a % are not planned (yet); the result keeps them.
+    @Test func aFixedWeightIsRead() {
+        // The box app's format doesn't read it (rule 3); the whiteboard formats do, and it's planned (FixedWeightTests).
         #expect(WorkoutParser.parse("Strict press 4x6 @ 40kg").isEmpty)
         let result = BoardFormats.read("Strict press 4x6 @ 40kg")
         #expect(result?.blocks?.first?.lift == "Strict Press")
@@ -165,10 +165,11 @@ struct ReadResultTests {
             .init(label: nil, lift: "Deadlift", sets: [.init(reps: 3, percent: 80, weight: nil)], note: nil),
         ])
         let blocks = result.strengthBlocks()
-        // The fixed weight isn't planned (SPEC 3.6 rule 3); letters carry on from the labelled block.
-        #expect(blocks.map(\.letter) == ["A", "B"])
-        #expect(blocks.map(\.prLift) == ["Back Squat", "Deadlift"])
+        // The fixed weight is planned in the result's unit; letters carry on from the labelled block.
+        #expect(blocks.map(\.letter) == ["A", "B", "C"])
+        #expect(blocks.map(\.prLift) == ["Back Squat", "Strict Press", "Deadlift"])
         #expect(blocks[0].sets == [ParsedSet(reps: 5, target: .single(75)), ParsedSet(reps: 3, target: nil)])
+        #expect(blocks[1].sets == [ParsedSet(reps: 6, target: .weight(40, unit: .kg))])
         #expect(blocks[0].note == "EMOM 10")
     }
 
