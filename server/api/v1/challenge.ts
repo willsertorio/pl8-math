@@ -1,5 +1,5 @@
-import { handleChallenge, liveDeps } from "../../lib/handlers.js";
+import { handleChallenge, withLiveDeps } from "../../lib/handlers.js";
 
 export async function GET(): Promise<Response> {
-  return handleChallenge(await liveDeps());
+  return withLiveDeps((deps) => handleChallenge(deps));
 }

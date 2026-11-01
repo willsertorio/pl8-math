@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>PL8ReadServer</key>
-	<string></string>
+	<string>https://pl8-math-server.vercel.app</string>
 	<key>PostHogAPIKey</key>
 	<string>phc_xm9CjdNdMPbTpDDWbz55eqwEGrTNbxJZbkQFFfErKEZ5</string>
 	<key>UIBackgroundModes</key>
