@@ -39,7 +39,7 @@ npm run typecheck
 6. **The app:** put the deployment's address (e.g. `https://pl8-read.vercel.app`) in `pl8/Info.plist` as
    `PL8ReadServer`. Until then the app never uses the cloud.
 
-Apple's root certificate is in `lib/apple-app-attestation-root-ca.pem`. Its SHA-256 fingerprint is
+Apple's root certificate is written into `lib/appattest.ts`. Its SHA-256 fingerprint is
 `1C:B9:82:3B:A2:8B:A6:AD:2D:33:A0:06:94:1D:E2:AE:4F:51:3E:F1:D4:E8:31:B9:F7:E0:FA:7B:62:42:C9:32`; you can check it
 against the one at https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem.
 
