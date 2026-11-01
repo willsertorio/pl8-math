@@ -48,8 +48,8 @@ struct BoardFormatsTests {
     }
 
     @Test func aFixedWeightIsRead() {
-        // The box app's format doesn't read it (rule 3); the whiteboard formats do, and it's planned (FixedWeightTests).
-        #expect(WorkoutParser.parse("Strict press 4x6 @ 40kg").isEmpty)
+        // The whiteboard formats read it, and it's planned (SPEC 3.6 rule 10, FixedWeightTests).
+        #expect(WorkoutParser.parse("Strict press 4x6 @ 40kg").first?.sets.first?.target == .weight(40, unit: .kg))
         let result = BoardFormats.read("Strict press 4x6 @ 40kg")
         #expect(result?.blocks?.first?.lift == "Strict Press")
         #expect(result?.blocks?.first?.sets == Array(repeating: ReadResult.Set(reps: 6, percent: nil, weight: 40), count: 4))
