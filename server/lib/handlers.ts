@@ -106,6 +106,7 @@ export async function liveDeps(): Promise<Deps> {
   const { claudeReader } = await import("./claude.js");
   const teamId = process.env.APPLE_TEAM_ID;
   if (!teamId) throw new Error("APPLE_TEAM_ID isn't set.");
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY isn't set.");
   return {
     store: redisStore(),
     read: claudeReader(),
@@ -113,4 +114,18 @@ export async function liveDeps(): Promise<Deps> {
     now: () => new Date(),
     log: (entry) => console.log(JSON.stringify(entry)),
   };
+}
+
+/** Runs a route with the live dependencies. A setup mistake (a missing environment variable, no store) answers 500
+ *  with what's missing, so the deploy can be fixed from the browser; it never names a value. */
+export async function withLiveDeps(handle: (deps: Deps) => Promise<Response>): Promise<Response> {
+  let deps: Deps;
+  try {
+    deps = await liveDeps();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "setup failed";
+    console.error(JSON.stringify({ setup: detail }));
+    return json(500, { error: "setup", detail });
+  }
+  return handle(deps);
 }
