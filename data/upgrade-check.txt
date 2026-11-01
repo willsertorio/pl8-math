@@ -1,0 +1,6 @@
+result: ok
+gyms: 1
+prs: 6
+workouts: 0
+sessions: 0
+sets: 0
