@@ -105,15 +105,15 @@ public struct ReadResult: Codable, Hashable, Sendable {
 
     // MARK: - Into the app's own types
 
-    /// The strength blocks the planner works from. Sets with only a fixed weight aren't planned (SPEC 3.6 rule 3:
-    /// loads without a % aren't strength work yet), and a block left with no sets goes. Blocks without a letter
-    /// carry on from the one before.
+    /// The strength blocks the planner works from. A set's % wins; a fixed weight is the load in the result's unit
+    /// (SPEC 3.6 rule 10); a set with neither asks for its %. Blocks without a letter carry on from the one before.
     public func strengthBlocks() -> [StrengthBlock] {
         var result: [StrengthBlock] = []
         var next: Character = "A"
         for block in blocks ?? [] {
-            let sets = block.sets.filter { $0.percent != nil || $0.weight == nil }
-                .map { ParsedSet(reps: $0.reps, target: $0.percent.map { .single($0) }) }
+            let sets = block.sets.map { set in
+                ParsedSet(reps: set.reps, target: set.percent.map { .single($0) } ?? set.weight.map { .weight($0, unit: unit) })
+            }
             guard !sets.isEmpty else { continue }
             var letter = String(next)
             if let label = block.label?.trimmingCharacters(in: .whitespaces).uppercased(), label.count == 1,

@@ -7,10 +7,12 @@ enum Planner {
     static func plan(blocks: [StrengthBlock], gym: Gym?, records: [PersonalRecord]) -> SessionPlan {
         let lifts = blocks.filter { !$0.pctMissing }.map { block in
             let record = self.record(for: block.prLift, in: records)
+            // Without a PR, totals show in the fixed weight's unit, else the gym's.
+            let fixedUnit = block.sets.lazy.compactMap { $0.target?.weightUnit }.first
             return LiftInput(
                 name: block.name,
                 pr: record?.value ?? 0,
-                prUnit: record?.unit ?? .kg,
+                prUnit: record?.unit ?? fixedUnit ?? gym?.unit ?? .kg,
                 sets: block.sets.compactMap { set in
                     set.target.map { LiftInput.WorkSet(reps: set.reps, target: $0) }
                 }
@@ -24,10 +26,10 @@ enum Planner {
         blocks.filter { !$0.pctMissing }.map { LiftNames.canonical($0.prLift) }
     }
 
-    /// PR lifts these blocks need that have no value yet, in workout order.
+    /// PR lifts these blocks need that have no value yet, in workout order. A lift of fixed weights only needs none.
     static func missingPRs(blocks: [StrengthBlock], records: [PersonalRecord]) -> [String] {
         var names: [String] = []
-        for block in blocks {
+        for block in blocks where !block.sets.allSatisfy({ $0.target?.isFixed == true }) {
             let name = LiftNames.canonical(block.prLift)
             if record(for: name, in: records)?.value == nil, !names.contains(name) {
                 names.append(name)

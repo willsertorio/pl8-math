@@ -1,14 +1,34 @@
-/// A set's target as a percentage of 1RM: `75–78%`, `80%+` or `80%` (SPEC 3.3).
+/// A set's target as a percentage of 1RM: `75–78%`, `80%+` or `80%` (SPEC 3.3), or a fixed weight like `40 kg`
+/// (SPEC 3.6 rule 10), which is the load itself and needs no PR.
 public struct Target: Hashable, Codable, Sendable {
     public let low: Double
     public let high: Double?
     public let plus: Bool
+    /// A fixed load; when set, the percentages are ignored. Saved targets from before have none.
+    public let weight: Double?
+    /// The fixed load's unit; nil means the gym's.
+    public let weightUnit: WeightUnit?
 
     public init(low: Double, high: Double? = nil, plus: Bool = false) {
         self.low = low
         self.high = high
         self.plus = plus
+        self.weight = nil
+        self.weightUnit = nil
     }
+
+    private init(weight: Double, unit: WeightUnit?) {
+        self.low = 0
+        self.high = nil
+        self.plus = false
+        self.weight = weight
+        self.weightUnit = unit
+    }
+
+    /// `40 kg`: the weight is the load.
+    public static func weight(_ weight: Double, unit: WeightUnit?) -> Target { Target(weight: weight, unit: unit) }
+
+    public var isFixed: Bool { weight != nil }
 
     /// `75–78%`
     public static func range(_ low: Double, _ high: Double) -> Target { Target(low: low, high: high) }
@@ -17,8 +37,12 @@ public struct Target: Hashable, Codable, Sendable {
     /// `80%`
     public static func single(_ percent: Double) -> Target { Target(low: percent) }
 
-    /// "75–78%", "80%+" or "80%".
+    /// "75–78%", "80%+", "80%", or "40 kg" for a fixed weight.
     public var text: String {
+        if let weight {
+            let number = WeightUnit.trimmed(weight)
+            return weightUnit.map { "\(number) \($0.rawValue)" } ?? number
+        }
         let low = WeightUnit.trimmed(self.low)
         if plus { return "\(low)%+" }
         if let high, high != self.low { return "\(low)–\(WeightUnit.trimmed(high))%" }
@@ -50,6 +74,13 @@ public struct PlateSolver: Sendable {
 
     /// The load for `target`, with the PR converted to the gym's unit.
     public func load(for target: Target, pr: Double, prUnit: WeightUnit) -> Load {
+        if let weight = target.weight {
+            let total = (target.weightUnit ?? gym.unit).convert(weight, to: gym.unit)
+            if total < gym.barWeight - tolerance {
+                return Load(total: gym.barWeight, perSide: [], isLighterThanBar: true)
+            }
+            return nearestLoad(to: total)
+        }
         let max = prUnit.convert(pr, to: gym.unit)
         let low = max * target.low / 100
         let high = target.high.map { max * $0 / 100 }

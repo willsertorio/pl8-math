@@ -58,11 +58,13 @@ public struct StrengthBlock: Hashable, Codable, Sendable {
                              sets: Array(repeating: set, count: max(1, sets)))
     }
 
-    /// Within the limits every reading stage is held to (§2.4): reps 1–50, any % between 30 and 110, at least one set.
+    /// Within the limits every reading stage is held to (§2.4): reps 1–50, any % between 30 and 110, a fixed weight
+    /// within 1–500 kg (1,100 lb), at least one set.
     public var isLikely: Bool {
         !sets.isEmpty && sets.allSatisfy { set in
             ReadResult.reps.contains(set.reps) && set.target.map { target in
-                ReadResult.percent.contains(target.low) && (target.high.map { ReadResult.percent.contains($0) } ?? true)
+                if let weight = target.weight { return ReadResult.weights(in: target.weightUnit).contains(weight) }
+                return ReadResult.percent.contains(target.low) && (target.high.map { ReadResult.percent.contains($0) } ?? true)
             } ?? true
         }
     }
