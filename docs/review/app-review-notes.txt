@@ -1,0 +1,26 @@
+1. SCREEN RECORDING
+Attached (recorded on iPhone, iOS [VERSION]). It starts at launch and shows the full flow: gym setup, PRs, uploading a workout screenshot, the plate kit, the sets and the end of the session. The app has no accounts, no user-generated content shared with others and no paid content.
+
+2. PURPOSE AND AUDIENCE
+pl8(math) is a plate calculator for CrossFit athletes and Olympic weightlifters. Box workouts are written as percentages of a lifter's one-rep max (e.g. "Back squat 5x5 @ 75%"). Today lifters work out each set on a calculator mid-class: percentage of their PR, convert kilos/pounds, subtract the bar, split into plates. pl8(math) reads a screenshot or photo of the workout and shows the plates to take from the rack for the whole session, then guides the lifter set by set: what to add or take off, plus a warm-up.
+
+3. HOW TO USE IT (no login needed)
+- Launch the app and tap the title.
+- Answer the setup questions: gym name, kilos or pounds, the plates your gym has, your bar.
+- PRs: type them in, or upload a PR screenshot. Sample: https://willsertorio.github.io/pl8-math/review/sample-prs.png
+- Workout: upload a workout screenshot on the whiteboard step. Sample: https://willsertorio.github.io/pl8-math/review/sample-workout.png (save both to Photos first).
+- The app shows the plate kit, then each set. Tap through the sets and end the session.
+- The menu lets you edit gyms, PRs and the workout. A photo the app can't read shows question marks on the board.
+
+4. EXTERNAL SERVICES
+- Apple Vision (on device): reads the text in the photo.
+- Apple Foundation Models (on device, iOS 26 devices with Apple Intelligence): reads the text into lifts when the built-in rules can't.
+- pl8(math) read server (Vercel, EU region) with Anthropic's Claude API: only when the phone can't read a photo, and only after the user agrees in an alert (switchable in Settings > pl8(math)). It receives the recognized text (or the photo when no text was found) and returns the lifts; nothing is stored. Access is limited to the genuine app with Apple App Attest; Upstash Redis (EU) stores only the App Attest keys and a daily read count.
+- iCloud / CloudKit: syncs the user's gyms, PRs and workouts to their private iCloud database.
+- PostHog (EU): anonymous usage analytics, no personal data, not linked to the user, no tracking.
+
+5. REGIONS
+The app works the same in every region. The on-device model is used only where Apple Intelligence is available; elsewhere the app uses its rules and, with consent, the cloud reading.
+
+6. REGULATION
+Not applicable: a fitness utility, not a medical or regulated service, with no third-party protected content.
