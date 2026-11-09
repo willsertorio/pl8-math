@@ -245,8 +245,9 @@ public enum WorkoutParser {
     private static func continues(_ previous: String, with line: String) -> Bool {
         guard previous.firstMatch(of: #/^\d+\s+\S/#) != nil else { return false }
         if line.wholeMatch(of: #/([A-Z])[.)](?:\s+(.+))?/#) != nil || parseHeader(line) != nil { return false }
-        // A complex's % on its own line ("Progressão: 60–80%") is never the end of a movement's line.
-        if percentOnly(line) != nil { return false }
+        // A complex's labelled % ("Progressão: 60–80%") is never the end of a movement's line; a bare "@68-70%"
+        // still is (Fixtures 14/10).
+        if line.contains(":"), percentOnly(line) != nil { return false }
         if let first = line.first, "*-–•".contains(first) { return false }
         if isAppButton(line) { return false }
         if line.firstMatch(of: #/^\d+\s/#) != nil { return false }
