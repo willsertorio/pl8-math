@@ -184,10 +184,10 @@ struct ScreenshotHost: View {
                 flow.pointerUp(q)
                 guard let request = flow.photoRequest else { return }
                 flow.photoRequest = nil
-                request.picked(UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
+                request.picked([UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image { context in
                     UIColor.white.setFill()
                     context.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
-                })
+                }])
             }
         default:
             break

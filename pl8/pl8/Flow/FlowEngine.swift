@@ -728,7 +728,8 @@ struct FlowPhotoRequest: Identifiable {
     enum Kind { case workout, prs }
     let id = UUID()
     let kind: Kind
-    let picked: (UIImage) -> Void
+    /// In the order picked; one for a workout, up to ten for PRs.
+    let picked: ([UIImage]) -> Void
 }
 
 extension Color {

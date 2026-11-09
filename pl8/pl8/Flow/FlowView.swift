@@ -9,7 +9,7 @@ import PlateKit
 /// own UI. The finger goes to the stage unless it lands on a button.
 struct FlowView: View {
     @State var flow: Flow
-    @State private var photoItem: PhotosPickerItem?
+    @State private var photoItems: [PhotosPickerItem] = []
     /// Resets when the touch ends or is cancelled: a cancel (no onEnded) still lets go of what was held.
     @GestureState private var touching = false
 
@@ -65,16 +65,22 @@ struct FlowView: View {
         } message: { alert in
             Text(alert.message)
         }
-        .photosPicker(isPresented: Binding(get: { flow.photoRequest != nil }, set: { if !$0 && photoItem == nil { flow.photoRequest = nil } }),
-                      selection: $photoItem, matching: .images)
-        .onChange(of: photoItem) { _, item in
-            guard let item, let request = flow.photoRequest else { return }
-            photoItem = nil
+        // PR lists often take several screenshots, so those can be picked together (beta, 2026-11-09).
+        .photosPicker(isPresented: Binding(get: { flow.photoRequest != nil }, set: { if !$0 && photoItems.isEmpty { flow.photoRequest = nil } }),
+                      selection: $photoItems, maxSelectionCount: flow.photoRequest?.kind == .prs ? 10 : 1,
+                      selectionBehavior: .ordered, matching: .images)
+        .onChange(of: photoItems) { _, items in
+            guard !items.isEmpty, let request = flow.photoRequest else { return }
+            photoItems = []
             flow.photoRequest = nil
             Task {
-                if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
-                    request.picked(image)
+                var images: [UIImage] = []
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                        images.append(image)
+                    }
                 }
+                if !images.isEmpty { request.picked(images) }
             }
         }
     }
@@ -347,15 +353,20 @@ extension Flow {
         }
     }
 
+    /// Asks for a photo (several for PRs) and reads each in turn; `then` hears whether any was read.
     func pickPhoto(_ kind: FlowPhotoRequest.Kind, reading text: String, read: @escaping (UIImage) async -> Bool, then: @escaping (Bool) -> Void) {
-        photoRequest = FlowPhotoRequest(kind: kind) { [weak self] image in
+        photoRequest = FlowPhotoRequest(kind: kind) { [weak self] images in
             guard let self else { return }
             self.readingText = text
             let started = self.t, question = self.clearings
             Task { @MainActor in
-                let ok = await read(image)
-                if let last = self.data.lastRead {
-                    Analytics.send(.photoRead(kind: last.kind.rawValue, stage: last.stage.rawValue, milliseconds: last.milliseconds))
+                var ok = false
+                for (index, image) in images.enumerated() {
+                    if images.count > 1 { self.readingText = "\(text) \(index + 1) of \(images.count)" }
+                    if await read(image) { ok = true }
+                    if let last = self.data.lastRead {
+                        Analytics.send(.photoRead(kind: last.kind.rawValue, stage: last.stage.rawValue, milliseconds: last.milliseconds))
+                    }
                 }
                 let wait = max(0, 3 - (self.t - started))
                 try? await Task.sleep(for: .seconds(wait))
