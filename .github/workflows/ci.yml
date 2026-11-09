@@ -195,10 +195,10 @@ jobs:
         continue-on-error: true
 
       - name: Publish the pictures on the ci-screens branch
-        if: always() && github.event_name == 'pull_request'
+        if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p publish/screens publish/prototype-check publish/perf publish/data
           cp screens/*.png publish/screens/ 2>/dev/null || true
@@ -206,6 +206,8 @@ jobs:
           cp perf/*.txt publish/perf/ 2>/dev/null || true
           # The prototype's renders are 780 px wide: the same size keeps the push small (a full set timed out).
           for f in publish/screens/*.png; do sips --resampleWidth 780 "$f" >/dev/null 2>&1 || true; done
+          # The logo is compared pixel by pixel with Will's reference: kept at full size.
+          cp screens/brand-mark.png publish/screens/brand-mark-full.png 2>/dev/null || true
           cp prototype-check/*.png publish/prototype-check/ 2>/dev/null || true
           cp build.log publish/ 2>/dev/null || true
           echo "$SHA" > publish/SHA
