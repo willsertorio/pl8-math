@@ -7,7 +7,7 @@ import PlateKit
 /// For the automatic checks (.github/workflows/ci.yml): launched with `-pl8Shot <screen>`, the app fills an
 /// in-memory store with demo data and opens that one screen, so the Simulator can take its picture.
 /// Screens: `room-<station>` (overview, corner, nameFlag, flag, bar, pr, board, kit, setv), `firstrun-name`,
-/// `firstrun-plates`, `session` (the kit), `session-sets` (the first set), `session-pull` (a deadlift set, bar on the floor), `opening-title`, `opening-box` (the closed
+/// `firstrun-plates`, `session` (the kit), `session-sets` (the first set), `session-pull` (a deadlift set, bar on the floor), `opening-title`, `brand-mark` (the logo at 67 pt, with the font each letter uses), `opening-box` (the closed
 /// box), `session-over` (the scale), `session-over-drag` (its bar and top plate pulled off), `home`, `tab-<train|prs|gym|history>` (home with that drawer open).
 enum ScreenshotMode {
     static let shot: String? = {
@@ -32,6 +32,19 @@ struct ScreenshotHost: View {
                 FlowRoot(start: Self.flowStart(shot), configure: { Self.configure($0, shot: shot) })
             } else if shot.hasPrefix("room-"), let station = RoomLayout.Station(rawValue: String(shot.dropFirst(5))) {
                 NavigationStack { Room3DView(station: station) }
+            } else if shot == "brand-mark" {
+                // The logo alone at 67 pt on the red, and which font draws each letter (ℓ and α must be Helvetica).
+                ZStack {
+                    Theme.background.ignoresSafeArea()
+                    BrandMark(size: 67, colour: Color(rgb: FlowLook.light))
+                    VStack {
+                        Spacer()
+                        Text(BrandMark.fontsUsed().map { "\($0.0) \($0.1)" }.joined(separator: "\n"))
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(Color(rgb: FlowLook.light))
+                            .padding(.bottom, 60)
+                    }
+                }
             } else if shot == "opening-title" {
                 FirstRunView(startAt: .opening) {}
             } else if shot == "opening-box" {

@@ -317,11 +317,11 @@ struct OpeningTitle: View {
         ZStack {
             Theme.background
             // Behind the plates, like the prototype's (its text layer sits under the 3D): they fly past in front.
-            // Helvetica Neue like the rest of the Flow (Will, 2026-10-30): the display role, at the prototype's 39 pt.
-            Text("pl8(math)")
-                .font(.custom(FlowType.medium, size: 39))
-                .tracking(-0.035 * 39)
-                .foregroundStyle(cream)
+            // The logo (Will, 2026-11-09): 67 pt on a 390 pt-wide screen, centred.
+            GeometryReader { geometry in
+                BrandMark(size: BrandMark.size(forWidth: geometry.size.width), colour: cream)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
             GeometryReader { geometry in
                 // Drawn like the prototype's layer: through the sketch pass, which outlines each plate.
                 SketchStageView { stage.build(aspect: Float(geometry.size.width / max(1, geometry.size.height)), sketched: true) }
