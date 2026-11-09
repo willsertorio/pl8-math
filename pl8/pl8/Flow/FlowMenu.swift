@@ -105,7 +105,16 @@ extension Flow {
         // notebook's top lines up with the board's (299 / 293 pt) and the box's front edge sits on the line of the
         // board's wheels (534 pt), the box set back a little for that.
         let restSize: Float = 0.85, bookRestY: Float = 0.64, roomRestBack: Float = 0.3
-        let book = build(FlowProps.notebook(title: "MY PRs", rows: data.prRows))
+        // Eight PRs a page; a page turns on the spine with the finger (beta, 2026-11-09).
+        var pages = NotebookPages.split(data.prRows), page = 0
+        let book = build(FlowProps.notebook(title: "MY PRs", rows: pages[0]))
+        let leafHinge = build(FlowProps.notebookLeaf())
+        leafHinge.isEnabled = false
+        book.addChild(leafHinge)
+        let paintPage = { [weak self] (index: Int) in
+            self?.repaint(book, part: "page", with: .notebookPage(pages[index], page: index, pages: pages.count))
+        }
+        paintPage(0)
         book.position.y = bookRestY
         book.scale = SIMD3(repeating: restSize)
         book.orientation = simd_quatf(angle: -0.25, axis: [1, 0, 0])
@@ -359,7 +368,9 @@ extension Flow {
             }, then: { [weak self] ok in
                 guard let self else { return }
                 guard ok else { self.repaint(book, part: "page", with: .notebookUnread); return }
-                self.repaint(book, part: "page", with: .notebookPage(self.data.prRows))
+                pages = NotebookPages.split(self.data.prRows)
+                page = 0
+                paintPage(0)
                 self.shine([book], duration: 0.7)
                 self.sparkles(at: wrappers[1].position + [0.4, 0.9, 0.4], count: 5, spread: 1)
             })
@@ -396,6 +407,36 @@ extension Flow {
         }
         let pointsPerItem = 390 * spacing / (7.2 * 0.2914 * 1.15)
 
+        // Turning a page: the leaf on the spine carries the page being turned; under it, the page it uncovers.
+        var turnForward = true, turnProgress = 0.0
+        let setLeaf = { (progress: Double) in
+            turnProgress = progress
+            let angle = NotebookPages.turnedAngle * Float(turnForward ? progress : 1 - progress)
+            leafHinge.orientation = simd_quatf(angle: -angle, axis: [0, 1, 0])
+        }
+        let startTurn = { [weak self] (forward: Bool) in
+            guard let self else { return }
+            turnForward = forward
+            let shown = forward ? page : page - 1
+            self.repaint(leafHinge, part: "leafFront", with: .notebookPage(pages[shown], page: shown, pages: pages.count))
+            if forward { paintPage(page + 1) }
+            setLeaf(0)
+            leafHinge.isEnabled = true
+            self.click(1.8)
+        }
+        let endTurn = { [weak self] (complete: Bool) in
+            guard let self else { return }
+            let from = turnProgress, to: Double = complete ? 1 : 0
+            self.anim(0.28 * max(0.3, abs(to - from)), { u in setLeaf(from + (to - from) * Ease.outCubic(u)) }, done: { [weak self] in
+                guard let self else { return }
+                if complete { page += turnForward ? 1 : -1; self.buzz(.selection) }
+                paintPage(page)
+                // The page under it is drawn first, then the leaf goes.
+                self.later(0.05) { leafHinge.isEnabled = false }
+            })
+        }
+        let pageWidth = Double(240 * layoutScale)
+
         hit = { [weak self] point in
             guard let self else { return nil }
             if busy { return FlowDrag(move: nil, up: nil) }
@@ -405,6 +446,7 @@ extension Flow {
                 let onBoard = keys[a] == "train" && board.face.map { self.touches(point, $0) } == true
                 var row0 = rowPosition
                 var hold: Int?
+                var flick = 0.0, flickTime = self.t
                 if keys[a] == "gym", Int(rowTarget.rounded()) < gyms.count, self.touches(point, room.entity) {
                     hold = self.later(0.6) { if mode == nil { mode = "held"; askDelete() } }
                 }
@@ -416,6 +458,12 @@ extension Flow {
                         self.cancelTimer(hold)
                         if keys[a] == "gym" && abs(dx) > abs(dy) {
                             mode = "gyms"; rowDragging = true; row0 = rowPosition
+                        } else if keys[a] == "prs" && abs(dx) > abs(dy) && self.touches(point, book) {
+                            if NotebookPages.canTurn(forward: dx < 0, from: page, pages: pages.count) {
+                                mode = "page"; startTurn(dx < 0)
+                            } else {
+                                mode = "none"
+                            }
                         } else if -dy > abs(dx) * (onBoard && boardHasPlan ? 2.6 : 1.3) {
                             mode = "back"
                         } else if onBoard && boardHasPlan {
@@ -429,6 +477,12 @@ extension Flow {
                         // It settles back into the menu with your finger.
                         k = 1 - Float(max(0, min(1, (point.y - p.y - 10) / (300 * self.layoutScale))))
                         applyK()
+                    case "page":
+                        let progress = NotebookPages.progress(dx: Double(dx), pageWidth: pageWidth, forward: turnForward)
+                        let now = self.t
+                        flick = (progress - turnProgress) / max(0.008, now - flickTime)
+                        flickTime = now
+                        setLeaf(progress)
                     case "gyms":
                         rowPosition = max(-0.25, min(Float(rooms.count) - 0.75, row0 - Float(dx / self.layoutScale) / 420))
                     case "wipe":
@@ -440,6 +494,10 @@ extension Flow {
                     guard let self else { return }
                     self.cancelTimer(hold)
                     if mode == "held" { return }
+                    if mode == "page" {
+                        endTurn(NotebookPages.completes(progress: turnProgress, flick: self.t - flickTime < 0.1 ? flick : 0))
+                        return
+                    }
                     if mode == "gyms" {
                         rowDragging = false
                         let dx = p.x - point.x

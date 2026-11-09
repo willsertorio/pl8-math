@@ -371,11 +371,16 @@ enum FlowArt {
                 g.fill(CGRect(x: 70, y: 230, width: 372, height: 170))
                 centred(title, font: marker(92), colour: FlowLook.dark.uiColor, at: CGPoint(x: 256, y: 318))
             }
-        case .notebookPage(let rows):
+        case .notebookPage(let rows, let page, let pages):
             return draw(512, 680) { g in
                 drawPage(g)
                 for (i, row) in rows.enumerated() { baseline(row, font: marker(34), colour: pageInk, at: CGPoint(x: 96, y: 170 + CGFloat(i) * 62)) }
+                if pages > 1 {
+                    centred("\(page + 1) / \(pages)", font: marker(28), colour: pageInk, at: CGPoint(x: 300, y: 652))
+                }
             }
+        case .notebookBlank:
+            return draw(512, 680) { g in drawPage(g, title: false) }
         case .notebookUnread:
             return draw(512, 680) { g in
                 drawPage(g)
@@ -453,7 +458,7 @@ enum FlowArt {
     static let pageInk = UIColor(red: 0x1C / 255, green: 0x2A / 255, blue: 0x55 / 255, alpha: 1)
 
     /// notebookModel2's page: cream, ruled in blue with a red margin, "PRs" at the top.
-    static func drawPage(_ g: CGContext) {
+    static func drawPage(_ g: CGContext, title: Bool = true) {
         g.setFillColor(UIColor(red: 0xFB / 255, green: 0xF8 / 255, blue: 0xF2 / 255, alpha: 1).cgColor)
         g.fill(CGRect(x: 0, y: 0, width: 512, height: 680))
         g.setStrokeColor(UIColor(red: 70 / 255, green: 110 / 255, blue: 190 / 255, alpha: 0.28).cgColor)
@@ -461,7 +466,7 @@ enum FlowArt {
         for y in stride(from: 120, to: 680, by: 62) { g.strokeLineSegments(between: [CGPoint(x: 30, y: y), CGPoint(x: 490, y: y)]) }
         g.setStrokeColor(UIColor(red: 210 / 255, green: 60 / 255, blue: 60 / 255, alpha: 0.35).cgColor)
         g.strokeLineSegments(between: [CGPoint(x: 78, y: 0), CGPoint(x: 78, y: 680)])
-        baseline("PRs", font: marker(48), colour: pageInk, at: CGPoint(x: 96, y: 88))
+        if title { baseline("PRs", font: marker(48), colour: pageInk, at: CGPoint(x: 96, y: 88)) }
     }
 
     /// The board when a screenshot couldn't be read: clean, then question marks where the workout would go.

@@ -15,7 +15,7 @@ extension Flow {
 
     func stepPRs() {
         setCamera([0, 0.5, 6.6], [0, 0.02, 0])
-        let book = build(FlowProps.notebook(title: "MY PRs", rows: data.prRows))
+        let book = build(FlowProps.notebook(title: "MY PRs", rows: NotebookPages.split(data.prRows)[0]))
         book.orientation = Flow.quaternion([-0.28, 0.18, 0.06])
         book.isEnabled = false
         add(book)
@@ -90,7 +90,9 @@ extension Flow {
                     guard let self else { return }
                     guard ok else { self.repaint(book, part: "page", with: .notebookUnread); return }
                     busy = true
-                    self.repaint(book, part: "page", with: .notebookPage(self.data.prRows))
+                    // The first page; the rest turn in the menu's notebook.
+                    let pages = NotebookPages.split(self.data.prRows)
+                    self.repaint(book, part: "page", with: .notebookPage(pages[0], page: 0, pages: pages.count))
                     self.shine([book], duration: 0.6)
                     self.later(0.9) { leave() }
                 })
