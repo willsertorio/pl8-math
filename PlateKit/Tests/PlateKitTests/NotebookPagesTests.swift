@@ -42,7 +42,7 @@ struct NotebookPagesTests {
     @Test func theLeafHangsOnTheSpine() {
         let leaf = FlowProps.notebookLeaf()
         #expect(leaf.name == "leafHinge")
-        #expect(leaf.position.x == -1.05 / 2)
+        #expect(abs(leaf.position.x + 0.525) < 0.0001)
         let names = leaf.children.flatMap { $0.parts.map(\.name) }
         #expect(names.contains("leafFront") && names.contains("leafBack"))
     }
