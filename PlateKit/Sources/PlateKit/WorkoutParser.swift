@@ -193,7 +193,7 @@ public enum WorkoutParser {
         var leading: [String] = []
         var sections: [Section] = []
         for line in lines {
-            if let match = line.wholeMatch(of: #/([A-Z])\.(?:\s+(.+))?/#) {
+            if let match = line.wholeMatch(of: #/([A-Z])[.)](?:\s+(.+))?/#) {
                 sections.append(Section(letter: String(match.1), label: match.2.map { clean(String($0)) }, lines: [], shot: shot))
             } else if sections.isEmpty {
                 leading.append(line)
@@ -244,7 +244,9 @@ public enum WorkoutParser {
 
     private static func continues(_ previous: String, with line: String) -> Bool {
         guard previous.firstMatch(of: #/^\d+\s+\S/#) != nil else { return false }
-        if line.wholeMatch(of: #/([A-Z])\.(?:\s+(.+))?/#) != nil || parseHeader(line) != nil { return false }
+        if line.wholeMatch(of: #/([A-Z])[.)](?:\s+(.+))?/#) != nil || parseHeader(line) != nil { return false }
+        // A complex's % on its own line ("Progressão: 60–80%") is never the end of a movement's line.
+        if percentOnly(line) != nil { return false }
         if let first = line.first, "*-–•".contains(first) { return false }
         if isAppButton(line) { return false }
         if line.firstMatch(of: #/^\d+\s/#) != nil { return false }
@@ -275,6 +277,10 @@ public enum WorkoutParser {
         /// `NxR` lines say their own set count; a format header doesn't expand them.
         let countsItself: Bool
         var rpe: Double? = nil
+        /// "Progressão: 60–80%": the sets climb from the low % to the high one.
+        var climbs = false
+        /// A complex's movements as written, kept as the lift's note.
+        var note: String? = nil
     }
 
     private struct Lift {
@@ -290,28 +296,54 @@ public enum WorkoutParser {
         var label = label
         var lifts: [Lift] = []
 
-        for text in lines {
-            if let newHeader = parseHeader(text) {
-                header = newHeader
-            } else if let line = parseStrength(text) ?? parseRPE(text) ?? parseHiddenPercent(text, under: header) {
-                if let last = lifts.last, last.movement == line.movement, last.prLift == line.prLift {
-                    lifts[lifts.count - 1].lines.append(line)
-                } else {
-                    lifts.append(Lift(movement: line.movement, prLift: line.prLift, header: header, lines: [line]))
-                }
-            } else if isAppNoise(text) {
-                continue
-            } else if lifts.isEmpty {
+        func add(_ line: Line) {
+            if let last = lifts.last, last.movement == line.movement, last.prLift == line.prLift {
+                lifts[lifts.count - 1].lines.append(line)
+            } else {
+                lifts.append(Lift(movement: line.movement, prLift: line.prLift, header: header, lines: [line],
+                                  notes: line.note.map { [$0] } ?? []))
+            }
+        }
+        func other(_ text: String) {
+            if isAppNoise(text) { return }
+            if lifts.isEmpty {
                 label = label ?? clean(text)
             } else {
                 lifts[lifts.count - 1].notes.append(clean(text))
             }
         }
+        // Movements without a % ("* 1 Snatch Pull"), waiting for a % line that makes them one complex.
+        var pending: [(text: String, reps: Int, movement: String)] = []
+        func flush() {
+            for part in pending { other(part.text) }
+            pending = []
+        }
+
+        for raw in lines {
+            let text = unbulleted(raw)
+            if let newHeader = parseHeader(text) {
+                flush()
+                header = newHeader
+            } else if let line = parseStrength(text) ?? parseRPE(text) ?? parseHiddenPercent(text, under: header) {
+                flush()
+                add(line)
+            } else if let part = complexPart(text) {
+                pending.append((text, part.reps, part.movement))
+            } else if !pending.isEmpty, let percent = percentOnly(text) {
+                add(complexLine(pending, percent: percent, label: label))
+                pending = []
+            } else {
+                flush()
+                other(text)
+            }
+        }
+        flush()
 
         return lifts.map { lift in
             var sets = lift.lines.flatMap(\.sets)
             if lift.lines.count == 1, !lift.lines[0].countsItself, let count = lift.header?.count, count > 1 {
                 sets = Array(repeating: sets[0], count: count)
+                if lift.lines[0].climbs { sets = climbing(sets) }
             } else if let header = lift.header, header.repeatsRound, header.count > 1,
                       lift.lines.count > 1, header.isRange || lift.lines.count != header.count,
                       !lift.lines.contains(where: \.countsItself) {
@@ -335,12 +367,18 @@ public enum WorkoutParser {
         if let m = text.wholeMatch(of: #/(\d+)\s*(?:minutes?|min)\s*EMOM/#.ignoresCase()), let n = Int(m.1) {
             return Header(format: "EMOM", count: n)
         }
-        if let m = text.wholeMatch(of: #/EMOM\s*(\d+)\s*(?:minutes?|min)?/#.ignoresCase()), let n = Int(m.1) {
+        if let m = text.wholeMatch(of: #/EMOM\s*(\d+)\s*(?:minutes?|min|['’′])?/#.ignoresCase()), let n = Int(m.1) {
             return Header(format: "EMOM", count: n)
         }
         if let m = text.wholeMatch(of: #/E(\d+)MOM\s*(\d+)\s*(?:minutes?|min)?/#.ignoresCase()),
            let every = Int(m.1), let minutes = Int(m.2), every > 0 {
             return Header(format: "E\(every)MOM", count: minutes / every)
+        }
+        // "Every 2:00 × 6 sets", "Every 2 min x 6": E2MOM, 6 sets.
+        if let m = text.wholeMatch(of: #/every\s*(\d+)(?::(\d{2}))?\s*(?:minutes?|min|['’′])?\s*[x×]\s*(\d+)(?:\s*sets?)?/#.ignoresCase()),
+           let minutes = Int(m.1), let n = Int(m.3), minutes > 0 {
+            let whole = m.2.map { Int($0) == 0 } ?? true
+            return Header(format: whole ? (minutes == 1 ? "EMOM" : "E\(minutes)MOM") : nil, count: n)
         }
         // "2-3 Sets" → 2 (DECISIONS 2026-10-14)
         if let m = text.wholeMatch(of: #/(\d+)\s*(?:[-–]|to)\s*\d+\s*sets?/#.ignoresCase()), let n = Int(m.1) {
@@ -422,6 +460,61 @@ public enum WorkoutParser {
         return Line(movement: lift, prLift: lift, sets: [ParsedSet(reps: reps, target: nil)], countsItself: false)
     }
 
+    /// "* 1 Snatch Pull" → "1 Snatch Pull": a list's bullet isn't part of the line.
+    private static func unbulleted(_ text: String) -> String {
+        text.replacing(#/^[*•·\-–]+\s*/#, with: "")
+    }
+
+    /// "1 Snatch Pull": reps and a movement naming a lift we know, with no load. Part of a complex when a % line
+    /// follows; otherwise technique work (a label or a note, as before).
+    private static func complexPart(_ text: String) -> (reps: Int, movement: String)? {
+        guard !text.contains("%"), !text.contains("@"),
+              let m = text.wholeMatch(of: #/(\d+)\s+(.+)/#), let reps = Int(m.1) else { return nil }
+        let movement = movementName(String(m.2))
+        guard LiftNames.firstKnown(in: movement) != nil else { return nil }
+        return (reps, movement)
+    }
+
+    /// A line that is only a % ("Progressão: 60–80%", "Carga: 70-80%", "@ 75%"), and whether its word says the
+    /// sets climb (progressão, progression, build).
+    static func percentOnly(_ text: String) -> (target: Target, climbs: Bool)? {
+        guard let m = text.wholeMatch(of: #/(?:(?<word>[^\d@%:]+):\s*)?@?\s*(?<low>\d+(?:[.,]\d+)?)\s*(?:[-–]\s*(?<high>\d+(?:[.,]\d+)?))?\s*(?<plusA>\+)?\s*%\s*(?<plusB>\+)?\s*(?:(?:of\s*)?1\s*RM.*)?/#.ignoresCase()),
+              let low = number(m.low) else { return nil }
+        let word = m.word.map { $0.lowercased() } ?? ""
+        let climbs = ["progress", "build"].contains { word.contains($0) }
+        return (Target.make(low: low, high: m.high.flatMap(number), plus: m.plusA != nil || m.plusB != nil), climbs)
+    }
+
+    /// Movements listed one per line, then their %: one lift. Several movements are a complex named by the block's
+    /// header ("SNATCH COMPLEX" → Snatch PR, Will 2026-11-09), or by its first known lift when the header names none.
+    private static func complexLine(_ parts: [(text: String, reps: Int, movement: String)],
+                                    percent: (target: Target, climbs: Bool), label: String?) -> Line {
+        let set = ParsedSet(reps: parts[0].reps, target: percent.target)
+        if parts.count == 1 {
+            return Line(movement: parts[0].movement, prLift: parts[0].movement, sets: [set], countsItself: false,
+                        climbs: percent.climbs)
+        }
+        let joined = parts.map(\.movement).joined(separator: " + ")
+        let headerLift = label.flatMap(LiftNames.firstKnown(in:))
+        return Line(
+            movement: headerLift != nil ? LiftNames.canonical(label!) : joined,
+            prLift: headerLift ?? LiftNames.firstKnown(in: joined) ?? parts[0].movement,
+            sets: [set],
+            countsItself: false,
+            climbs: percent.climbs,
+            note: parts.map(\.text).joined(separator: " + ")
+        )
+    }
+
+    /// Sets that climb evenly from a range's low % to its high one: 6 sets at 60–80% → 60, 64, 68, 72, 76, 80.
+    private static func climbing(_ sets: [ParsedSet]) -> [ParsedSet] {
+        guard sets.count > 1, let target = sets[0].target, let high = target.high else { return sets }
+        let step = (high - target.low) / Double(sets.count - 1)
+        return sets.enumerated().map { index, set in
+            ParsedSet(reps: set.reps, target: .single(((target.low + step * Double(index)) * 10).rounded() / 10))
+        }
+    }
+
     /// "Deadlift (315/225) (OR" → "Deadlift": fixed loads in brackets and a dangling "or" aren't the movement.
     static func movementName(_ text: String) -> String {
         var name = text.replacing(#/\([^)]*\)/#, with: " ")
@@ -438,7 +531,7 @@ public enum WorkoutParser {
 
     /// The box app's own buttons: "Check-In", "Ações".
     private static func isAppButton(_ line: String) -> Bool {
-        ["check-in", "ações", "acoes"].contains(line.lowercased())
+        ["check-in", "check-in aberto", "ações", "acoes", "wod"].contains(line.lowercased())
     }
 
     /// Buttons and stray marks ("L 0", "c") that aren't labels or notes.

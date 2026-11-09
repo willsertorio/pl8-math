@@ -16,6 +16,7 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 | `2026-10-14.png` / `.screen.txt` | 14/10 — the B sets are so long they wrap over 3 lines each, and only C was read. A is RPE-based (`@ 5/10 RPE`). The text is transcribed line by line as shown on screen (how Vision splits lines); replace with the real Vision text when available. D is cut off at the bottom. |
 | `2026-10-14-top` / `-bottom` (`.webp` + `.vision.txt`) | 14/10 as two screenshots read by Vision. They overlap (end of C, start of D are on both). Will picked the bottom one first. E's lines are `10 Deadlift (315/225) (OR 60% 1RM)`: nothing after 1RM but `)`, which became the PR ("What's your ) PR?"). |
 | `2026-10-02-app.vision.txt` | 02/10 as the box's app showed it later, read by Vision (no image saved): block B is a fixed-load AMRAP and C is "C. After a Party" on one line |
+| `2026-11-07.png` / `.screen.txt` | 07/11, from a beta tester's box app (Portuguese): letters with `)` (`A) SNATCH COMPLEX`), `Every 2:00 × 6 sets`, bullets (`* 1 Snatch Pull`), and a complex's % on its own line (`Progressão: 60–80%`, `Carga: 70–80%`). Nothing was read. Transcribed from the screen; replace with Vision's text when available. |
 | `2026-10-13.webp` / `.vision.txt` | 13/10 — read by Vision on the iPhone. Vision read "A." with a **Cyrillic А** (and Cyrillic letters in "TIMECAP"), so the block was missed. |
 
 ### Expected parse
@@ -61,6 +62,12 @@ Real inputs from Will's box and the results the app must produce. Every bug foun
 - A · Split Jerk · EMOM · prLift `Split Jerk` · 6 × 1: `83, 83, 85, 85, 85–88, 85–88`
 - B (run, double unders, wall walks): ignored
 - C "After a Party" (planks, cut off by Check-In, no %): ignored
+
+**07/11** (`.screen.txt`, decided with Will 2026-11-09)
+- A "SNATCH COMPLEX" · name `Snatch Complex` · prLift `Snatch` (the header's lift) · E2MOM · 6 × 1, climbing (Progressão): `60, 64, 68, 72, 76, 80` · note "1 Snatch Pull + 1 Hang Snatch + 1 Squat Snatch"
+- B "SQUAT SNATCH" · Squat Snatch · prLift `Squat Snatch` · E2MOM · 5 × 2: `75–80` ×5
+- C "CLEAN & JERK COMPLEX" · name `Clean & Jerk Complex` · prLift `Clean & Jerk` · E2MOM · 6 × 1: `70–80` ×6 (Carga is a load, not a progression) · note "1 Clean + 1 Hang Clean + 1 Split Jerk"
+- E "FINAL BOSS" · Clean & Jerk · EMOM · 6 × 1: `75–80` ×6
 
 ## Golden loads (M1)
 
