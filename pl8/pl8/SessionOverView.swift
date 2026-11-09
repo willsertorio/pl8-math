@@ -1,4 +1,3 @@
-import os
 import AVFoundation
 import Combine
 import RealityKit
@@ -206,13 +205,6 @@ final class ScaleStage {
     /// settled, and the bar and plates can be dragged.
     func play(instantly: Bool) async {
         while !built && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(16)) }
-        // The clock starts once the scene is on screen: on a phone the first frames (the sketch pass's shaders)
-        // can take longer than the whole fall, and the scale then appeared already loaded (beta, 2026-11-09).
-        let waitUntil = ContinuousClock.now + .seconds(5)
-        while !Task.isCancelled && ContinuousClock.now < waitUntil {
-            if let drawn = (view as? SketchARView)?.drawn.withLock({ $0 }), drawn >= 3 { break }
-            try? await Task.sleep(for: .milliseconds(16))
-        }
         var dip: Float = 0, dipSpeed: Float = 0, read: Double = 0, shake: Float = 0
         var landed = Array(repeating: false, count: drops.count)
         let start = ContinuousClock.now
