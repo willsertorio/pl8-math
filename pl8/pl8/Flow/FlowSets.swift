@@ -509,6 +509,8 @@ struct SetCard: View {
                     .tracking(FlowType.bodyTracking())
                     .monospacedDigit()
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .layoutPriority(1)
             }
             // The display role's line is 1.02 × 33: a Text's own line is the font's (about 1.2), 5 points taller.
             .frame(height: FlowType.displayLineHeight)

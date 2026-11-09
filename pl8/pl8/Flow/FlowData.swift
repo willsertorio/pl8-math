@@ -217,7 +217,7 @@ final class FlowData {
 /// A session as the Flow's kit and sets show it (the prototype's plan: groups, flat sets, kit).
 struct FlowPlan {
     struct Set {
-        /// "WARM-UP · BACK SQUAT" small; "Set 2 of 5" big; "5 reps · 100 kg".
+        /// "WARM-UP · BACK SQUAT" small; "Set 2 of 5" big; "5 reps · 100 kg · 75%".
         let group: String
         let label: String
         let reps: Int
@@ -257,11 +257,18 @@ struct FlowPlan {
                 sets.append(Set(group: first.isWarmUp ? "Warm-up · \(firstLift)" : name,
                                 label: "\(first.isWarmUp ? "Round" : "Set") \(i + 1) of \(group.count)",
                                 reps: log.reps, total: log.plannedTotal,
-                                totalText: "\(log.reps) \(log.reps == 1 ? "rep" : "reps") · \(total)",
+                                totalText: "\(log.reps) \(log.reps == 1 ? "rep" : "reps") · \(total)" + Self.percent(log.pctText),
                                 perSide: log.perSide, onFloor: LiftNames.startsOnFloor(name), groupIndex: g))
             }
         }
         self.sets = sets
         kit = Kit(bar: session.barWeight, loads: logs.map { Load(total: $0.plannedTotal, perSide: $0.perSide) }).plates.map { ($0.size, $0.count) }
+    }
+
+    /// " · 70%" after the weight (beta, 2026-11-09): the set's %, or a warm-up round's "≈50%". Nothing for a fixed
+    /// weight (its text is the weight itself) or a warm-up without a PR.
+    static func percent(_ pctText: String) -> String {
+        let text = pctText.replacingOccurrences(of: " 1RM", with: "")
+        return text.hasSuffix("%") || text.hasSuffix("%+") ? " · \(text)" : ""
     }
 }
