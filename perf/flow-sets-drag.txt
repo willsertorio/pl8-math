@@ -1,0 +1,6 @@
+   t  step      frames  mean ms  p95 ms  max ms  work ms (max)  relight ms  bakes
+  0.4  build sets 183.4 ms
+  1.7  sets      2    829.7  1263.6  1263.6    39.9 ( 79.3)      39.6     37
+  2.7  sets     18     29.0   154.4   154.4    29.8 (529.7)       0.1      0
+  3.7  sets     39     39.4    65.1   666.6     1.7 ( 14.1)       0.1      0
+  4.7  sets     39     25.6    90.2   242.3     1.7 ( 54.2)       1.5     20

@@ -1,0 +1,4 @@
+   t  step      frames  mean ms  p95 ms  max ms  work ms (max)  relight ms  bakes
+  0.7  build menu 670.8 ms
+  1.3  menu      1    751.5   751.5   751.5   513.7 (513.7)     513.4    267
+  2.6  menu      2    627.2  1121.1  1121.1   316.2 (631.5)       0.7      0
