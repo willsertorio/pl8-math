@@ -11,6 +11,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      shots:
+        description: "Quick check: only these screenshots (space-separated), no data or timing checks. Empty: everything."
+        required: false
+        default: ""
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -115,7 +120,10 @@ jobs:
           xcrun simctl bootstatus "$DEVICE" -b
           xcrun simctl install "$DEVICE" build/Build/Products/Debug-iphonesimulator/pl8.app
           mkdir -p screens perf
-          for shot in brand-mark opening-title flow-name flow-unit flow-plates flow-plates-ticked flow-bar flow-prs flow-prDial flow-wod flow-kit flow-sets flow-sets-last flow-done flow-menu flow-menu-train flow-menu-prs flow-menu-gym flow-name-locked flow-unit-abduct flow-plates-stroke flow-plates-done flow-kit-down flow-kit-up flow-sets-drag flow-menu-back flow-menu-delete flow-reading flow-menu-add flow-wod-unread flow-prs-unread session-over-drag flow-menu-at-prs flow-menu-at-gym flow-menu-roll flow-menu-prs-turn; do
+          ALL="brand-mark opening-title flow-name flow-unit flow-plates flow-plates-ticked flow-bar flow-prs flow-prDial flow-wod flow-kit flow-sets flow-sets-last flow-done flow-menu flow-menu-train flow-menu-prs flow-menu-gym flow-name-locked flow-unit-abduct flow-plates-stroke flow-plates-done flow-kit-down flow-kit-up flow-sets-drag flow-menu-back flow-menu-delete flow-reading flow-menu-add flow-wod-unread flow-prs-unread session-over-drag flow-menu-at-prs flow-menu-at-gym flow-menu-roll flow-menu-prs-turn"
+          # A quick check (manual run with shots) takes only those pictures.
+          SHOTS="${{ github.event.inputs.shots }}"
+          for shot in ${SHOTS:-$ALL}; do
             xcrun simctl launch --terminate-running-process "$DEVICE" com.williansertorio.pl8 -pl8Shot "$shot"
             sleep 20
             xcrun simctl io "$DEVICE" screenshot "screens/$shot.png"
@@ -125,6 +133,7 @@ jobs:
           echo "$DEVICE" > device.txt
 
       - name: Data checks
+        if: github.event.inputs.shots == ''
         run: |
           # The saved data must survive the update (docs/DATA-AND-SERVICES.md §1). Two checks:
           DEVICE=$(cat device.txt)
@@ -159,6 +168,7 @@ jobs:
           grep -q "^gyms: [1-9]" data/upgrade-check.txt
 
       - name: Timing in Release
+        if: github.event.inputs.shots == ''
         continue-on-error: true
         run: |
           # The same moments built optimized (Xcode's Run builds Debug), to see what the optimizer buys.
