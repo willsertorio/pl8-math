@@ -117,6 +117,9 @@ extension Flow {
         turnedLeaf.orientation = simd_quatf(angle: -(NotebookPages.turnedAngle + 0.02), axis: [0, 1, 0])
         turnedLeaf.isEnabled = false
         book.addChild(turnedLeaf)
+        // Open, it lies a little above the cover's inside (level with it, the cover hid the half by the spine:
+        // a black strip, Will 2026-11-10); closed, it goes back down so it doesn't poke through the cover.
+        let turnedLeafZ = turnedLeaf.position.z, turnedLeafLift: Float = 0.022
         let paintPage = { [weak self] (index: Int) in
             self?.repaint(book, part: "page", with: .notebookPage(pages[index], page: index, pages: pages.count))
         }
@@ -177,6 +180,7 @@ extension Flow {
                 hinge?.orientation = simd_quatf(angle: -2.95 * e, axis: [0, 1, 0])
                 // The turned pages close with the cover.
                 turnedLeaf.orientation = simd_quatf(angle: -(NotebookPages.turnedAngle + 0.02) * e, axis: [0, 1, 0])
+                turnedLeaf.position.z = turnedLeafZ + turnedLeafLift * e
                 book.orientation = Flow.quaternion([-0.25 + 0.15 * e, 0.18 * (1 - e), 0])
                 book.scale = SIMD3(repeating: restSize + (0.7 - restSize) * e)
                 book.position.x = 0.37 * e
