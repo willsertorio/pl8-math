@@ -11,7 +11,8 @@ enum DataCleanup {
         let records = (try? context.fetch(FetchDescriptor<PersonalRecord>())) ?? []
         let groups = Dictionary(grouping: records) { LiftNames.key(LiftNames.canonical($0.lift)) }
         for (_, group) in groups {
-            let keep = group.filter { $0.value != nil }.max { $0.updatedAt < $1.updatedAt } ?? group[0]
+            guard group.count > 1 || group[0].lift != LiftNames.canonical(group[0].lift) else { continue }
+            let keep = PRMerge.keeper(of: group.map { (value: $0.value, updated: $0.updatedAt) }).map { group[$0] } ?? group[0]
             keep.lift = LiftNames.canonical(keep.lift)
             for other in group where other !== keep {
                 for entry in other.history ?? [] { entry.record = keep }
@@ -29,27 +30,6 @@ enum DataCleanup {
         guard !gone.isEmpty else { return }
         for record in gone { context.delete(record) }
         try? context.save()
-    }
-
-    /// One PR per lift (Will, 2026-11-10): two records with the same lift (an iCloud copy after a reinstall, or two
-    /// spellings like "Clean + Jerk" and "Clean & Jerk") become one, the one with the newest value; the others'
-    /// values go into its history.
-    static func mergeDuplicatePRs(in context: ModelContext) {
-        let records = (try? context.fetch(FetchDescriptor<PersonalRecord>())) ?? []
-        let groups = Dictionary(grouping: records) { LiftNames.key(LiftNames.canonical($0.lift)) }
-        var changed = false
-        for (_, group) in groups where group.count > 1 {
-            guard let index = PRMerge.keeper(of: group.map { (value: $0.value, updated: $0.updatedAt) }) else { continue }
-            let keeper = group[index]
-            for other in group where other !== keeper {
-                if let value = other.value {
-                    keeper.history = (keeper.history ?? []) + [PRHistory(value: value, unit: other.unit, date: other.updatedAt)]
-                }
-                context.delete(other)
-            }
-            changed = true
-        }
-        if changed { try? context.save() }
     }
 
     /// Replaying the first run starts from nothing: every gym, PR, workout and session is deleted.
