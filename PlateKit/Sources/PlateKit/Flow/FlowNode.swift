@@ -53,11 +53,10 @@ public enum FlowPicture: Hashable, Sendable {
     /// The whiteboard: light with a fine grid, "Today's sesh", then the workout (nil: clean).
     case whiteboard([FlowBoardLine]?)
     case notebookCover(String)
-    /// The PR page: ruled, "PRs", one row per PR. `edged`: with the notebook's dark border along its edges (the
-    /// part of a page that folds carries it, Will 2026-11-10).
-    case notebookPage([String], edged: Bool = false)
+    /// The PR page: ruled, "PRs", one row per PR.
+    case notebookPage([String])
     /// A ruled page with nothing on it (the back of a page that turns).
-    case notebookBlank(edged: Bool = false)
+    case notebookBlank
     /// The PR page when a screenshot couldn't be read: "PRs", then question marks.
     case notebookUnread
     /// The gym box's front: its name in Space Grotesk on light.

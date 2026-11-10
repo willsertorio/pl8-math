@@ -4,8 +4,8 @@ import PlateKit
 
 /// The PR notebook's top page as it folds (Will, 2026-11-10): a dog-ear at the top right when there's another page,
 /// and a turn that peels from that corner (`PageFold`). Three pieces: the part that stays flat, and the part that
-/// lifts, front and back. The lifting part carries the page's dark edge, so the notebook's border folds with it;
-/// the sketch pass outlines it wherever it stands out against the red.
+/// lifts, front and back. No line of its own (Will, 2026-11-10: the crayon line is only round the whole object):
+/// the sketch pass outlines it where it sticks out past the notebook, and its back is a shade darker. No shadow.
 @MainActor
 final class FlowPageTurn {
     let entity = Entity()
@@ -28,8 +28,8 @@ final class FlowPageTurn {
         self.rows = rows
         guard let flow else { return }
         paint(flat, flow.texture(.notebookPage(rows)))
-        paint(flapFront, flow.texture(.notebookPage(rows, edged: true)))
-        paint(flapBack, flow.texture(.notebookBlank(edged: true)))
+        paint(flapFront, flow.texture(.notebookPage(rows)))
+        paint(flapBack, flow.texture(.notebookBlank))
         update()
     }
 

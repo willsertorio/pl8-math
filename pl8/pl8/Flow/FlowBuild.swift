@@ -373,18 +373,14 @@ enum FlowArt {
                 g.fill(CGRect(x: 70, y: 230, width: 372, height: 170))
                 centred(title, font: marker(92), colour: FlowLook.dark.uiColor, at: CGPoint(x: 256, y: 318))
             }
-        case .notebookPage(let rows, let edged):
+        case .notebookPage(let rows):
             // No page number: a dog-ear says there's another page (Will, 2026-11-10).
             return draw(512, 680) { g in
                 drawPage(g)
                 for (i, row) in rows.enumerated() { baseline(row, font: marker(34), colour: pageInk, at: CGPoint(x: 96, y: 170 + CGFloat(i) * 62)) }
-                if edged { drawEdge(g) }
             }
-        case .notebookBlank(let edged):
-            return draw(512, 680) { g in
-                drawPage(g, title: false)
-                if edged { drawEdge(g) }
-            }
+        case .notebookBlank:
+            return draw(512, 680) { g in drawPage(g, title: false) }
         case .notebookUnread:
             return draw(512, 680) { g in
                 drawPage(g)
@@ -474,30 +470,6 @@ enum FlowArt {
         g.setStrokeColor(UIColor(red: 210 / 255, green: 60 / 255, blue: 60 / 255, alpha: 0.35).cgColor)
         g.strokeLineSegments(between: [CGPoint(x: 78, y: 0), CGPoint(x: 78, y: 680)])
         if title { baseline("PRs", font: marker(48), colour: pageInk, at: CGPoint(x: 96, y: 88)) }
-    }
-
-    /// The notebook's dark border along a page's edges, a little rough, for the part of a page that folds.
-    static func drawEdge(_ g: CGContext) {
-        g.setStrokeColor(FlowLook.dark.uiColor.cgColor)
-        g.setLineCap(.round)
-        // The same wobble every time (a fixed sequence), so the picture is the same on every phone and in CI.
-        var seed: CGFloat = 0
-        func wobble() -> CGFloat { seed += 1; return 2.5 * sin(seed * 12.9898 + 4.1414 * sin(seed * 78.233)) }
-        let inset: CGFloat = 7, corners = [CGPoint(x: inset, y: inset), CGPoint(x: 512 - inset, y: inset),
-                                           CGPoint(x: 512 - inset, y: 680 - inset), CGPoint(x: inset, y: 680 - inset)]
-        for pass in 0..<2 {
-            g.setLineWidth(pass == 0 ? 13 : 7)
-            for i in 0..<4 {
-                let a = corners[i], b = corners[(i + 1) % 4]
-                g.beginPath()
-                g.move(to: CGPoint(x: a.x + wobble(), y: a.y + wobble()))
-                for k in 1...8 {
-                    let u = CGFloat(k) / 8
-                    g.addLine(to: CGPoint(x: a.x + (b.x - a.x) * u + wobble(), y: a.y + (b.y - a.y) * u + wobble()))
-                }
-                g.strokePath()
-            }
-        }
     }
 
     /// The board when a screenshot couldn't be read: clean, then question marks where the workout would go.
