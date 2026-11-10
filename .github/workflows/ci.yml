@@ -18,7 +18,8 @@ on:
         default: ""
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Manual runs get their own group: a cancelled run that GitHub is slow to stop never holds them up.
+  group: ci-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: false   # a new push waits, so every commit gets its pictures
 
 jobs:
