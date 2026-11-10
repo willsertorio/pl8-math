@@ -7,7 +7,7 @@ import Foundation
 public struct PageFold: Sendable {
     public let width: Float
     public let height: Float
-    public static let dogEar: Float = 0.05
+    public static let dogEar: Float = 0.08
 
     public init(width: Float, height: Float) {
         self.width = width
@@ -24,9 +24,10 @@ public struct PageFold: Sendable {
     }
 
     /// How far the lifted part has turned about the line: lying folded over (2.9, as a turned page lies) at the
-    /// dog-ear and at the end, standing up in between.
+    /// dog-ear and at the end, lifting off a little in between (about 145°). Standing straight up, the camera in
+    /// front saw it edge-on: a thin line (CI, 2026-11-10).
     public func angle(at t: Float) -> Float {
-        NotebookPages.turnedAngle - 0.38 * .pi * sin(.pi * t)
+        NotebookPages.turnedAngle - 0.12 * .pi * sin(.pi * t)
     }
 
     /// Where a point of the page is at `t`, `lift` off the page along its own normal (the back is a hair behind).

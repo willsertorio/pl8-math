@@ -47,9 +47,10 @@ struct PageFoldTests {
         #expect(abs(flat - folded) < 0.0001)
     }
 
-    @Test func midTurnThePeelStandsUp() {
-        // Not flat on the page: the corner rises towards the camera.
+    @Test func midTurnThePeelLiftsButFacesTheReader() {
+        // Off the page, towards the camera, but leaning over so it's seen, not edge-on.
         #expect(fold.place([0.525, 0.7], at: 0.5).z > 0.2)
+        #expect(abs(fold.flapNormal(at: 0.5).z) > 0.7)
     }
 
     @Test func pointsBeforeTheLineStayFlat() {

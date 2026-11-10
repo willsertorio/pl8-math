@@ -58,7 +58,8 @@ final class FlowPageTurn {
         let n = fold.flapNormal(at: t, angle: theta)
         tint(flat, world.act([0, 0, 1]))
         tint(flapFront, world.act(n))
-        tint(flapBack, world.act(-n))
+        // The back a shade darker than the page, so the fold reads against it.
+        tint(flapBack, world.act(-n), shade: 0.86)
     }
 
     /// A convex polygon as a fan of triangles; nothing when it's empty.
@@ -84,10 +85,10 @@ final class FlowPageTurn {
         textures[ObjectIdentifier(model)] = texture
     }
 
-    private func tint(_ model: ModelEntity, _ normal: SIMD3<Float>) {
+    private func tint(_ model: ModelEntity, _ normal: SIMD3<Float>, shade: Float = 1) {
         guard model.isEnabled, let texture = textures[ObjectIdentifier(model)] else { return }
         var material = UnlitMaterial(applyPostProcessToneMap: false)
-        material.color = .init(tint: FlowLight.toon(RGB(1, 1, 1), normal: normal).uiColor, texture: .init(texture))
+        material.color = .init(tint: FlowLight.toon(RGB(shade, shade, shade), normal: normal).uiColor, texture: .init(texture))
         model.model?.materials = [material]
     }
 }
