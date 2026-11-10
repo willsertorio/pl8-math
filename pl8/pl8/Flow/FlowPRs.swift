@@ -92,7 +92,7 @@ extension Flow {
                     busy = true
                     // The first page; the rest turn in the menu's notebook.
                     let pages = NotebookPages.split(self.data.prRows)
-                    self.repaint(book, part: "page", with: .notebookPage(pages[0], page: 0, pages: pages.count))
+                    self.repaint(book, part: "page", with: .notebookPage(pages[0]))
                     self.shine([book], duration: 0.6)
                     self.later(0.9) { leave() }
                 })

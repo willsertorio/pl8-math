@@ -96,7 +96,7 @@ struct ScreenshotHost: View {
         }
         // An empty board, so a tap asks for a screenshot (flow-wod-unread).
         if shot == "flow-wod-unread" { flow.data.wipeBoard() }
-        if shot.hasPrefix("flow-menu-") { flow.menuActive = ["back": "prs", "delete": "gym", "add": "gym"][String(shot.dropFirst(10))] ?? String(shot.dropFirst(10)) }
+        if shot.hasPrefix("flow-menu-") { flow.menuActive = ["back": "prs", "delete": "gym", "add": "gym", "prs-turn": "prs"][String(shot.dropFirst(10))] ?? String(shot.dropFirst(10)) }
         // The menu at rest on My PRs or the gym, nothing awake; or just opened, the board rolling in.
         if let at = ["flow-menu-at-prs": Float(1), "flow-menu-at-gym": 2, "flow-menu-roll": 0][shot] {
             flow.menuPosition = at
@@ -177,6 +177,10 @@ struct ScreenshotHost: View {
         case "flow-menu-back":
             drag({ flow.screen(195, 600) }, by: CGPoint(x: 0, y: -160 * flow.layoutScale), at: 2.0, duration: 0.5, release: false)
             at(2.7) { flow.frozen = true }
+        case "flow-menu-prs-turn":
+            // The open notebook's page dragged two fifths of the way to the left and held: the fold mid-turn.
+            drag({ flow.screen(300, 400) }, by: CGPoint(x: -100 * flow.layoutScale, y: 0), at: 4.0, duration: 0.6, release: false)
+            at(4.9) { flow.frozen = true }
         case "flow-menu-add":
             // Swiped along the row of gyms to its last slot, the empty one to tap for a new gym.
             drag({ project([0, 0.5, 0]) }, by: CGPoint(x: -220 * flow.layoutScale, y: 0), at: 2.5, duration: 0.4, release: true)
@@ -231,7 +235,10 @@ struct ScreenshotHost: View {
     private func seed() {
         let gym = Gym(name: "79", unit: .kg)
         context.insert(gym)
-        for (lift, value) in [("Back Squat", 120.0), ("Snatch", 75), ("Clean", 95), ("Deadlift", 170)] {
+        // The menu's notebook gets two pages' worth, so its dog-ear and page turn show (2026-11-10).
+        let more: [(String, Double)] = shot.hasPrefix("flow-menu-prs") ? [("Front Squat", 105), ("Bench Press", 80),
+            ("Power Clean", 85), ("Push Press", 70), ("Snatch Balance", 80), ("Split Jerk", 95), ("Overhead Squat", 70)] : []
+        for (lift, value) in [("Back Squat", 120.0), ("Snatch", 75), ("Clean", 95), ("Deadlift", 170)] + more {
             let record = PersonalRecord(lift: lift)
             context.insert(record)
             record.update(value: value, unit: .kg)

@@ -109,9 +109,10 @@ extension Flow {
         var pages = NotebookPages.split(data.prRows), page = 0
         // No label on the cover: "My PRs" is written under it (Will, 2026-11-10).
         let book = build(FlowProps.notebook(title: "", rows: pages[0]))
-        let leafHinge = build(FlowProps.notebookLeaf())
-        leafHinge.isEnabled = false
-        book.addChild(leafHinge)
+        // The top page, folding: a dog-ear when there's another page, and the turn (Will, 2026-11-10).
+        let turner = FlowPageTurn(flow: self)
+        turner.entity.isEnabled = false
+        book.addChild(turner.entity)
         // Pages already turned lie on the left, ruled (they showed the cover's black inside: Will, 2026-11-10).
         let turnedLeaf = build(FlowProps.notebookLeaf())
         turnedLeaf.orientation = simd_quatf(angle: -(NotebookPages.turnedAngle + 0.02), axis: [0, 1, 0])
@@ -121,9 +122,25 @@ extension Flow {
         // a black strip, Will 2026-11-10); closed, it goes back down so it doesn't poke through the cover.
         let turnedLeafZ = turnedLeaf.position.z, turnedLeafLift: Float = 0.022
         let paintPage = { [weak self] (index: Int) in
-            self?.repaint(book, part: "page", with: .notebookPage(pages[index], page: index, pages: pages.count))
+            self?.repaint(book, part: "page", with: .notebookPage(pages[index]))
         }
-        paintPage(0)
+        // At rest: the page on top, dog-eared when another one follows (the block under it shows that one);
+        // turned pages lie on the left.
+        var bookOpen: Float = 0
+        let rest = {
+            if page + 1 < pages.count {
+                turner.show(pages[page])
+                // Flat while the cover is shut, so the corner doesn't poke through it.
+                turner.set(PageFold.dogEar, angle: .pi - (.pi - turner.fold.angle(at: PageFold.dogEar)) * bookOpen)
+                turner.entity.isEnabled = true
+                paintPage(page + 1)
+            } else {
+                turner.entity.isEnabled = false
+                paintPage(page)
+            }
+            turnedLeaf.isEnabled = page > 0
+        }
+        rest()
         book.position.y = bookRestY
         book.scale = SIMD3(repeating: restSize)
         book.orientation = simd_quatf(angle: -0.25, axis: [1, 0, 0])
@@ -178,6 +195,11 @@ extension Flow {
             switch keys[a] {
             case "prs":
                 hinge?.orientation = simd_quatf(angle: -2.95 * e, axis: [0, 1, 0])
+                // The dog-ear lies flat as the notebook closes, so it stays under the cover.
+                bookOpen = e
+                if turner.entity.isEnabled && turner.t == PageFold.dogEar {
+                    turner.set(PageFold.dogEar, angle: .pi - (.pi - turner.fold.angle(at: PageFold.dogEar)) * e)
+                }
                 // The turned pages close with the cover.
                 turnedLeaf.orientation = simd_quatf(angle: -(NotebookPages.turnedAngle + 0.02) * e, axis: [0, 1, 0])
                 turnedLeaf.position.z = turnedLeafZ + turnedLeafLift * e
@@ -383,8 +405,7 @@ extension Flow {
                 guard ok else { self.repaint(book, part: "page", with: .notebookUnread); return }
                 pages = NotebookPages.split(self.data.prRows)
                 page = 0
-                paintPage(0)
-                turnedLeaf.isEnabled = false
+                rest()
                 self.shine([book], duration: 0.7)
                 self.sparkles(at: wrappers[1].position + [0.4, 0.9, 0.4], count: 5, spread: 1)
             })
@@ -421,35 +442,35 @@ extension Flow {
         }
         let pointsPerItem = 390 * spacing / (7.2 * 0.2914 * 1.15)
 
-        // Turning a page: the leaf on the spine carries the page being turned; under it, the page it uncovers.
+        // Turning a page: the top page folds from its top-right corner and the fold sweeps to the spine with the
+        // finger (forward); back, the page lying on the left unfolds onto the right.
         var turnForward = true, turnProgress = 0.0
+        let span = 1 - PageFold.dogEar
         let setLeaf = { (progress: Double) in
             turnProgress = progress
-            let angle = NotebookPages.turnedAngle * Float(turnForward ? progress : 1 - progress)
-            leafHinge.orientation = simd_quatf(angle: -angle, axis: [0, 1, 0])
+            let p = Float(progress)
+            turner.set(turnForward ? PageFold.dogEar + span * p : 1 - span * p)
         }
         let startTurn = { [weak self] (forward: Bool) in
             guard let self else { return }
             turnForward = forward
-            let shown = forward ? page : page - 1
-            self.repaint(leafHinge, part: "leafFront", with: .notebookPage(pages[shown], page: shown, pages: pages.count))
-            if forward { paintPage(page + 1) }
-            // Turning back to the first page: nothing is left lying on the left.
-            if !forward && page == 1 { turnedLeaf.isEnabled = false }
+            if !forward {
+                // The page before comes back from the left; under it, this page.
+                turner.show(pages[page - 1])
+                paintPage(page)
+                if page == 1 { turnedLeaf.isEnabled = false }
+            }
+            turner.entity.isEnabled = true
             setLeaf(0)
-            leafHinge.isEnabled = true
             self.click(1.8)
         }
         let endTurn = { [weak self] (complete: Bool) in
             guard let self else { return }
             let from = turnProgress, to: Double = complete ? 1 : 0
-            self.anim(0.28 * max(0.3, abs(to - from)), { u in setLeaf(from + (to - from) * Ease.outCubic(u)) }, done: { [weak self] in
+            self.anim(0.32 * max(0.3, abs(to - from)), { u in setLeaf(from + (to - from) * Ease.outCubic(u)) }, done: { [weak self] in
                 guard let self else { return }
                 if complete { page += turnForward ? 1 : -1; self.buzz(.selection) }
-                paintPage(page)
-                turnedLeaf.isEnabled = page > 0
-                // The page under it is drawn first, then the leaf goes.
-                self.later(0.05) { leafHinge.isEnabled = false }
+                rest()
             })
         }
         let pageWidth = Double(240 * layoutScale)

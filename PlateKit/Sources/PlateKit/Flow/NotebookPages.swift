@@ -39,7 +39,7 @@ extension FlowProps {
         for (i, face) in Geo.box(w, h, 0.004).enumerated() {
             switch i {
             case 4: leaf.parts.append(FlowPart("leafFront", mesh: face, paint: .picture(.notebookPage([]), tint: RGB(1, 1, 1)), shade: .toon))
-            case 5: leaf.parts.append(FlowPart("leafBack", mesh: face, paint: .picture(.notebookBlank, tint: RGB(1, 1, 1)), shade: .toon))
+            case 5: leaf.parts.append(FlowPart("leafBack", mesh: face, paint: .picture(.notebookBlank(edged: true), tint: RGB(1, 1, 1)), shade: .toon))
             default: leaf.parts.append(.toon("leafEdge", face, RGB(hex: "#F6F2EA")))
             }
         }
