@@ -367,6 +367,8 @@ enum FlowArt {
                 g.fill(CGRect(x: 0, y: 0, width: 512, height: 680))
                 g.setFillColor(UIColor(white: 1, alpha: 0.07).cgColor)
                 for y in stride(from: 0, to: 680, by: 6) { g.fill(CGRect(x: 0, y: y, width: 512, height: 2)) }
+                // No label when there's no title (Will, 2026-11-10: "My PRs" is already written under it).
+                guard !title.isEmpty else { return }
                 g.setFillColor(FlowLook.light.uiColor.cgColor)
                 g.fill(CGRect(x: 70, y: 230, width: 372, height: 170))
                 centred(title, font: marker(92), colour: FlowLook.dark.uiColor, at: CGPoint(x: 256, y: 318))
@@ -445,13 +447,16 @@ enum FlowArt {
         g.setLineWidth(5)
         g.strokeLineSegments(between: [CGPoint(x: 48, y: 124), CGPoint(x: 48 + width, y: 118)])
         guard let lines else { return }
+        // Three lifts at most, then "…" (Will, 2026-11-10): the rest are in the session.
+        let shown = FlowBoard.shown(lines)
         var y: CGFloat = 210
-        for line in lines.prefix(4) {
+        for line in shown.lines {
             baseline(line.title, font: marker(50), colour: ink, at: CGPoint(x: 48, y: y))
             baseline(line.format, font: marker(40), colour: ink, at: CGPoint(x: 100, y: y + 56))
             baseline(line.load, font: marker(40), colour: ink, at: CGPoint(x: 600, y: y + 56))
             y += 150
         }
+        if shown.more { baseline("…", font: marker(64), colour: ink, at: CGPoint(x: 48, y: y - 6)) }
     }
 
     /// The PR page's ink: a ballpoint navy.

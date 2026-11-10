@@ -15,7 +15,7 @@ extension Flow {
 
     func stepPRs() {
         setCamera([0, 0.5, 6.6], [0, 0.02, 0])
-        let book = build(FlowProps.notebook(title: "MY PRs", rows: NotebookPages.split(data.prRows)[0]))
+        let book = build(FlowProps.notebook(title: "", rows: NotebookPages.split(data.prRows)[0]))
         book.orientation = Flow.quaternion([-0.28, 0.18, 0.06])
         book.isEnabled = false
         add(book)

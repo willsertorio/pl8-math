@@ -65,9 +65,11 @@ public enum LiftNames {
     public static func isKnown(_ name: String) -> Bool { known.contains(canonical(name)) }
 
     /// The same for every spelling of a lift: letters and digits only, lowercased ("Pull-Ups" → "pullups";
-    /// "&" counts as "and"). Use it to find a lift's one PR.
+    /// "&" and "+" count as "and"). Use it to find a lift's one PR.
     public static func key(_ name: String) -> String {
-        name.lowercased().replacingOccurrences(of: "&", with: "and").filter { $0.isLetter || $0.isNumber }
+        // "&" and "+" both count as "and": the marker font draws "&" like "+" (2026-11-10).
+        name.lowercased().replacingOccurrences(of: "&", with: "and").replacingOccurrences(of: "+", with: "and")
+            .filter { $0.isLetter || $0.isNumber }
     }
 
     /// The known lift `text` starts with (longest match, whole words) and what follows it.

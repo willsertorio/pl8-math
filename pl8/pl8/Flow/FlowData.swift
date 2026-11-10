@@ -104,12 +104,14 @@ final class FlowData {
         return list + all.filter { record in !list.contains { $0 === record } }
     }
 
-    /// "Back Squat  140 kg" for each PR with a value: the notebook's page.
+    /// "Back Squat  140 kg" for each PR with a value, one per lift, A to Z: the notebook's pages (2026-11-10).
     var prRows: [String] {
-        records.compactMap { record in
-            guard let value = record.value, value > 0 else { return nil }
+        var seen = Set<String>()
+        let rows: [String] = records.compactMap { record in
+            guard let value = record.value, value > 0, seen.insert(LiftNames.key(record.lift)).inserted else { return nil }
             return "\(LiftNames.sentenceCase(record.lift))  \(WeightUnit.trimmed(value)) \(record.unit.rawValue)"
         }
+        return NotebookPages.ordered(rows)
     }
 
     func setPR(_ record: PersonalRecord, value: Double, unit: WeightUnit) {
@@ -124,6 +126,7 @@ final class FlowData {
 
     /// Reads a PR screenshot into the PRs, in stages (PhotoReader); true when it found any.
     func readPRs(_ image: UIImage) async -> Bool {
+        DataCleanup.mergeDuplicatePRs(in: context)
         let read = await PhotoReader.prs(image, unit: unit, consent: askCloudConsent)
         lastRead = (kind: ReadResult.Kind.prs, stage: read.stage, milliseconds: read.milliseconds)
         var entries = read.entries
@@ -177,12 +180,14 @@ final class FlowData {
         guard let workout else { return nil }
         let blocks = workout.blocks
         let plan = Planner.plan(blocks: blocks, gym: gym, records: records)
-        let records = plan.setRecords
         let letters = Array("ABCDEFGH")
-        return plan.lifts.prefix(4).enumerated().map { index, lift in
+        // Every lift; the board shows three and "…" (FlowBoard).
+        return plan.lifts.enumerated().map { index, lift in
             let reps = lift.sets.map(\.reps)
             var format = Set(reps).count == 1 ? "\(reps.count) × \(reps[0])" : reps.map(String.init).joined(separator: "-")
-            if let pct = records.first(where: { $0.blockIndex == index && !$0.isWarmUp })?.pctText, !pct.isEmpty { format += " @ \(pct)" }
+            // A climb reads as its range, "6 × 1 @ 60–80%", not just its first set's 60%.
+            let pct = FlowBoard.percentText(lift.sets.map(\.target))
+            if !pct.isEmpty { format += " @ \(pct)" }
             let load = lift.sets.first.map { plan.displayTotal($0) } ?? ""
             return FlowBoardLine(title: "\(letters[min(index, 7)]). \(lift.name.uppercased())", format: format, load: "→ \(load)")
         }

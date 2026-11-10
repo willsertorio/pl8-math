@@ -107,10 +107,16 @@ extension Flow {
         let restSize: Float = 0.85, bookRestY: Float = 0.64, roomRestBack: Float = 0.3
         // Eight PRs a page; a page turns on the spine with the finger (beta, 2026-11-09).
         var pages = NotebookPages.split(data.prRows), page = 0
-        let book = build(FlowProps.notebook(title: "MY PRs", rows: pages[0]))
+        // No label on the cover: "My PRs" is written under it (Will, 2026-11-10).
+        let book = build(FlowProps.notebook(title: "", rows: pages[0]))
         let leafHinge = build(FlowProps.notebookLeaf())
         leafHinge.isEnabled = false
         book.addChild(leafHinge)
+        // Pages already turned lie on the left, ruled (they showed the cover's black inside: Will, 2026-11-10).
+        let turnedLeaf = build(FlowProps.notebookLeaf())
+        turnedLeaf.orientation = simd_quatf(angle: -(NotebookPages.turnedAngle + 0.02), axis: [0, 1, 0])
+        turnedLeaf.isEnabled = false
+        book.addChild(turnedLeaf)
         let paintPage = { [weak self] (index: Int) in
             self?.repaint(book, part: "page", with: .notebookPage(pages[index], page: index, pages: pages.count))
         }
@@ -120,8 +126,9 @@ extension Flow {
         book.orientation = simd_quatf(angle: -0.25, axis: [1, 0, 0])
         let hinge = book.findEntity(named: "hinge")
         let pen = build(FlowProps.pencil())
-        pen.position = [0.55, 0.36, 0.34]
-        pen.orientation = Flow.quaternion([0.5, 0, -0.95])
+        // Lying above the open notebook, point to the left, clear of the page that turns (Will, 2026-11-10).
+        pen.position = [0.02, 1.44, 0.3]
+        pen.orientation = Flow.quaternion([0.25, 0, -1.63])
         pen.scale = SIMD3(repeating: 0.0001)
         // Gym: the current gym's room; inside, the row of gyms with an empty cube at the end.
         let gyms = data.gyms
@@ -168,6 +175,8 @@ extension Flow {
             switch keys[a] {
             case "prs":
                 hinge?.orientation = simd_quatf(angle: -2.95 * e, axis: [0, 1, 0])
+                // The turned pages close with the cover.
+                turnedLeaf.orientation = simd_quatf(angle: -(NotebookPages.turnedAngle + 0.02) * e, axis: [0, 1, 0])
                 book.orientation = Flow.quaternion([-0.25 + 0.15 * e, 0.18 * (1 - e), 0])
                 book.scale = SIMD3(repeating: restSize + (0.7 - restSize) * e)
                 book.position.x = 0.37 * e
@@ -371,6 +380,7 @@ extension Flow {
                 pages = NotebookPages.split(self.data.prRows)
                 page = 0
                 paintPage(0)
+                turnedLeaf.isEnabled = false
                 self.shine([book], duration: 0.7)
                 self.sparkles(at: wrappers[1].position + [0.4, 0.9, 0.4], count: 5, spread: 1)
             })
@@ -420,6 +430,8 @@ extension Flow {
             let shown = forward ? page : page - 1
             self.repaint(leafHinge, part: "leafFront", with: .notebookPage(pages[shown], page: shown, pages: pages.count))
             if forward { paintPage(page + 1) }
+            // Turning back to the first page: nothing is left lying on the left.
+            if !forward && page == 1 { turnedLeaf.isEnabled = false }
             setLeaf(0)
             leafHinge.isEnabled = true
             self.click(1.8)
@@ -431,6 +443,7 @@ extension Flow {
                 guard let self else { return }
                 if complete { page += turnForward ? 1 : -1; self.buzz(.selection) }
                 paintPage(page)
+                turnedLeaf.isEnabled = page > 0
                 // The page under it is drawn first, then the leaf goes.
                 self.later(0.05) { leafHinge.isEnabled = false }
             })
